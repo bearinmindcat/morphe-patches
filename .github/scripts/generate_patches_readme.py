@@ -3,9 +3,8 @@
 Generates the patches section of README.md from patches-list.json
 and injects it between <!-- PATCHES_START --> / <!-- PATCHES_END --> markers.
 
-Spoilers are expanded (open by default) if:
-  1. Total patch count <= AUTO_EXPAND_THRESHOLD.
-  2. The README marker explicitly says: <!-- PATCHES_START EXPANDED -->
+Spoilers are collapsed by default. They are expanded (open) only when the
+README marker explicitly says: <!-- PATCHES_START EXPANDED -->
 
 python3 generate_patches_readme.py <owner/repo> <branch> [patches-list.json] [README.md]
 """
@@ -40,6 +39,26 @@ with open(json_path, encoding="utf-8") as f:
 def pkg_emoji(pkg):
     """Return a standard package emoji regardless of the package name."""
     return "📦"
+
+
+# Apps this bundle renames, rendered as "<source app>  →  <patched app>" in the
+# spoiler summary instead of the generic 📦 label. The patched name comes from a
+# patch option, not from patches-list.json, so it is declared here.
+APP_RENAMES = {
+    "com.google.android.apps.maps": (
+        '<img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps',
+        '<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps',
+    ),
+}
+
+
+def pkg_label(pkg, entry):
+    """Spoiler label for one app."""
+    pair = APP_RENAMES.get(pkg)
+    if pair:
+        src, dst = pair
+        return f"{src}&nbsp;&nbsp;-&gt;&nbsp;&nbsp;{dst}"
+    return f"{entry['emoji']} {entry['name']}"
 
 # Group patches by package; patches with no compatiblePackages are universal.
 # JSON structure: compatiblePackages is a list of objects with
@@ -77,7 +96,7 @@ def anchor(name):
 def patches_table(patches):
     """Render a sorted markdown table of patches with name, description, and options."""
     rows = [
-        "| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |",
+        "| Patch | Description | Options |",
         "|----------|----------------|-----------|",
     ]
     for p in sorted(patches, key=lambda x: x["name"]):
@@ -94,35 +113,30 @@ def patches_table(patches):
     return "\n".join(rows)
 
 
-def versions_table(targets):
-    """Render a markdown table of supported versions.
-    Experimental versions get a 🧪 prefix.
-    Versions with a description get it shown in a second row below.
+def versions_line(targets):
+    """Render supported versions inline, after the label, rather than as a table.
+    Experimental versions are marked, and any per-version description follows it.
     """
     if not targets:
         return ""
 
-    cells = []
+    parts = []
     for t in targets:
-        ver   = t["version"]
+        ver = t["version"]
         if ver is None:
             continue
-        label = f"🧪&nbsp;{ver}" if t.get("isExperimental") else ver
-        cells.append(label)
+        label = ver
+        if t.get("isExperimental"):
+            label += " (experimental)"
+        desc = (t.get("description") or "").replace("\n", " ").strip()
+        if desc:
+            label += f" — {desc}"
+        parts.append(label)
 
-    if not cells:
+    if not parts:
         return ""
 
-    header = "| " + " | ".join(cells) + " |"
-    sep = "| " + " | ".join(":---:" for _ in cells) + " |"
-    rows = [header, sep]
-
-    # Optional description row — only rendered if at least one target has one
-    descs = [(t.get("description") or "").replace("\n", "<br>") for t in targets]
-    if any(descs):
-        rows.append("| " + " | ".join(descs) + " |")
-
-    return "\n".join(rows)
+    return "**Supported version(s):** " + ", ".join(parts)
 
 
 def spoiler(label, count, targets, tbl, expanded=False):
@@ -130,8 +144,8 @@ def spoiler(label, count, targets, tbl, expanded=False):
     If expanded=True, the spoiler is open by default (for repos with few patches).
     """
     noun = "patch" if count == 1 else "patches"
-    vtbl = versions_table(targets)
-    versions_section = f"**🎯 Supported versions:**\n\n{vtbl}\n\n" if vtbl else ""
+    vline = versions_line(targets)
+    versions_section = f"{vline}\n\n" if vline else ""
     tag = "<details open>" if expanded else "<details>"
     return f"""{tag}
 <summary>{label}&nbsp;&nbsp;•&nbsp;&nbsp;{count} {noun}</summary>
@@ -144,16 +158,17 @@ def spoiler(label, count, targets, tbl, expanded=False):
 
 def build_content(expanded=False):
     """Build the full generated patches section."""
+    total_noun = "patch" if total == 1 else "patches"
     lines = [
         f"> **[v{ver}](https://github.com/{owner}/{repo}/releases/tag/v{ver})**"
         f"&nbsp;&nbsp;•&nbsp;&nbsp;`{branch}`&nbsp;&nbsp;•&nbsp;&nbsp;"
-        f"{total} patches total"
+        f"{total} {total_noun} total"
     ]
 
     # One spoiler per app, in the order they appear in the JSON
     for pkg, entry in by_pkg.items():
         patches = list(entry["patches"].values())
-        label   = f"{entry['emoji']} {entry['name']}"
+        label   = pkg_label(pkg, entry)
         lines.append(spoiler(label, len(patches), entry["targets"], patches_table(patches), expanded))
         lines.append("")
 
@@ -199,17 +214,13 @@ if not marker_match or END_MARKER not in readme:
 
 actual_start = marker_match.group(0)
 
-# Auto-expand threshold
-AUTO_EXPAND_THRESHOLD = 20
-
-# Spoilers are expanded if:
-# 1. Total patch count is small (≤ AUTO_EXPAND_THRESHOLD)
-#    with only a few patches where collapsing adds no benefit.
-# 2. The README marker explicitly requests it: <!-- PATCHES_START EXPANDED -->
-expanded = (
-    total <= AUTO_EXPAND_THRESHOLD or
-    "EXPANDED" in actual_start
-)
+# Spoilers are expanded only when the README marker explicitly requests it:
+# <!-- PATCHES_START EXPANDED -->
+#
+# Upstream also auto-expanded any list of <= 20 patches, which meant a small
+# bundle could not be collapsed at all. We always want the compact list, so
+# the marker is now the only thing that decides.
+expanded = "EXPANDED" in actual_start
 
 generated  = build_content(expanded=expanded)
 

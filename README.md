@@ -1,91 +1,61 @@
-# 👋🧩 Morphe Patches template
+<h1><img width="100" src="docs/icons/bear.png" alt="bearinmind patches" align="absmiddle"> bearinmind patches</h1>
 
-Template repository for Morphe Patches.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Built for Morphe](https://img.shields.io/badge/Built%20for-Morphe-1E5AA8?style=flat-square)](https://morphe.software)
 
-## ❓ About
+I'll continue to support patches for apps I use & apps that I get requests for (either for specific features or premium unlocking). Below is a short description of how to install my patches on morphe!
 
-Patches for apps I like.
+Install Morphe Manager if you have not yet: https://morphe.software
 
-<!-- TODO: Update this about section with a brief introduction/summary about this repo and what it offers. -->
+[Click here to add bearinmind patches to Morphe Manager](https://morphe.software/add-source?github=bearinmindcat/morphe-patches)
 
-### How to use these patches
+Select the app you want to patch inside Morphe Manager, follow all instructions shown.
 
-Click here to add these patches to Morphe: https://morphe.software/add-source?github=xyz-user/xyz-patches
+## Patches
 
-## 🩹 Patches list
+<!-- PATCHES_START -->
+> **[v0.0.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v0.0.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;24 patches total
+<details>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;24 patches</summary>
+<br>
 
-<!-- PATCHES_START EXPANDED -->
+**Supported version(s):** 26.36.04.973607363
 
-<!-- Do not modify this section by hand. The patch list is generated when release.yml creates a new release.
-     
-     If you wish for the patches list to be collapsed, then remove the word 'EXPANDED' from the comment tag above.
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Black theme](#black-theme) | AMOLED-black theme. Pins Maps' own dark mode and its separate navigation colour scheme, and remaps colour resources, drawable fills and draw-time paints so no surface is left grey. |  |
+| [Blue pin](#blue-pin) | Chromium-coloured flat map pin on the launcher icon, every in-app product logo, and the search bar's leading icon. |  |
+| [Bypass Play Services checks](#bypass-play-services-checks) | Maps' bundled signature verification and availability check always report success, so the app runs re-signed and with Google Play services disabled or absent. |  |
+| [Change app name](#change-app-name) | Sets the launcher and in-app app name. | • App name |
+| [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. | • Package name |
+| [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet, hosting the toggles below. |  |
+| [Hide ads](#hide-ads) | Hides promoted map pins and "Sponsored" search result rows. |  |
+| [Hide explore feed](#hide-explore-feed) | Hides the home tab's Explore feed sheet ("Local vibe"). |  |
+| [Hide navigation tabs](#hide-navigation-tabs) | Hides the Explore / Contribute / You strip at the bottom of the home screen. |  |
+| [Hide section title](#hide-section-title) | Removes the "More from this app" label from the account sheet. |  |
+| [Hide sign-in button](#hide-sign-in-button) | Removes the "Sign in" pill from the account sheet entirely. |  |
+| [Keep account sheet open](#keep-account-sheet-open) | Returning from Settings or Customization no longer dismisses the account sheet underneath. |  |
+| [Legacy icon](#legacy-icon) | Restores the pre-2025 flat pin launcher icon, lifted from an older Maps APK at build time. | • Source APK |
+| [Location provider toggle](#location-provider-toggle) | Adds a "Google Play location" switch. Off uses Android's own location providers only. |  |
+| [Network location fallback](#network-location-fallback) | Keeps the network (Wi-Fi/cell) provider registered when no Play services fused provider answers, so a fix does not go stale indoors. |  |
+| [Rectangle shapes](#rectangle-shapes) | Squares off rounded corners across the UI, including the two round navigation controls whose face is a bitmap rather than a radius. |  |
+| [Remove login promo](#remove-login-promo) | Drops the first-launch "Make it your map" page. |  |
+| [Remove sign-in promo](#remove-sign-in-promo) | Removes the search screen's "Tired of typing?" card. |  |
+| [Remove telemetry](#remove-telemetry) | Kills the Firebase Installations registration, the gmscompliance check-in and the ad-impression beacons. |  |
+| [Restore map data](#restore-map-data) | Spoofs the package and certificate gRPC headers and stops the remaining identity check from crashing the app, so tiles, search and routing work on a re-signed build. |  |
+| [Sign-in toast](#sign-in-toast) | The "Sign in" pill shows a "Can't sign in" toast instead of failing silently. |  |
+| [Trim account menu](#trim-account-menu) | Removes Your Timeline, Location sharing, Your data in Maps and Help & feedback from the account sheet. |  |
+| [Your profile toast](#your-profile-toast) | Tapping "Your profile" shows a "Can't sign in" toast instead of opening nothing. |  |
+| [Zoom controls in navigation](#zoom-controls-in-navigation) | Adds +, − and reset tiles during turn-by-turn that change the navigation zoom while the camera keeps following the car. |  |
 
-     If you wish to manually keep this list updated then remove the PATCHES_START and PATCHES_END 
-     comment blocks entirely. -->
-
-#### A list of your patches will automatically be shown here after your first patches release is created.
-
-&nbsp;
-
-## 🚀 Getting development started
-
-To start using this template, follow these steps:
-
-1. [Setup](https://github.com/MorpheApp/morphe-documentation/blob/main/docs/morphe-development/README.md) your development environment including adding a GitHub PAT as described [here](https://github.com/MorpheApp/morphe-patcher/blob/main/docs/2_1_setup.md#-prepare-the-environment).
-2. [Create a new repository using this template](https://github.com/new?template_name=morphe-patches-template&template_owner=MorpheApp). Select create a new repository, and **enable 'Include all branches'** 
-3. Enable "Allow GitHub Actions to create and approve pull requests" in your repo Settings > Actions > General > Workflow permissions
-4. Update the [build.gradle.kts](patches/build.gradle.kts) file (Specifically, the 
-   [group of the project](patches/build.gradle.kts#L1), and the [About](patches/build.gradle.kts#L6-L11))
-5. Update the [README.md](README.md) file to be specific of your repo, and update the links in the [issue templates](.github/ISSUE_TEMPLATE).
-6. Choose a name for your patches project. Keep in mind you must use a name that does not 
-   imply authorship by the Morphe open source project. If unsure, then simply name these
-   patches after yourself ("UserXYZ Morphe patches"). See the [NOTICE](NOTICE) for details. 
-7. (Optional): Add `patches-bundle.png` to the project if you want a custom icon to show in
-   Morphe Manager instead of your GitHub profile avatar.
-
-🎉 You are now ready to start creating patches!
-
-## 🧑‍💻 Dev usage
-
-To develop and release your Patches using this template:
-
-- **Make all changes to the `dev` branch.**
-- For local development work build your patches using the gradle task `./gradlew buildAndroid` to generate the mpp file found in `patches/build/libs/patches-*.mpp`. Apply your patches locally using Morphe Desktop tool like any other patch bundle.
-- Always use [Semantic commit](https://kapeli.com/cheat_sheets/Semantic_Commits.docset/Contents/Resources/Documents/index) messages for commits. To keep it simple use only 3 commit message types: 
-  - `feat: Added a new feature`
-  - `fix: Some problem now fixed`
-  - `chore: Random change you do not want in the user facing changelog`
-- Commits of `fix:` and `feat:` will automatically generate new pre-releases and `chore:` will not create a new release.
-- Users can apply your dev branch releases by enabling `pre-release` in Morphe Manager patch sources.
-- When your dev branch is ready, and you want a stable release, merge dev branch to main (do not squash, and only merge).
-- **Always use semantic release (release.yml)**. Do not manually upload or create releases by hand
-  because many files must be updated and release.yml handles everything.
-
-## 🤓 Tips
-- See the [patcher documentation](https://github.com/MorpheApp/morphe-patcher/blob/main/docs/1_patcher_intro.md) for more examples of creating patches and fingerprints.
-- Do not use AI to create new release scripts. The `release.yml` here already handles everything.
-  If you need omething custom with your releases then modify the existing `release.yml`
-  and `.releaserc` instead of writing everything new from scratch.
-- Do not manually edit or manually commit any generated files such as: `patches-list.json`,
-  `patches-bundle.json`, `CHANGELOG.md`.  These files will be automatically updated by `release.yml`.
-- Do not force push any semantic release commits as that will break all future releases.
-  If you need to fix a broken release, it's always easiest to create a new release instead of 
-  fixing an existing release.
-
-
-<!-- The patches end tag is intentionally placed here so the first release will clean up 
-     this readme of all developer instructions above. -->
+</details>
 <!-- PATCHES_END -->
 
-### 🛠️ Building locally
+## Building
 
-- Run `./gradlew buildAndroid`
-- The built patches .mpp file is found in `patches/build/libs/patches-*.mpp`
-- Patch the mpp file using [Morphe-Desktop](https://github.com/MorpheApp/morphe-desktop)
-  like any other patch bundle.
+To build bearinmind patches, follow the [Morphe documentation](https://github.com/MorpheApp/morphe-documentation).
 
-See the [Morphe documentation](https://github.com/MorpheApp/morphe-documentation) for more information.
+## Want more patches & features?
 
-## 📜 License
+Open up an issue request and I'll do my best to fulfil your feature ideas for any specific apps you ask for, I enjoy working on random things so just ask!
 
-UserXYZ Patches are licensed under the [GNU General Public License v3.0](LICENSE)
