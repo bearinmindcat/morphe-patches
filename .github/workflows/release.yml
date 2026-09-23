@@ -12,6 +12,11 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+      # @semantic-release/github touches issues and PRs after publishing; without
+      # these it fails with "Resource not accessible by integration" and the run
+      # goes red even though the release itself succeeded.
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,6 +49,12 @@ jobs:
 
       - name: Attest
         if: steps.release.outputs.new_release_published == 'true'
+        # Build provenance cannot be persisted for user-owned PRIVATE repos:
+        # "Feature not available for user-owned private repositories." It runs
+        # after the release is already published, so a failure here costs
+        # nothing but turns the whole run red. This starts working by itself
+        # once the repo is public.
+        continue-on-error: true
         uses: actions/attest-build-provenance@v4
         with:
           subject-name: 'Morphe Patches ${{ steps.release.outputs.new_release_git_tag }}'

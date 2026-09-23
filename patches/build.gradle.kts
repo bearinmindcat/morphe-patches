@@ -1,14 +1,13 @@
-group = "app.template"
+group = "org.ungoogled"
 
 patches {
-    // TODO: Update this section with your project details.
     about {
-        name = "UserXYZ Patches"
-        description = "Patches for apps I like"
-        source = "git@github.com:UserXYZ/morphe-patches.git"
-        author = "Awesome dev"
-        contact = "na"
-        website = "na"
+        name = "bearinmind patches"
+        description = "Ungoogled Maps: de-Googling, privacy and UI patches for Google Maps."
+        source = "git@github.com:bearinmindcat/morphe-patches.git"
+        author = "bearinmindcat"
+        contact = "https://github.com/bearinmindcat"
+        website = "https://github.com/bearinmindcat/morphe-patches"
         license = "GPLv3"
     }
 }
