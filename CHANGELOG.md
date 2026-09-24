@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.2...v1.0.3) (2026-09-24)
+
+### 🐛 Bug Fixes
+
+* android api as default location source ([154342a](https://github.com/bearinmindcat/morphe-patches/commit/154342a46b4503ae8cbbdd1988813e00557f462d))
+
 ## [1.0.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.1...v1.0.2) (2026-09-24)
 
 ### 🐛 Bug Fixes
