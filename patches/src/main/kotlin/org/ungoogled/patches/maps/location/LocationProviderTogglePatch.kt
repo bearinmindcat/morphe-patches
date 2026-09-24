@@ -26,7 +26,7 @@ val locationProviderTogglePatch = bytecodePatch(
 
     val useFusedProvider = booleanOption(
         key = "useFusedProvider",
-        default = true,
+        default = false,
         title = "Default to Play services location",
         description = "The location source Maps starts with. On: Google Play services' fused provider " +
             "whenever Play services is installed and enabled, Android's own providers otherwise. Off: " +
