@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "patches": [
     {
       "name": "Better offline maps",
@@ -187,7 +187,7 @@
           "description": "The package name to install under. Must be a valid Android package name.",
           "required": true,
           "type": "kotlin.String",
-          "default": "org.ungoogled.maps",
+          "default": "org.ungoogled.android.apps.maps",
           "values": null
         }
       ]

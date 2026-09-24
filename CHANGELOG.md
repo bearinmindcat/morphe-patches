@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.1...v1.0.2) (2026-09-24)
+
+### 🐛 Bug Fixes
+
+* update package name ([ce3a6dd](https://github.com/bearinmindcat/morphe-patches/commit/ce3a6dd1ff263625affec38fabe6140b24dd248b))
+
 ## [1.0.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.0...v1.0.1) (2026-09-24)
 
 ### 🐛 Bug Fixes
