@@ -94,5 +94,20 @@ val restoreMapDataPatch = bytecodePatch(
             if (instructions[increment].opcode != Opcode.ADD_INT_LIT8) throw PatchException("property binder's try range is no longer followed by the loop increment")
             implementation!!.replaceInstruction(handler, BuilderInstruction10t(Opcode.GOTO, implementation!!.newLabelForIndex(increment)))
         }
+
+        // 4. The API key. Maps reads it from the manifest of the package the
+        //    X-Android-Package getter names -- Google's, after step 1 -- so it was
+        //    really reading stock Maps' manifest, and with stock Maps not installed
+        //    the lookup threw and the app died on start. Read it from the app's own
+        //    manifest instead, as unpatched Maps does: same key, no dependency on
+        //    stock Maps. Inserted ahead of the method's monitor-enter, where p1 is
+        //    still the Context (the method reuses that register right after).
+        ApiKeyReaderFingerprint.method.addInstructions(
+            0,
+            """
+                invoke-virtual { p1 }, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+                move-result-object p2
+            """,
+        )
     }
 }

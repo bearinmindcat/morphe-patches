@@ -87,3 +87,15 @@ internal object ViewPropertyBinderFingerprint : Fingerprint(
     ),
     custom = { method, _ -> method.parameterTypes.size == 4 && method.parameterTypes[3] == "I" },
 )
+
+/**
+ * The bundled Maps SDK's API key reader: getApplicationInfo(package, GET_META_DATA)
+ * and the key from that package's manifest meta-data, with a NameNotFoundException
+ * rethrown as an AssertionError. Maps passes it the package name from the same
+ * getter that supplies X-Android-Package. The error string occurs once in the APK.
+ */
+internal object ApiKeyReaderFingerprint : Fingerprint(
+    returnType = "Ljava/lang/String;",
+    parameters = listOf("Landroid/content/Context;", "Ljava/lang/String;"),
+    filters = listOf(string("API key not found.  Check that <meta-data android:name=\"")),
+)
