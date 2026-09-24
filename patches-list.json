@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "patches": [
     {
       "name": "Better offline maps",
@@ -157,8 +157,8 @@
     },
     {
       "name": "Change package name",
-      "description": "Installs alongside stock Google Maps under its own package name.",
-      "default": false,
+      "description": "Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy.",
+      "default": true,
       "category": null,
       "dependencies": [],
       "compatiblePackages": [
@@ -187,7 +187,7 @@
           "description": "The package name to install under. Must be a valid Android package name.",
           "required": true,
           "type": "kotlin.String",
-          "default": "org.ungoogled.android.apps.maps",
+          "default": "org.ungoogled.maps",
           "values": null
         }
       ]

@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.0...v1.0.1) (2026-09-24)
+
+### 🐛 Bug Fixes
+
+* install alongside stock google maps by default ([c5ff618](https://github.com/bearinmindcat/morphe-patches/commit/c5ff6183a80a35b391201d1435f096b638d9c8df))
+
 ## 1.0.0 (2026-09-24)
 
 ### ✨ New Features
