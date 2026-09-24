@@ -29,6 +29,7 @@ private val rectangleShapesResourcePatch = resourcePatch(
         val res = this["res"]
         val dirs = res.listFiles()!!.filter { it.isDirectory && !ShapeResources.isGenerated(it) }
         var dimens = 0; var styles = 0; var drawables = 0; var masks = 0
+        val maskDensities = mutableMapOf<String, MutableSet<String>>()
         for (dir in dirs) {
             val out = File(res, ShapeResources.qualified(dir.name, ShapeResources.RECT))
             when {
@@ -53,6 +54,7 @@ private val rectangleShapesResourcePatch = resourcePatch(
                             out.mkdirs()
                             File(out, file.name).writeBytes(ShapeResources.squareMask(file.readBytes()))
                             masks++
+                            maskDensities.getOrPut(dir.name) { mutableSetOf() } += file.name
                         }
                     }
                 }
@@ -63,8 +65,12 @@ private val rectangleShapesResourcePatch = resourcePatch(
         if (dimens < 50 || styles < 50 || drawables < 50) {
             throw PatchException("only $dimens dimens, $styles styles, $drawables drawables had corners to square")
         }
-        if (masks != FAB_MASKS.size) throw PatchException("found $masks of the ${FAB_MASKS.size} navigation button masks")
-        Logger.getLogger("RectangleShapes").info("Rectangle shapes: $dimens dimens, $styles styles, $drawables drawables, $masks masks")
+        // Each mask once per screen density it ships in: splits pulled from a phone
+        // carry one density, an APK bundle from a download site carries them all.
+        // All that matters is that both were found at least once.
+        val missing = FAB_MASKS.filter { name -> maskDensities.values.none { name in it } }
+        if (missing.isNotEmpty()) throw PatchException("navigation button masks not found: $missing")
+        Logger.getLogger("RectangleShapes").info("Rectangle shapes: $dimens dimens, $styles styles, $drawables drawables, $masks masks in ${maskDensities.size} densities")
     }
 }
 
