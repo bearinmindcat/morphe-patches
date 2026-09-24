@@ -1,3 +1,9 @@
+## [1.0.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.3...v1.0.4) (2026-09-24)
+
+### 🐛 Bug Fixes
+
+* fixed crash when stock maps was not installed, maps api now targets changed package name ([c769d38](https://github.com/bearinmindcat/morphe-patches/commit/c769d3812fe9b3ee48da93f304d1c0aa9c3cb420))
+
 ## [1.0.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.2...v1.0.3) (2026-09-24)
 
 ### 🐛 Bug Fixes
