@@ -60,6 +60,29 @@ def pkg_label(pkg, entry):
         return f"{src}&nbsp;&nbsp;-&gt;&nbsp;&nbsp;{dst}"
     return f"{entry['emoji']} {entry['name']}"
 
+
+# Screenshots for an app live in docs/screenshots/<packageName>/ and are shown in
+# one row at the top of its spoiler, in file-name order. The alt text is the file
+# name without its numeric prefix ("2-customization.png" -> "Customization").
+SCREENSHOT_DIR = Path("docs/screenshots")
+SCREENSHOT_TYPES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def screenshots_row(pkg):
+    """One row of screenshots for an app, or "" when it has none."""
+    folder = SCREENSHOT_DIR / pkg
+    if not folder.is_dir():
+        return ""
+    files = sorted(p for p in folder.iterdir() if p.suffix.lower() in SCREENSHOT_TYPES)
+    if not files:
+        return ""
+    width = f"{100 // len(files) - 1}%"
+    imgs = []
+    for p in files:
+        alt = re.sub(r"^\d+[-_]", "", p.stem).replace("-", " ").replace("_", " ").capitalize()
+        imgs.append(f'<img src="{p.as_posix()}" width="{width}" alt="{alt}" title="{alt}">')
+    return "<p>\n" + "\n".join(imgs) + "\n</p>"
+
 # Group patches by package; patches with no compatiblePackages are universal.
 # JSON structure: compatiblePackages is a list of objects with
 # { packageName, name, targets: [{ version, isExperimental, description }] }
@@ -139,19 +162,21 @@ def versions_line(targets):
     return "**Supported version(s):** " + ", ".join(parts)
 
 
-def spoiler(label, count, targets, tbl, expanded=False):
+def spoiler(label, count, targets, tbl, expanded=False, shots=""):
     """Wrap a patches table in a <details> spoiler with a versions sub-table.
     If expanded=True, the spoiler is open by default (for repos with few patches).
+    Screenshots, when given, come first, above the versions line.
     """
     noun = "patch" if count == 1 else "patches"
     vline = versions_line(targets)
     versions_section = f"{vline}\n\n" if vline else ""
+    shots_section = f"{shots}\n\n" if shots else ""
     tag = "<details open>" if expanded else "<details>"
     return f"""{tag}
 <summary>{label}&nbsp;&nbsp;•&nbsp;&nbsp;{count} {noun}</summary>
 <br>
 
-{versions_section}{tbl}
+{shots_section}{versions_section}{tbl}
 
 </details>"""
 
@@ -169,7 +194,8 @@ def build_content(expanded=False):
     for pkg, entry in by_pkg.items():
         patches = list(entry["patches"].values())
         label   = pkg_label(pkg, entry)
-        lines.append(spoiler(label, len(patches), entry["targets"], patches_table(patches), expanded))
+        lines.append(spoiler(label, len(patches), entry["targets"], patches_table(patches), expanded,
+                             screenshots_row(pkg)))
         lines.append("")
 
     # Universal patches (no specific app)
