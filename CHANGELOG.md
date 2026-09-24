@@ -1,3 +1,9 @@
+## [1.0.5](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.4...v1.0.5) (2026-09-24)
+
+### 🐛 Bug Fixes
+
+* fixed misc patching error with shapes ([14cf6cf](https://github.com/bearinmindcat/morphe-patches/commit/14cf6cf57fde7b23835b9f7002c13bbf2bbd95eb))
+
 ## [1.0.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.0.3...v1.0.4) (2026-09-24)
 
 ### 🐛 Bug Fixes
