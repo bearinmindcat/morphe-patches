@@ -47,18 +47,25 @@ private fun Document.elements(tag: String): List<Element> =
  * Maps' code: none of those 19 name this app's own components -- they are an
  * internal account type, action names and lists of other apps -- and the
  * authorities and aliases the code does use are built from getPackageName().
+ *
+ * On by default: stock Maps comes built into most phones, signed by Google, so a
+ * patched copy under the stock package name cannot install at all -- Morphe
+ * Manager's Simple mode would only offer to uninstall stock Maps, which merely
+ * rolls it back to the built-in version. The default name is deliberately not
+ * the shell tooling's org.ungoogled.android.apps.maps, so both builds can sit
+ * side by side.
  */
 @Suppress("unused")
 val changePackageNamePatch = resourcePatch(
     name = "Change package name",
-    description = "Installs alongside stock Google Maps under its own package name.",
-    default = false,
+    description = "Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy.",
+    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 
     val packageName = stringOption(
         key = "packageName",
-        default = "org.ungoogled.android.apps.maps",
+        default = "org.ungoogled.maps",
         title = "Package name",
         description = "The package name to install under. Must be a valid Android package name.",
         required = true,
