@@ -1573,6 +1573,7 @@ public final class Shapes {
         for (android.view.View root : roots) {
             if (!(root instanceof android.view.ViewGroup) || !root.isShown()) continue;
             if (root.getClass().getName().indexOf("Popup") >= 0) continue;
+            if (PowerSaving.isMinModeWindow(root)) continue;  // the power saving screen has its own nav_container
             try {
                 float d = root.getResources().getDisplayMetrics().density;
                 int shortEdge = Math.min(root.getWidth(), root.getHeight());
