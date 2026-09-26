@@ -80,6 +80,7 @@ public final class Shapes {
     public static boolean locationSourcePatched() { return false; }
     public static boolean proxyPatched() { return false; }
     public static boolean betterOfflinePatched() { return false; }
+    public static boolean powerSavingPatched() { return false; }
     /** Location provider toggle's option: rewritten to return true when it defaults to Play services. */
     public static boolean playLocationByDefault() { return false; }
 

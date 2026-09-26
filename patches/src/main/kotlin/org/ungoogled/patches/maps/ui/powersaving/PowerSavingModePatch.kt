@@ -2,13 +2,16 @@ package org.ungoogled.patches.maps.ui.powersaving
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.string
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
@@ -45,17 +48,21 @@ val powerSavingModePatch = bytecodePatch(
     name = "Power saving mode",
     description = "Brings the Pixel-only power saving mode to every phone: while driving with navigation, " +
         "press the power button and Maps shows only key information such as the next turn on a black " +
-        "screen. Turn it on or off in Settings > Navigation > Power saving mode.",
+        "screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it " +
+        "built in keep Google's own version unless Customization > Power saving mode is turned on.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch)
 
     execute {
+        markPatched("powerSavingPatched")
+
         // 1. Availability. Maps offers the feature only when a server flag is on AND
         //    Pixel's SystemUI has min mode; exactly one method asks both, and it is the
         //    only caller of the device check. Answering yes there shows the setting and
-        //    registers the listener that arms min mode when navigation starts.
+        //    registers the listener that arms min mode when navigation starts. The
+        //    extension answers first, and a "no" from it runs Google's own check.
         val check = MinModeDeviceCheckFingerprint.method
         val callers = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
         classDefForEach { classDef ->
@@ -74,13 +81,25 @@ val powerSavingModePatch = bytecodePatch(
             ?: throw PatchException("expected one caller of the min-mode device check, found ${callers.size}")
         mutableClassDefBy(ownerType).methods
             .single { it.name == availability.name && it.parameterTypes == availability.parameterTypes }
-            .addInstructions(
-                0,
-                """
-                    const/4 v0, 0x1
-                    return v0
-                """,
-            )
+            .apply {
+                // v0 must be a local, not a parameter: the original code runs after it.
+                // Static, so the parameters are all there is (wide ones take two registers).
+                val impl = implementation!!
+                val parameterRegisters = parameterTypes.size + parameterTypes.count { it == "J" || it == "D" }
+                if (impl.registerCount - parameterRegisters < 1) {
+                    throw PatchException("min-mode availability check has no free local register")
+                }
+                addInstructionsWithLabels(
+                    0,
+                    """
+                        invoke-static {}, $POWER_SAVING->forceAvailable()Z
+                        move-result v0
+                        if-eqz v0, :google_check
+                        return v0
+                    """,
+                    ExternalLabel("google_check", impl.instructions.first()),
+                )
+            }
 
         // 2. Arming. Let the extension know, so it can take SystemUI's part: open the
         //    power saving screen when the power button turns the screen off.

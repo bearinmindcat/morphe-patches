@@ -27,10 +27,18 @@ import java.util.WeakHashMap;
  *
  * On a Pixel, while navigating with Power saving mode on, Maps hands the power
  * button to SystemUI (aghj.O(true): "minModeOn" plus a binder, written into
- * com.android.systemui.minmode.minmodeprovider). On the next power press SystemUI
- * puts the display into its low-power min mode and starts Maps' own
- * MinModeActivity over the lock screen. Other phones have no such SystemUI: the
- * provider calls fail silently and the power button just turns the screen off.
+ * com.android.systemui.minmode.minmodeprovider), and SystemUI answers the next
+ * power press by starting Maps' own MinModeActivity over the lock screen. Other
+ * phones have no such SystemUI: the provider calls fail silently and the power
+ * button just turns the screen off.
+ *
+ * A phone whose SystemUI has min mode built in (nativeMinMode: the same
+ * config_minmode_enabled check Maps makes) always keeps its own, and this class
+ * stays out of the way there. The Customization switch "Power saving mode"
+ * (allPhones) decides the rest: on, Maps offers the setting whatever
+ * Google's server flag and the phone say (forceAvailable) and, on a phone without
+ * built-in min mode, this class does SystemUI's part. It defaults to on, except
+ * on a phone with built-in min mode, which stays exactly as Google ships it.
  *
  * This stands in for SystemUI. While Maps says min mode is armed, the power button
  * opens MinModeActivity, which wakes the screen over the lock screen and keeps it
@@ -63,29 +71,72 @@ public final class PowerSaving {
 
     private PowerSaving() {}
 
+    public static final String KEY_ALL_PHONES = "power_saving_all_phones";
+    private static volatile Boolean nativeMinMode;
+
+    /** SystemUI has min mode built in (a Pixel): Maps' own device check, abmz.a(). Read once. */
+    public static boolean nativeMinMode(Context c) {
+        Boolean known = nativeMinMode;
+        if (known != null) return known;
+        boolean has = false;
+        try {
+            android.content.res.Resources res = c.createPackageContext("com.android.systemui", 0).getResources();
+            int id = res.getIdentifier("config_minmode_enabled", "bool", "com.android.systemui");
+            has = id != 0 && res.getBoolean(id);
+        } catch (Throwable ignored) {}
+        nativeMinMode = has;
+        return has;
+    }
+
+    /** The Customization switch. Unset, it is on everywhere but on a phone with built-in min mode. */
+    public static boolean allPhones(Context c) {
+        return Shapes.powerSavingPatched()
+                && c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ALL_PHONES, !nativeMinMode(c));
+    }
+
+    public static void setAllPhones(Context c, boolean on) {
+        c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ALL_PHONES, on).commit();
+    }
+
+    /**
+     * Asked first by Maps' availability check (abvx.z): true makes Maps offer the
+     * setting and arm min mode on this phone; false leaves Google's own answer,
+     * which is a server flag AND nativeMinMode.
+     */
+    public static boolean forceAvailable() {
+        Context app = application();
+        return app != null && allPhones(app);
+    }
+
+    /** This class does SystemUI's part: switched on, and SystemUI cannot do it itself. */
+    static boolean standIn(Context c) {
+        return allPhones(c) && !nativeMinMode(c);
+    }
+
     /**
      * aghj.O: Maps arms min mode when navigation starts with Power saving mode on,
      * and disarms it when navigation ends, the setting is turned off, or the app
-     * goes into a split-screen or freeform window.
+     * goes into a split-screen or freeform window. On a phone with built-in min
+     * mode, SystemUI has just been armed by Maps itself and nothing happens here.
      */
     public static void armed(boolean on) {
-        armed = on;
         try {
             Context app = application();
             if (app == null) return;
+            armed = on && standIn(app);
             synchronized (PowerSaving.class) {
-                trackLifecycle(app);
-                if (on && screenOff == null) {
+                if (armed) trackLifecycle(app);
+                if (armed && screenOff == null) {
                     screenOff = new ScreenOff();
                     // SCREEN_OFF is a protected system broadcast: no exported flag needed.
                     app.registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
-                } else if (!on && screenOff != null) {
+                } else if (!armed && screenOff != null) {
                     try { app.unregisterReceiver(screenOff); } catch (Throwable ignored) {}
                     screenOff = null;
                 }
             }
             // The navigation screen is already up when Maps arms, so Front has not seen it.
-            if (on) new Handler(Looper.getMainLooper()).post(new WatchWindows());
+            if (armed) new Handler(Looper.getMainLooper()).post(new WatchWindows());
         } catch (Throwable ignored) {}
     }
 
@@ -152,13 +203,17 @@ public final class PowerSaving {
     /**
      * Start of MinModeActivity.onCreate: what Pixel's SystemUI does for it --
      * over the lock screen, screen woken on launch and kept on while it shows.
+     * Where SystemUI opened it itself, it gets nothing from here: SystemUI looks
+     * after the screen on those phones.
      */
     public static void onMinModeCreate(Activity a) {
         try {
+            // Recorded on every phone: the navigation zoom tiles skip this window on a Pixel too.
+            minModeWindow = new WeakReference<>(a.getWindow().getDecorView());
+            if (!standIn(a)) return;
             a.setShowWhenLocked(true);
             a.setTurnScreenOn(true);
             a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            minModeWindow = new WeakReference<>(a.getWindow().getDecorView());
             trackLifecycle(a.getApplicationContext());
             minModeLast = true;
         } catch (Throwable ignored) {}
