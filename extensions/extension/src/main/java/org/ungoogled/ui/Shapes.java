@@ -1431,7 +1431,7 @@ public final class Shapes {
         // between the speed badge and the turn card -- measured: the "+" tile
         // drew ON TOP of the card. Side by side it is 46dp tall and clears it.
         boolean land = decor.getWidth() > decor.getHeight();
-        android.widget.LinearLayout col = new android.widget.LinearLayout(ctx);
+        ClipColumn col = new ClipColumn(ctx);
         col.setOrientation(land ? android.widget.LinearLayout.HORIZONTAL
                                 : android.widget.LinearLayout.VERTICAL);
         // minus on the left reading left-to-right, plus above reading bottom-up:
@@ -1492,6 +1492,7 @@ public final class Shapes {
         lp.leftMargin = left; lp.bottomMargin = bottom;
         decor.addView(col, lp);
         navTiles = col;
+        watchCovers(decor);
         navLandscape = land;
         navAttachTries = 0;   // so a LATER attach (rotation -> new decor) waits for the badge too
         if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM tiles attached at left=" + left + " bottom=" + bottom
@@ -1501,6 +1502,7 @@ public final class Shapes {
 
     /** Remove the tiles but keep navZoom and NAV_CAM, so the held zoom survives. */
     static void hideTiles() {
+        unwatchCovers();
         android.view.View t = navTiles;
         navTiles = null;
         if (t == null) return;
@@ -1536,6 +1538,7 @@ public final class Shapes {
     }
 
     static void detachTiles() {
+        unwatchCovers();
         android.view.View t = navTiles;
         navTiles = null;
         if (t == null) return;
@@ -1548,6 +1551,110 @@ public final class Shapes {
         speedUnit = null;        // a static View reference would pin the Activity
         navAttachTries = 0;
         NAV_CAM = null;          // blyt.k() republishes on the next session
+    }
+
+    // ---- Maps' panels slide over its own controls; ours sit on the window's top layer ----------------
+    // Navigation's trip sheet pulled up covers Maps' speedometer and buttons, but left our tiles floating
+    // on top of it (reported with the sheet up). The tiles cannot sit inside Maps' layout (its view DSL
+    // throws foreign children out), so they act covered instead: frame by frame they are drawn, and take
+    // taps, only above the top edge of a panel sliding over them -- the sheet sits over them as it does
+    // over Maps' search and compass buttons.
+    private static final java.util.List<java.lang.ref.WeakReference<android.view.View>> coverViews = new java.util.ArrayList<>();
+    private static java.lang.ref.WeakReference<android.view.ViewGroup> coverDecor = new java.lang.ref.WeakReference<>(null);
+    private static android.view.ViewTreeObserver.OnPreDrawListener coverWatch;
+
+    /** The tiles' column: drawn and touchable only above [visible] px from its top (-1 = all of it). */
+    static final class ClipColumn extends android.widget.LinearLayout {
+        int visible = -1;
+
+        ClipColumn(Context c) { super(c); }
+
+        /** A touch on the covered part belongs to the panel over it, which Android offers it to next. */
+        @Override public boolean dispatchTouchEvent(android.view.MotionEvent e) {
+            if (visible >= 0 && e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN && e.getY() >= visible) return false;
+            return super.dispatchTouchEvent(e);
+        }
+    }
+
+    private static void watchCovers(android.view.ViewGroup decor) {
+        unwatchCovers();
+        coverWatch = () -> { coverCheck(); return true; };
+        decor.getViewTreeObserver().addOnPreDrawListener(coverWatch);
+        coverDecor = new java.lang.ref.WeakReference<>(decor);
+        findCovers(decor);
+    }
+
+    private static void unwatchCovers() {
+        android.view.ViewGroup d = coverDecor.get();
+        if (d != null && coverWatch != null) {
+            try { d.getViewTreeObserver().removeOnPreDrawListener(coverWatch); } catch (Throwable t) { }
+        }
+        coverWatch = null;
+        coverDecor = new java.lang.ref.WeakReference<>(null);
+        coverViews.clear();
+    }
+
+    /** From the ticker: the panels that could slide over the tiles -- a painted background, at least a
+     *  third of the window wide and a sixth tall, and not the window itself (the map, its frames). */
+    static void findCovers(android.view.ViewGroup decor) {
+        coverViews.clear();
+        int w = decor.getWidth(), h = decor.getHeight();
+        if (w > 0 && h > 0) collectCovers(decor, w, h, new int[2]);
+    }
+
+    private static void collectCovers(android.view.View v, int w, int h, int[] at) {
+        if (v == navTiles || v.getVisibility() != android.view.View.VISIBLE) return;
+        android.graphics.drawable.Drawable bg = v.getBackground();
+        if (bg != null && v.getWidth() >= w * 0.3f && v.getHeight() >= h / 6f && painted(bg)) {
+            v.getLocationOnScreen(at);
+            boolean window = at[1] <= h * 0.05f && v.getHeight() >= h * 0.9f;
+            if (!window) {
+                coverViews.add(new java.lang.ref.WeakReference<>(v));
+                if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM cover candidate " + v.getClass().getName()
+                        + " at " + at[0] + "," + at[1] + " " + v.getWidth() + "x" + v.getHeight());
+            }
+        }
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) collectCovers(g.getChildAt(i), w, h, at);
+        }
+    }
+
+    /** A background that paints something: not a see-through colour, not a bare touch ripple. */
+    private static boolean painted(android.graphics.drawable.Drawable bg) {
+        if (bg instanceof android.graphics.drawable.ColorDrawable) {
+            return android.graphics.Color.alpha(((android.graphics.drawable.ColorDrawable) bg).getColor()) >= 128;
+        }
+        if (bg instanceof android.graphics.drawable.RippleDrawable) {
+            android.graphics.drawable.RippleDrawable r = (android.graphics.drawable.RippleDrawable) bg;
+            for (int i = 0; i < r.getNumberOfLayers(); i++) if (r.getId(i) != android.R.id.mask) return true;
+            return false;
+        }
+        return bg.getAlpha() > 0;
+    }
+
+    /** Every frame: cut the tiles off at the top edge of any of those panels lying over them. */
+    private static void coverCheck() {
+        if (!(navTiles instanceof ClipColumn)) return;
+        ClipColumn tiles = (ClipColumn) navTiles;
+        if (tiles.getWidth() == 0) return;
+        int[] at = new int[2];
+        tiles.getLocationOnScreen(at);
+        int left = at[0], top = at[1], right = left + tiles.getWidth(), bottom = top + tiles.getHeight();
+        int edge = Integer.MAX_VALUE;
+        for (java.lang.ref.WeakReference<android.view.View> r : coverViews) {
+            android.view.View v = r.get();
+            if (v == null || !v.isShown() || v.getAlpha() < 0.5f) continue;
+            v.getLocationOnScreen(at);
+            if (at[0] + v.getWidth() <= left || at[0] >= right) continue;   // not across the column
+            if (at[1] + v.getHeight() <= top || at[1] >= bottom) continue;  // not down over it
+            edge = Math.min(edge, at[1]);
+        }
+        int visible = edge == Integer.MAX_VALUE ? -1 : Math.max(0, edge - top);
+        if (visible == tiles.visible) return;
+        tiles.visible = visible;
+        tiles.setClipBounds(visible < 0 ? null : new android.graphics.Rect(0, 0, tiles.getWidth(), visible));
+        if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM tiles " + (visible < 0 ? "clear" : "covered below " + visible + "px"));
     }
 
     /** One second tick: show the tiles only while the navigation screen is up. */
@@ -1583,6 +1690,7 @@ public final class Shapes {
                         navTiles = null;                    // keep navZoom: the override still stands
                     }
                     attachTiles(decor);
+                    if (navTiles != null) findCovers(decor);
                 } else if (navTiles != null) {
                     // Guidance still live but no usable window = picture-in-picture:
                     // take the tiles away without dropping the user's zoom, so it
