@@ -1348,10 +1348,10 @@ public final class Shapes {
 
     /** LayoutParams with the leading margin that produces our visible gap.
      *  A helper, not an anonymous subclass: d8 NPEs on anonymous classes here. */
-    static android.widget.LinearLayout.LayoutParams lmargin(int side, int gap, boolean horizontal) {
+    static android.widget.LinearLayout.LayoutParams lmargin(int side, int gap) {
         android.widget.LinearLayout.LayoutParams p =
                 new android.widget.LinearLayout.LayoutParams(side, side);
-        if (horizontal) p.leftMargin = gap; else p.topMargin = gap;
+        p.topMargin = gap;
         return p;
     }
 
@@ -1418,86 +1418,164 @@ public final class Shapes {
         int gap    = Math.max(0, vgap - 2 * pad);              // margin -> that visible gap
         android.view.View label = findSpeedBadge(decor);   // first: it sets speedUnit, which tile() reads
         android.view.View badge = label == null ? null : badgeCard(label, decor);
+        // LANDSCAPE puts the column beside Maps' own buttons down the right-hand
+        // side instead: reset level with the compass, + with search, - with
+        // sound. On the left there is only ~100dp between the speed badge and
+        // the turn card, so a column there drew over the card, and the row that
+        // replaced it hung into the display-cutout band (both measured).
+        boolean land = decor.getWidth() > decor.getHeight();
+        int[] beside = land ? besideStack(decor, side) : null;
         // The badge is what we position against AND what tells us the colour
         // scheme, and it is not necessarily laid out on the tick that first sees
         // nav_container. Give it a few seconds rather than silently settling for
-        // the guessed position and the wrong colours.
+        // the guessed position and the wrong colours -- and in landscape Maps'
+        // buttons the same.
         boolean haveCached = lastLeft >= 0 && lastBottom > 0;
-        if ((label == null || decor.getHeight() <= 0) && !haveCached && navAttachTries < 5) {
+        boolean waitBadge = (label == null || decor.getHeight() <= 0) && !haveCached;
+        if ((waitBadge || (land && beside == null)) && navAttachTries < 5) {
             navAttachTries++; return;
         }
-        // LANDSCAPE lays the pair out side by side. Stacked, the column is
-        // 2*46+10 = 102dp tall, and in landscape there is only about 100dp
-        // between the speed badge and the turn card -- measured: the "+" tile
-        // drew ON TOP of the card. Side by side it is 46dp tall and clears it.
-        boolean land = decor.getWidth() > decor.getHeight();
         ClipColumn col = new ClipColumn(ctx);
-        col.setOrientation(land ? android.widget.LinearLayout.HORIZONTAL
-                                : android.widget.LinearLayout.VERTICAL);
-        // minus on the left reading left-to-right, plus above reading bottom-up:
-        // either way "+" is the one nearer the top/right, as on Maps' own controls
+        col.setOrientation(android.widget.LinearLayout.VERTICAL);
         android.view.View plus  = tile(ctx, "+", +1f),
                           minus = tile(ctx, "\u2212", -1f),
                           reset = tile(ctx, null, 0f);        // null glyph -> the drawn ResetIcon
-        // Portrait reads top-to-bottom reset / + / -, landscape is that same
-        // order laid out bottom-to-top, i.e. - / + / reset left to right, so the
-        // two orientations stay consistent with each other.
-        if (land) {
-            col.addView(minus, new android.widget.LinearLayout.LayoutParams(side, side));
-            col.addView(plus,  lmargin(side, gap, true));
-            col.addView(reset, lmargin(side, gap, true));
-        } else {
-            col.addView(reset, new android.widget.LinearLayout.LayoutParams(side, side));
-            col.addView(plus,  lmargin(side, gap, false));
-            col.addView(minus, lmargin(side, gap, false));
-        }
+        // Top to bottom reset / + / -: "+" is the one nearer the top, as on Maps' own controls
+        col.addView(reset, new android.widget.LinearLayout.LayoutParams(side, side));
+        col.addView(plus,  lmargin(side, gap));
+        col.addView(minus, lmargin(side, gap));
 
         android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.START;
-        // LEFT is a fixed 16dp gutter, NOT taken from the badge. findSpeedBadge
-        // returns the parent of the "mph" label, and which view that is depends
-        // on what the badge is currently showing -- with the speed-limit sign up
-        // it can be an inner container indented well inside the card. Measured:
-        // the badge card's own left edge is 16dp, exactly this gutter, so this
-        // is both the correct alignment and a stable one. Observed failure: a
-        // re-attach mid-navigation landed the column at left=158 instead of 42.
-        int left = gutter - pad, bottom = Math.round(150f * d);
-        int step = side + gap;                               // one row of the grid
-        if (badge != null && decor.getHeight() > 0) {
-            int[] at = new int[2]; badge.getLocationOnScreen(at);
-            // at[1] is the badge's VIEW top, which carries the same transparent
-            // mask padding our own views do -- so the margin between the two
-            // VIEW boxes that yields a 21dp visible gap is `gap`, not
-            // `vgap - pad`. Getting that wrong sat the column ~14px high and is
-            // why its rows did not line up with the stack opposite.
-            int b = decor.getHeight() - at[1] + gap;
-            int lo = Math.round(80f * d), hi = Math.round(decor.getHeight() * 0.7f);
-            if (b >= lo && b <= hi) bottom = b;
+        if (land) {
+            if (beside == null) beside = besideGuess(decor, side);
+            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.LEFT;
+            lp.leftMargin = beside[0]; lp.topMargin = beside[1];
+        } else {
+            lp.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.START;
+            // LEFT is a fixed 16dp gutter, NOT taken from the badge. findSpeedBadge
+            // returns the parent of the "mph" label, and which view that is depends
+            // on what the badge is currently showing -- with the speed-limit sign up
+            // it can be an inner container indented well inside the card. Measured:
+            // the badge card's own left edge is 16dp, exactly this gutter, so this
+            // is both the correct alignment and a stable one. Observed failure: a
+            // re-attach mid-navigation landed the column at left=158 instead of 42.
+            int left = gutter - pad, bottom = Math.round(150f * d);
+            int step = side + gap;                               // one row of the grid
+            if (badge != null && decor.getHeight() > 0) {
+                int[] at = new int[2]; badge.getLocationOnScreen(at);
+                // at[1] is the badge's VIEW top, which carries the same transparent
+                // mask padding our own views do -- so the margin between the two
+                // VIEW boxes that yields a 21dp visible gap is `gap`, not
+                // `vgap - pad`. Getting that wrong sat the column ~14px high and is
+                // why its rows did not line up with the stack opposite.
+                int b = decor.getHeight() - at[1] + gap;
+                int lo = Math.round(80f * d), hi = Math.round(decor.getHeight() * 0.7f);
+                if (b >= lo && b <= hi) bottom = b;
+            }
+            // Phase-lock onto Maps' own button stack so the two columns share rows.
+            // Only the phase is taken, not the row index: we do not need to know
+            // which button was found, just where its grid falls.
+            android.view.View fab = findNavFab(decor);
+            if (fab != null && fab.getHeight() > 0 && step > 0) {
+                int[] fat = new int[2]; fab.getLocationOnScreen(fat);
+                int colTop = decor.getHeight() - bottom - (3 * side + 2 * gap);
+                int delta = ((fat[1] - colTop) % step + step) % step;
+                if (delta > step / 2) delta -= step;             // nearest row, either way
+                if (Math.abs(delta) <= gap) bottom -= delta;     // only a nudge, never a jump
+            }
+            if (badge == null && haveCached) { left = lastLeft; bottom = lastBottom; }
+            if (badge != null && (left != lastLeft || bottom != lastBottom)) savePlacement(ctx, left, bottom);
+            lastLeft = left; lastBottom = bottom;
+            lp.leftMargin = left; lp.bottomMargin = bottom;
         }
-        // Phase-lock onto Maps' own button stack so the two columns share rows.
-        // Only the phase is taken, not the row index: we do not need to know
-        // which button was found, just where its grid falls.
-        android.view.View fab = land ? null : findNavFab(decor);
-        if (fab != null && fab.getHeight() > 0 && step > 0) {
-            int[] fat = new int[2]; fab.getLocationOnScreen(fat);
-            int colTop = decor.getHeight() - bottom - (3 * side + 2 * gap);
-            int delta = ((fat[1] - colTop) % step + step) % step;
-            if (delta > step / 2) delta -= step;             // nearest row, either way
-            if (Math.abs(delta) <= gap) bottom -= delta;     // only a nudge, never a jump
-        }
-        if (badge == null && haveCached) { left = lastLeft; bottom = lastBottom; }
-        if (badge != null && (left != lastLeft || bottom != lastBottom)) savePlacement(ctx, left, bottom);
-        lastLeft = left; lastBottom = bottom;
-        lp.leftMargin = left; lp.bottomMargin = bottom;
         decor.addView(col, lp);
         navTiles = col;
         watchCovers(decor);
         navLandscape = land;
         navAttachTries = 0;   // so a LATER attach (rotation -> new decor) waits for the badge too
-        if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM tiles attached at left=" + left + " bottom=" + bottom
-                + (land ? " landscape/side-by-side" : " portrait/stacked")
-                + (badge == null ? " (no speed badge found, using fallback)" : " (above the speed badge)"));
+        if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM tiles attached at left=" + lp.leftMargin
+                + (land ? " top=" + lp.topMargin + " landscape, beside Maps' buttons"
+                        : " bottom=" + lp.bottomMargin
+                          + (badge == null ? " (no speed badge found, using fallback)" : " (above the speed badge)")));
+    }
+
+    /** Landscape: where the column goes -- one column in from Maps' own buttons down the
+     *  right-hand side (compass, search, sound), row for row, the faces as far apart across as
+     *  they are down (Maps' grid: 56dp faces 21dp apart). {left, top} in the decor, or null
+     *  while those buttons are not laid out. */
+    static int[] besideStack(android.view.ViewGroup decor, int side) {
+        android.graphics.Rect top = findNavStack(decor);
+        if (top == null) return null;
+        int step = Math.round((FACE_DP + 21f) * decor.getResources().getDisplayMetrics().density);
+        int left = top.centerX() - step - side / 2, y = top.centerY() - side / 2;
+        return left < 0 || y < 0 ? null : new int[] { left, y };
+    }
+
+    /** Those buttons not found: where they would put the column. Maps keeps them ~20dp in from
+     *  the right of its content (measured); the height is a guess, which repositionTiles()
+     *  corrects as soon as they turn up. */
+    static int[] besideGuess(android.view.ViewGroup decor, int side) {
+        float d = decor.getResources().getDisplayMetrics().density;
+        int right = decor.getWidth(), top = 0;
+        try {
+            android.view.WindowInsets wi = decor.getRootWindowInsets();
+            if (wi != null) {
+                android.graphics.Insets in = wi.getInsets(android.view.WindowInsets.Type.systemBars()
+                        | android.view.WindowInsets.Type.displayCutout());
+                right -= in.right; top = in.top;
+            }
+        } catch (Throwable t) { }
+        int cx = right - Math.round((20f + FACE_DP / 2f) * d), cy = top + Math.round((24f + FACE_DP / 2f) * d);
+        int step = Math.round((FACE_DP + 21f) * d);
+        return new int[] { Math.max(0, cx - step - side / 2), Math.max(0, cy - side / 2) };
+    }
+
+    /** Maps' buttons down the right-hand side, found by shape: idOf() is 0 for every name on a
+     *  merged install (names stripped). The biggest set of squares the size of Maps' nav buttons
+     *  sharing one left edge, right of the middle and above the trip sheet; their top one, in the
+     *  decor. Null until at least two are laid out. */
+    static android.graphics.Rect findNavStack(android.view.ViewGroup decor) {
+        java.util.List<android.graphics.Rect> sq = new java.util.ArrayList<>();
+        int[] o = new int[2];
+        decor.getLocationOnScreen(o);
+        int size = Math.round(MASK_DP * decor.getResources().getDisplayMetrics().density);
+        collectSquares(decor, size, decor.getWidth(), decor.getHeight(), o, sq);
+        android.graphics.Rect best = null;
+        int most = 1;
+        for (android.graphics.Rect r : sq) {
+            int n = 0;
+            android.graphics.Rect top = r;
+            for (android.graphics.Rect s : sq) {
+                if (Math.abs(s.left - r.left) > 4) continue;
+                n++;
+                if (s.top < top.top) top = s;
+            }
+            // a button's own inner view makes a second, narrower column: the rightmost wins a tie,
+            // and either gives the same centres
+            if (n > most || (n == most && best != null && top.left > best.left)) { most = n; best = top; }
+        }
+        return best;
+    }
+
+    private static void collectSquares(android.view.View v, int size, int w, int h, int[] o,
+                                       java.util.List<android.graphics.Rect> out) {
+        if (v == navTiles || v.getVisibility() != android.view.View.VISIBLE || v.getAlpha() < 0.1f) return;
+        int vw = v.getWidth(), vh = v.getHeight();
+        if (Math.abs(vw - size) <= size / 6 && Math.abs(vh - vw) <= size / 16) {
+            int[] at = new int[2];
+            v.getLocationOnScreen(at);
+            int x = at[0] - o[0], y = at[1] - o[1];
+            if (x + vw / 2 > w / 2 && y + vh < h * 0.8f) {
+                boolean seen = false;          // a button and a view filling it share one box
+                for (android.graphics.Rect s : out) seen |= Math.abs(s.left - x) <= 2 && Math.abs(s.top - y) <= 2;
+                if (!seen) out.add(new android.graphics.Rect(x, y, x + vw, y + vh));
+            }
+        }
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) collectSquares(g.getChildAt(i), size, w, h, o, out);
+        }
     }
 
     /** Remove the tiles but keep navZoom and NAV_CAM, so the held zoom survives. */
@@ -1518,6 +1596,16 @@ public final class Shapes {
      *  position we guessed from the cache was wrong. */
     static void repositionTiles(android.view.ViewGroup decor) {
         try {
+            if (navLandscape) {            // follow Maps' buttons, e.g. when the turn card grows
+                int[] at = besideStack(decor, tileSide(decor.getContext()));
+                android.view.ViewGroup.LayoutParams lp0 = navTiles.getLayoutParams();
+                if (at == null || !(lp0 instanceof android.widget.FrameLayout.LayoutParams)) return;
+                android.widget.FrameLayout.LayoutParams lp = (android.widget.FrameLayout.LayoutParams) lp0;
+                if (Math.abs(lp.leftMargin - at[0]) <= 2 && Math.abs(lp.topMargin - at[1]) <= 2) return;
+                lp.leftMargin = at[0]; lp.topMargin = at[1];
+                navTiles.setLayoutParams(lp);
+                return;
+            }
             android.view.View lbl = findSpeedBadge(decor);
             if (lbl == null || decor.getHeight() <= 0) return;
             android.view.View card = badgeCard(lbl, decor);
@@ -1647,7 +1735,10 @@ public final class Shapes {
             if (v == null || !v.isShown() || v.getAlpha() < 0.5f) continue;
             v.getLocationOnScreen(at);
             if (at[0] + v.getWidth() <= left || at[0] >= right) continue;   // not across the column
-            if (at[1] + v.getHeight() <= top || at[1] >= bottom) continue;  // not down over it
+            // Only a panel coming up from underneath counts: one reaching past the column's foot.
+            // What the column merely sits on ends above that -- landscape's turn card, under the
+            // reset tile as it is under Maps' compass.
+            if (at[1] >= bottom || at[1] + v.getHeight() < bottom) continue;
             edge = Math.min(edge, at[1]);
         }
         int visible = edge == Integer.MAX_VALUE ? -1 : Math.max(0, edge - top);
