@@ -91,6 +91,8 @@ final class SavedStore {
             p.reviews = o.optInt("reviews", 0);
             p.lat = o.optDouble("lat");
             p.lng = o.optDouble("lng");
+            checkCoordinates(p.lat, p.lng);
+            if (Float.isInfinite(p.rating)) throw new IllegalArgumentException("Invalid rating");
             p.added = o.optLong("added", System.currentTimeMillis());
             JSONArray l = o.optJSONArray("lists");
             if (l != null) for (int i = 0; i < l.length(); i++) p.lists.add(l.optString(i));
@@ -107,6 +109,7 @@ final class SavedStore {
     }
 
     private static boolean loaded;
+    private static Exception loadError;
     /** List id -> name, in display order. */
     static final Map<String, String> lists = new LinkedHashMap<>();
     /** Key -> place, newest last. */
@@ -120,15 +123,32 @@ final class SavedStore {
     static synchronized void load(Context c) {
         if (loaded) return;
         loaded = true;
-        lists.clear();
-        places.clear();
-        labels.clear();
-        home = work = null;
+        loadError = null;
+        clearState();
         try {
             File f = new File(c.getFilesDir(), FILE);
             if (f.exists()) read(new JSONObject(readAll(new java.io.FileInputStream(f))), true);
-        } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            clearState();
+            loadError = e;
+            warnSave(c, "Saved places could not be read; the original file has been preserved");
+        }
         ensureDefaultLists();
+    }
+
+    private static void clearState() {
+        lists.clear(); places.clear(); labels.clear(); home = work = null;
+    }
+
+    static void checkCoordinates(double lat, double lng) {
+        if (!Double.isFinite(lat) || !Double.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new IllegalArgumentException("Missing or invalid place coordinates");
+        }
+    }
+
+    static void warnSave(Context c, String message) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(c, message, android.widget.Toast.LENGTH_LONG).show());
     }
 
     static boolean isDefault(String id) {
@@ -180,12 +200,24 @@ final class SavedStore {
 
     static synchronized void save(Context c) {
         try {
-            File tmp = new File(c.getFilesDir(), FILE + ".tmp");
-            try (OutputStream out = new FileOutputStream(tmp)) {
-                out.write(toJson().toString(1).getBytes(StandardCharsets.UTF_8));
-            }
-            if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
-        } catch (Throwable ignored) {}
+            saveChecked(c);
+        } catch (Exception e) {
+            warnSave(c, "Saved places could not be saved: " + e.getMessage());
+        }
+    }
+
+    private static void saveChecked(Context c) throws Exception {
+        if (loadError != null) throw new java.io.IOException("The saved places file could not be read; refusing to overwrite it", loadError);
+        byte[] data = toJson().toString(1).getBytes(StandardCharsets.UTF_8);
+        File tmp = new File(c.getFilesDir(), FILE + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
+            out.write(data);
+            out.getFD().sync();
+        }
+        if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) {
+            tmp.delete();
+            throw new java.io.IOException("Could not replace the saved places file");
+        }
     }
 
     static synchronized JSONObject toJson() throws Exception {
@@ -407,23 +439,33 @@ final class SavedStore {
             if (in == null) throw new java.io.IOException("cannot read " + from);
             text = readAll(in);
         }
-        int before;
         synchronized (SavedStore.class) {
-            before = places.size();
+            load(c);
+            if (loadError != null) throw new java.io.IOException("Cannot import until the saved places file can be read", loadError);
+            int before = places.size();
+            JSONObject previous = toJson();
             String t = text.trim();
-            if (t.startsWith("{")) {
-                JSONObject root = new JSONObject(t);
-                if (root.has("places") || root.has("lists")) read(root, false);
-                else importGeoJson(root);
-                JSONArray history = root.optJSONArray("history");
+            try {
+                JSONArray history = null;
+                if (t.startsWith("{")) {
+                    JSONObject root = new JSONObject(t);
+                    history = root.optJSONArray("history");
+                    if (history != null) HistoryStore.validateImport(history);
+                    if (root.has("places") || root.has("lists")) read(root, false);
+                    else importGeoJson(root);
+                } else {
+                    importKml(c, t);
+                }
+                ensureDefaultLists();
+                saveChecked(c);
                 if (history != null) HistoryStore.merge(c, history);
-            } else {
-                importKml(c, t);
+            } catch (Exception e) {
+                clearState();
+                read(previous, true);
+                throw e;
             }
-            ensureDefaultLists();
+            return places.size() - before;
         }
-        save(c);
-        return places.size() - before;
     }
 
     private static void importGeoJson(JSONObject root) throws Exception {
@@ -437,6 +479,7 @@ final class SavedStore {
             Place p = new Place();
             p.lng = xy.getDouble(0);
             p.lat = xy.getDouble(1);
+            checkCoordinates(p.lat, p.lng);
             if (p.lat == 0 && p.lng == 0) continue;
             JSONObject props = f.optJSONObject("properties");
             String name = null;
@@ -482,6 +525,7 @@ final class SavedStore {
                         Place p = new Place();
                         p.lng = Double.parseDouble(xy[0]);
                         p.lat = Double.parseDouble(xy[1]);
+                        checkCoordinates(p.lat, p.lng);
                         p.name = name != null ? name : String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng);
                         p.added = System.currentTimeMillis();
                         String list = listForFolder(folder);
