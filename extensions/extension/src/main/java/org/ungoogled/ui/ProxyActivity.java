@@ -37,6 +37,7 @@ public final class ProxyActivity extends Activity {
     private int summary() { return dark ? SUMMARY_D : SUMMARY; }
 
     private Switch enable;
+    private boolean refreshingEnable;
     private String initial;          // the effective setting when the screen opened
     private TextView hostSub, portSub;
 
@@ -90,7 +91,7 @@ public final class ProxyActivity extends Activity {
         enable = new Switch(this);
         enable.setChecked(Shapes.proxyOn(this));
         body.addView(toggleRow("Enable proxy", null, enable));
-        enable.setOnCheckedChangeListener((CompoundButton b, boolean on) -> save());
+        enable.setOnCheckedChangeListener((CompoundButton b, boolean on) -> { if (!refreshingEnable) save(); });
 
         LinearLayout hostRow = rowBase("Proxy host", "None");
         hostSub = (TextView) ((LinearLayout) hostRow.getChildAt(0)).getChildAt(1);
@@ -109,7 +110,7 @@ public final class ProxyActivity extends Activity {
             // An engine in this process could not take the proxy (see CronetProxy): say so where it is set.
             TextView note = new TextView(this);
             note.setText("This phone's network engine (Play services' Cronet) is too old to use a proxy, "
-                    + "so most of Maps' traffic goes direct.");
+                    + "so its creation is blocked while the proxy is enabled.");
             note.setTextColor(summary());
             note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
             note.setPadding(dp(20), dp(16), dp(20), 0);
@@ -140,7 +141,17 @@ public final class ProxyActivity extends Activity {
     }
 
     private void save() {
-        Shapes.setProxyParts(this, enable.isChecked(), Shapes.proxyHost(this), Shapes.proxyPort(this));
+        saveParts(Shapes.proxyHost(this), Shapes.proxyPort(this));
+    }
+
+    private void saveParts(String host, int port) {
+        try {
+            Shapes.setProxyParts(this, enable.isChecked(), host, port);
+        } catch (IllegalArgumentException e) {
+            android.widget.Toast.makeText(this, e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            refreshingEnable = true;
+            try { enable.setChecked(Shapes.proxyOn(this)); } finally { refreshingEnable = false; }
+        }
         refresh();
     }
 
@@ -164,9 +175,9 @@ public final class ProxyActivity extends Activity {
                     if (numeric) {
                         int p = 0;
                         try { p = v.isEmpty() ? 0 : Integer.parseInt(v); } catch (Throwable ignored) {}
-                        Shapes.setProxyParts(this, enable.isChecked(), Shapes.proxyHost(this), p);
+                        saveParts(Shapes.proxyHost(this), p);
                     } else {
-                        Shapes.setProxyParts(this, enable.isChecked(), v, Shapes.proxyPort(this));
+                        saveParts(v, Shapes.proxyPort(this));
                     }
                     refresh();
                 })
