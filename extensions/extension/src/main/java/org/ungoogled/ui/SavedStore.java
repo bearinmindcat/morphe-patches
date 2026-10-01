@@ -154,6 +154,8 @@ final class SavedStore {
 
     /** Reads our own format; [replace] false merges into what is already there. */
     private static void read(JSONObject root, boolean replace) throws Exception {
+        // Only imports are untrusted network destinations; local store reloads keep their photos.
+        if (!replace) removeImportedPhotos(root);
         JSONArray l = root.optJSONArray("lists");
         if (l != null) for (int i = 0; i < l.length(); i++) {
             JSONObject o = l.getJSONObject(i);
@@ -424,6 +426,31 @@ final class SavedStore {
         }
         save(c);
         return places.size() - before;
+    }
+
+    private static void removeImportedPhotos(JSONObject root) {
+        for (String key : new String[]{"places", "history"}) {
+            JSONArray items = root.optJSONArray(key);
+            removeImportedPhotos(items);
+        }
+        removePhotoFields(root.optJSONObject("home"));
+        removePhotoFields(root.optJSONObject("work"));
+        JSONArray labels = root.optJSONArray("labels");
+        if (labels != null) for (int i = 0; i < labels.length(); i++) {
+            JSONObject label = labels.optJSONObject(i);
+            if (label != null) removePhotoFields(label.optJSONObject("place"));
+        }
+    }
+
+    private static void removePhotoFields(JSONObject place) {
+        if (place == null) return;
+        place.remove("photos");
+        place.remove("photo");
+    }
+
+    static void removeImportedPhotos(JSONArray items) {
+        if (items == null) return;
+        for (int i = 0; i < items.length(); i++) removePhotoFields(items.optJSONObject(i));
     }
 
     private static void importGeoJson(JSONObject root) throws Exception {
