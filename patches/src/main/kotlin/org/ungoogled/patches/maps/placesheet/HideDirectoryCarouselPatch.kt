@@ -1,28 +1,15 @@
 package org.ungoogled.patches.maps.placesheet
 
-import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.string
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
-import com.android.tools.smali.dexlib2.iface.reference.StringReference
-import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
-
-/**
- * The click handler of one directory-carousel card, the only code that opens the
- * "OnDirectoryCarouselItemClicked" trace section. Its class is the card's view model.
- */
-private object DirectoryCarouselItemClickFingerprint : Fingerprint(
-    filters = listOf(string("OnDirectoryCarouselItemClicked")),
-)
 
 /**
  * The header's carousel getter, `return shown ? holder.carousel : null`. Its only
@@ -48,25 +35,7 @@ val hideDirectoryCarouselPatch = bytecodePatch(
     execute {
         markPatched("hideDirectoryPatched")
 
-        // The place sheet header's view model is the one class that both mentions
-        // "GeospatialContent" (one other class does too) and unpacks directory cards.
-        val cardType = DirectoryCarouselItemClickFingerprint.method.definingClass
-        val headers = mutableListOf<String>()
-        classDefForEach { classDef ->
-            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
-            var geospatial = false
-            var cards = false
-            for (method in classDef.methods) {
-                for (insn in method.implementation?.instructions ?: continue) {
-                    val ref = (insn as? ReferenceInstruction)?.reference ?: continue
-                    if (ref is StringReference && ref.string == "GeospatialContent") geospatial = true
-                    if (insn.opcode == Opcode.CHECK_CAST && ref is TypeReference && ref.type == cardType) cards = true
-                }
-            }
-            if (geospatial && cards) headers += classDef.type
-        }
-        val header = headers.singleOrNull()
-            ?: throw PatchException("expected one place sheet header, found ${headers.size}")
+        val header = placeSheetHeaderType()
 
         // A null carousel is what the header gets for a place without a directory, so
         // the sheet lays out exactly as it does there. The Directory button is untouched.

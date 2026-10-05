@@ -82,6 +82,7 @@ public final class Shapes {
     public static boolean betterOfflinePatched() { return false; }
     public static boolean powerSavingPatched() { return false; }
     public static boolean hideDirectoryPatched() { return false; }
+    public static boolean hideAiPatched() { return false; }
     public static boolean highRefreshPatched() { return false; }
     public static boolean timelinePatched() { return false; }
     /** Location provider toggle's option: rewritten to return true when it defaults to Play services. */
@@ -95,6 +96,7 @@ public final class Shapes {
     public static volatile boolean HIDE_EXPLORE = hideExplorePatched();
     public static volatile boolean HIDE_TABS = hideTabsPatched();
     public static volatile boolean HIDE_DIRECTORY = hideDirectoryPatched();
+    public static volatile boolean HIDE_AI = hideAiPatched();
     /** Off by default, unlike the others: it costs battery. */
     public static volatile boolean HIGH_REFRESH = false;
     public static volatile boolean BETTER_OFFLINE = betterOfflinePatched();
@@ -215,6 +217,22 @@ public final class Shapes {
     public static void setHideDirectoryEnabled(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_HIDE_DIRECTORY, on).commit();
         HIDE_DIRECTORY = on && hideDirectoryPatched();
+    }
+
+    // ---- Hide AI ---------------------------------------------------------------
+    // Gemini's "Know before you go" card on place sheets and the review summary
+    // ("Summarized with Gemini") on the Reviews tab. Read every time a place sheet
+    // is bound, so a change needs no restart.
+
+    public static final String KEY_HIDE_AI = "hide_ai";
+
+    public static boolean hideAiEnabled(Context c) {
+        return hideAiPatched() && prefs(c).getBoolean(KEY_HIDE_AI, true);
+    }
+
+    public static void setHideAiEnabled(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_HIDE_AI, on).commit();
+        HIDE_AI = on && hideAiPatched();
     }
 
     // ---- 120 refresh rate ------------------------------------------------------
@@ -533,6 +551,7 @@ public final class Shapes {
             HIDE_EXPLORE = hideExploreEnabled(base);
             HIDE_TABS = hideTabsEnabled(base);
             HIDE_DIRECTORY = hideDirectoryEnabled(base);
+            HIDE_AI = hideAiEnabled(base);
             HIGH_REFRESH = highRefreshEnabled(base);
             SavedPlaces.track(base);
             BETTER_OFFLINE = betterOfflineEnabled(base);

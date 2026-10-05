@@ -186,6 +186,14 @@ public final class CustomizationActivity extends Activity {
             directory.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideDirectoryEnabled(this, on));
         }
 
+        if (Shapes.hideAiPatched()) {
+            Switch ai = new Switch(this);
+            ai.setChecked(Shapes.hideAiEnabled(this));
+            body.addView(toggleRow("Hide AI", null, ai));
+            // read each time a place sheet opens, so no restart
+            ai.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideAiEnabled(this, on));
+        }
+
         if (Shapes.betterOfflinePatched()) {
             Switch offline = new Switch(this);
             offline.setChecked(Shapes.betterOfflineEnabled(this));
