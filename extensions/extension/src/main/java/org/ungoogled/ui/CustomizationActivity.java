@@ -300,4 +300,23 @@ public final class CustomizationActivity extends Activity {
     }
 
     private int dp(int v) { return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()); }
+
+    /**
+     * The account sheet's "Customization" row: opens this screen and leaves the sheet open
+     * behind it (when Keep account sheet open is applied; otherwise the flag is unread).
+     * The row builder hands over its Activity, because the sheet calls row listeners with
+     * a null View.
+     */
+    public static final class Open implements View.OnClickListener {
+        private final android.content.Context context;
+
+        public Open(android.content.Context context) { this.context = context; }
+
+        @Override
+        public void onClick(View v) {
+            Shapes.SKIP_DISMISS = true;
+            context.startActivity(new android.content.Intent()
+                    .setClassName(context.getPackageName(), CustomizationActivity.class.getName()));
+        }
+    }
 }

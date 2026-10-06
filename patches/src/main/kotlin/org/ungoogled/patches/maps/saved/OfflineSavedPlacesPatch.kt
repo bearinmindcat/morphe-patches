@@ -315,7 +315,7 @@ val offlineSavedPlacesPatch = bytecodePatch(
                 for (m in c.methods) {
                     if (m.returnType != returnType || m.parameterTypes.map { it.toString() } != parameters) continue
                     val callsRow = m.implementation?.instructions?.any {
-                        ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r -> r.definingClass == "Lolr;" && r.name == "a" } == true
+                        ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r -> r.definingClass == "Lolr;" && r.name == "uaCustomizationRow" } == true
                     } == true
                     if (callsRow) found += c.type to m.name
                 }
@@ -327,7 +327,7 @@ val offlineSavedPlacesPatch = bytecodePatch(
             }
             val ins = method.implementation!!.instructions
             val call = ins.indexOfFirst {
-                ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r -> r.definingClass == "Lolr;" && r.name == "a" } == true
+                ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r -> r.definingClass == "Lolr;" && r.name == "uaCustomizationRow" } == true
             }
             val result = ins[call + 1]
             val add = ins[call + 2]
