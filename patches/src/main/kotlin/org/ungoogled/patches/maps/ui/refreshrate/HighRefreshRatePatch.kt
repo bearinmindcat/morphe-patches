@@ -10,8 +10,11 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.string
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
@@ -36,6 +39,14 @@ private object WindowRefreshCapFingerprint : Fingerprint(
             location = MatchAfterImmediately(),
         ),
     ),
+)
+
+/**
+ * The map's frame-rate controller: it hands a target to the old renderer's limiter or
+ * to the newer renderer, whichever is drawing. Found by its own log message.
+ */
+private object FrameRateControllerFingerprint : Fingerprint(
+    filters = listOf(string("Invalid parameter %s in setMinAdaptiveFrameRate.")),
 )
 
 /** The map renderer's frame limiter, found by its dump; its target-rate setter is in the same class. */
@@ -86,6 +97,48 @@ val highRefreshRatePatch = bytecodePatch(
             """
                 invoke-static/range { p1 .. p2 }, $REFRESH_RATE->map(J)J
                 move-result-wide p1
+            """,
+        )
+
+        // 3. Phones that Maps' servers put on its newer map renderer (GeoXP mapcore) get the
+        //    target as a field of that renderer's settings, and the setter above is never
+        //    called: the 30 fps navigation asks for went through untouched and the car and
+        //    camera moved at 30 fps (issue #21). Both renderers get their target from the
+        //    controller's int setter -- the one that calls the old limiter's setter.
+        val controller = FrameRateControllerFingerprint.originalMethod.definingClass
+        val target = mutableClassDefBy(controller).methods.filter { m ->
+            m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf("I") &&
+                m.implementation?.instructions?.any { insn ->
+                    ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                        r.definingClass == limiter && r.name == setter.name && r.parameterTypes.map { it.toString() } == listOf("J")
+                    } == true
+                } == true
+        }.singleOrNull() ?: throw PatchException("frame rate controller's target setter not found in $controller")
+        target.addInstructions(
+            0,
+            """
+                invoke-static { p1 }, $REFRESH_RATE->map(I)I
+                move-result p1
+            """,
+        )
+
+        // 4. Adaptive frame rate, which navigation turns on: frames are skipped until the
+        //    picture has moved about 1% of the screen, so the car and the camera's turns
+        //    stuttered at any target (issue #21). Its switch is the controller's boolean
+        //    setter, the one that stores into the old limiter (and into the newer
+        //    renderer's settings); RefreshRate.adaptive() keeps it off.
+        val adaptive = mutableClassDefBy(controller).methods.filter { m ->
+            m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf("Z") &&
+                m.implementation?.instructions?.any { insn ->
+                    insn.opcode == Opcode.IPUT_BOOLEAN &&
+                        ((insn as ReferenceInstruction).reference as FieldReference).definingClass == limiter
+                } == true
+        }.singleOrNull() ?: throw PatchException("frame rate controller's adaptive switch not found in $controller")
+        adaptive.addInstructions(
+            0,
+            """
+                invoke-static { p1 }, $REFRESH_RATE->adaptive(Z)Z
+                move-result p1
             """,
         )
     }
