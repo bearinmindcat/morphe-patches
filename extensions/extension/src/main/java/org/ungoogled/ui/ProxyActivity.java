@@ -8,7 +8,6 @@ import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.view.WindowInsets;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -61,8 +60,8 @@ public final class ProxyActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(bg());
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            android.graphics.Insets sb = insets.getInsets(WindowInsets.Type.systemBars());
-            v.setPadding(sb.left, sb.top, sb.right, sb.bottom);
+            int[] sb = Shapes.barInsets(insets, false);
+            v.setPadding(sb[0], sb[1], sb[2], sb[3]);
             return insets;
         });
 

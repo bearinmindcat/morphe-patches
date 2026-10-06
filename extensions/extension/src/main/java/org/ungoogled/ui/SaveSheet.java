@@ -234,9 +234,8 @@ final class SaveSheet {
         FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(-1, -1, Gravity.BOTTOM);
         root.addView(sheet, sl);
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            int top = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
-            int bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()
-                    | android.view.WindowInsets.Type.ime()).bottom;
+            int[] bars = Shapes.barInsets(insets, true);
+            int top = bars[1], bottom = bars[3];
             // Maps' sheet stops 8 dp under the status bar and runs down behind the navigation bar.
             if (sl.topMargin != top + dp(8)) {
                 sl.topMargin = top + dp(8);

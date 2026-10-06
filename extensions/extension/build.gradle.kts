@@ -6,9 +6,10 @@ android {
     namespace = "org.ungoogled.extension"
 
     defaultConfig {
-        // Maps 26.36 itself requires Android 12L (API 32); matching it keeps lint
-        // from rejecting the API 30+ window-insets calls the Customization screen uses.
-        minSdk = 32
+        // The Maps build we patch from requires Android 12L, but people also patch a
+        // 26.36.04 build that runs on Android 10 (issue #8: an Android 11 insets call
+        // crashed every screen of ours there), so lint has to hold us to API 29.
+        minSdk = 29
     }
 }
 

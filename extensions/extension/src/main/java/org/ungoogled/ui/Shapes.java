@@ -617,6 +617,23 @@ public final class Shapes {
         return 0;
     }
 
+    /**
+     * {left, top, right, bottom} of the system bars, plus the keyboard when ime is set.
+     * WindowInsets.Type is Android 11+, and people also patch a 26.36.04 build that runs
+     * on Android 10 (issue #8), where it crashed every screen of ours; there the older
+     * system-window insets carry the same sizes.
+     */
+    static int[] barInsets(android.view.WindowInsets in, boolean ime) {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            int types = android.view.WindowInsets.Type.systemBars();
+            if (ime) types |= android.view.WindowInsets.Type.ime();
+            android.graphics.Insets i = in.getInsets(types);
+            return new int[] {i.left, i.top, i.right, i.bottom};
+        }
+        return new int[] {in.getSystemWindowInsetLeft(), in.getSystemWindowInsetTop(),
+                in.getSystemWindowInsetRight(), in.getSystemWindowInsetBottom()};
+    }
+
     /** Relaunch the app so every Activity is recreated with the new resources. */
     public static void restart(Context c) {
         Intent i = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
@@ -1568,10 +1585,13 @@ public final class Shapes {
         int right = decor.getWidth(), top = 0;
         try {
             android.view.WindowInsets wi = decor.getRootWindowInsets();
-            if (wi != null) {
+            if (wi != null && android.os.Build.VERSION.SDK_INT >= 30) {
                 android.graphics.Insets in = wi.getInsets(android.view.WindowInsets.Type.systemBars()
                         | android.view.WindowInsets.Type.displayCutout());
                 right -= in.right; top = in.top;
+            } else if (wi != null) {
+                int[] in = barInsets(wi, false);
+                right -= in[2]; top = in[1];
             }
         } catch (Throwable t) { }
         int cx = right - Math.round((20f + FACE_DP / 2f) * d), cy = top + Math.round((24f + FACE_DP / 2f) * d);
