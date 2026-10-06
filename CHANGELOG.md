@@ -1,3 +1,9 @@
+## [1.4.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.1...v1.4.2) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* customization and other screens no longer crash on android 10 ([9bac165](https://github.com/bearinmindcat/morphe-patches/commit/9bac165b01a94c97699376b692c46def333dfc89))
+
 ## [1.4.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.0...v1.4.1) (2026-10-06)
 
 ### 🐛 Bug Fixes
