@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.0...v1.4.1) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* black theme no longer overrides the theme picked in maps settings ([5d9df9e](https://github.com/bearinmindcat/morphe-patches/commit/5d9df9e14f7af9662ad2fa1948e8d7167a9c8883))
+
 ## [1.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.3.0...v1.4.0) (2026-10-06)
 
 ### 🐛 Bug Fixes
