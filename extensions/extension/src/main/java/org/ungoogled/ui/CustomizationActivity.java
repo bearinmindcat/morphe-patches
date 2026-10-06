@@ -109,7 +109,7 @@ public final class CustomizationActivity extends Activity {
         if (Shapes.blackThemePatched()) {
             Switch black = new Switch(this);
             black.setChecked(Shapes.blackEnabled(this));
-            body.addView(toggleRow("Black theme", "Also disables light & dark theme", black));
+            body.addView(toggleRow("Black theme", "Choosing a theme in Maps settings turns this off", black));
             black.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 Shapes.setBlackEnabled(this, on);
                 restartSoon(b);

@@ -494,15 +494,43 @@ public final class Shapes {
     }
 
     private static void restoreTheme(Context c) {
+        restoreTheme(c, true, true);
+    }
+
+    /** Puts back the captured value of each setting asked for, then forgets the capture. */
+    private static void restoreTheme(Context c, boolean dark, boolean nav) {
         try {
             SharedPreferences ours = prefs(c);
             String d = ours.getString(KEY_PREV_DARK, null), n = ours.getString(KEY_PREV_NAV, null);
             SharedPreferences.Editor e = c.getSharedPreferences("settings_preference", Context.MODE_PRIVATE).edit();
-            if (d == null || ABSENT.equals(d)) e.remove("dark_mode"); else e.putString("dark_mode", d);
-            if (n == null || ABSENT.equals(n)) e.remove(KEY_NAV_SCHEME); else e.putString(KEY_NAV_SCHEME, n);
+            if (dark) { if (d == null || ABSENT.equals(d)) e.remove("dark_mode"); else e.putString("dark_mode", d); }
+            if (nav) { if (n == null || ABSENT.equals(n)) e.remove(KEY_NAV_SCHEME); else e.putString(KEY_NAV_SCHEME, n); }
             e.commit();
             ours.edit().remove(KEY_PREV_DARK).remove(KEY_PREV_NAV).commit();
         } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Black theme only ever writes dark_mode=ON and the navigation scheme FORCE_NIGHT, so
+     * once it has taken them over, anything else there was picked by the user in Maps' own
+     * Settings. Re-pinning dark at the next Activity made "Always in light theme" come back
+     * dark after every restart, so Black theme steps aside instead: it switches itself off,
+     * keeps what they picked, and puts the other setting back the way it was before.
+     */
+    private static boolean themePickedInMaps(Context c) {
+        try {
+            SharedPreferences ours = prefs(c);
+            if (!ours.contains(KEY_PREV_DARK)) return false;   // not taken over yet
+            SharedPreferences sp = c.getSharedPreferences("settings_preference", Context.MODE_PRIVATE);
+            boolean dark = !"ON".equals(sp.getString("dark_mode", null));
+            boolean nav = !"FORCE_NIGHT".equals(sp.getString(KEY_NAV_SCHEME, null));
+            if (!dark && !nav) return false;
+            ours.edit().putBoolean(KEY_BLACK, false).commit();
+            restoreTheme(c, !dark, !nav);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static void enforceDark(Context c) {
@@ -528,7 +556,8 @@ public final class Shapes {
      * entirely. Black needs the dark palette underneath, so ON pins
      * dark_mode=ON and the navigation scheme to FORCE_NIGHT. Switching Black
      * OFF puts back whatever the user had before, captured by saveTheme() on
-     * the way in.
+     * the way in. Picking a theme in Maps' own Settings also switches it off,
+     * see themePickedInMaps().
      */
     public static void setBlackEnabled(Context c, boolean on) {
         if (on) saveTheme(c);                   // capture the user's Light/Dark/System choice first
@@ -546,7 +575,7 @@ public final class Shapes {
     public static Context wrap(Context base) {
         try {
             RECT = enabled(base);
-            BLACK = blackEnabled(base);
+            BLACK = blackEnabled(base) && !themePickedInMaps(base);
             HIDE_ADS = hideAdsEnabled(base);
             HIDE_EXPLORE = hideExploreEnabled(base);
             HIDE_TABS = hideTabsEnabled(base);
@@ -565,7 +594,7 @@ public final class Shapes {
             if (RECT) c.mnc = MNC_RECT;
             if (BLACK) {
                 c.mcc = MCC_BLACK;   // night itself comes from Maps' own dark_mode setting, see setBlackEnabled
-                enforceDark(base);   // ...which Maps' own Settings page could flip back: re-pin it on every Activity
+                enforceDark(base);   // ...pinned again at every Activity, unless the user changed it (themePickedInMaps)
             }
             // Maps applies its own theme setting to its AppCompat screens (Settings and its
             // pages) by updating each Activity's configuration after it is attached, and a
