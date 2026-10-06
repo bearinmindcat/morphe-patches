@@ -1,3 +1,14 @@
+## [1.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.3.0...v1.4.0) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* fixed issue with zoom buttons floating over pulled up menu ([65878f1](https://github.com/bearinmindcat/morphe-patches/commit/65878f16d29c0c55933a3c8eaa6c2f723f0d00a4))
+* fixed layout for landscape zoom control icons ([5e8783c](https://github.com/bearinmindcat/morphe-patches/commit/5e8783c9f8c6809a78f45c2981be1fe9b03b5a96))
+
+### ✨ New Features
+
+* add hide ai toggle (know before you go & gemini review summaries) ([efc79d7](https://github.com/bearinmindcat/morphe-patches/commit/efc79d71a2fe72b581724a0c54e120024934cc9c))
+
 ## [1.3.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.2.0...v1.3.0) (2026-09-30)
 
 ### ✨ New Features
