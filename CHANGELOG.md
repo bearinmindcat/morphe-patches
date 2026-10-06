@@ -1,3 +1,9 @@
+## [1.4.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.3...v1.4.4) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* 120 refresh rate now keeps navigation smooth ([f323173](https://github.com/bearinmindcat/morphe-patches/commit/f32317373b574bbe89eb45964bac18c5addb0090))
+
 ## [1.4.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.2...v1.4.3) (2026-10-06)
 
 ### 🐛 Bug Fixes
