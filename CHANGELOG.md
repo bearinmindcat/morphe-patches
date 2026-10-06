@@ -1,3 +1,9 @@
+## [1.4.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.2...v1.4.3) (2026-10-06)
+
+### 🐛 Bug Fixes
+
+* customization screen no longer removes other account menu rows ([269e0ef](https://github.com/bearinmindcat/morphe-patches/commit/269e0ef335990d713c46ff49ddf5d8cc4d8f5de6))
+
 ## [1.4.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.1...v1.4.2) (2026-10-06)
 
 ### 🐛 Bug Fixes
