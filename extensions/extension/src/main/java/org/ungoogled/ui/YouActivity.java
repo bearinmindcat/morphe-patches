@@ -157,8 +157,11 @@ public final class YouActivity extends UiScreen {
     // ---- the You page ------------------------------------------------------------------
 
     private void renderYou() {
-        if (Shapes.microgPatched()) renderAccount();
-        else renderRecent();
+        renderAccount();
+        if (!Shapes.microgPatched()) {
+            body.addView(bandView());
+            renderRecent();
+        }
 
         body.addView(bandView());
         body.addView(sectionTitle("Your saves", null, "New list", v ->
@@ -192,11 +195,15 @@ public final class YouActivity extends UiScreen {
     }
 
     /**
-     * microG Maps saves to the Google account, as Maps does: in place of the recent places it
-     * keeps no history of, the page offers a copy of the account's lists to keep on the phone.
+     * A copy of the Google account's lists to keep on the phone. microG Maps saves to the account,
+     * as Maps does, and shows this in place of the recent places it keeps no history of; Ungoogled
+     * Maps shows it too, so the two pages match, though it is never signed in to an account.
      */
     private void renderAccount() {
-        body.addView(sectionTitle("Your Google account", "Saving stays with your account. Pull copies its saved lists here, to keep on this phone.", null, null));
+        body.addView(sectionTitle("Your Google account", Shapes.microgPatched()
+                ? "Saving stays with your account. Pull copies its saved lists here, to keep on this phone."
+                : "Pull copies the saved lists of a Google account signed in to Maps. Ungoogled Maps saves on this phone only.",
+                null, null));
         long at = getSharedPreferences(Shapes.PREFS, MODE_PRIVATE).getLong(AccountSaves.KEY_PULLED_AT, 0);
         body.addView(listLikeRow(new PathIcon(PathIcon.DOWNLOAD, accent()), "Pull from Google account",
                 at == 0 ? null : System.currentTimeMillis() - at < DateUtils.MINUTE_IN_MILLIS ? "Last pulled just now"
@@ -215,7 +222,10 @@ public final class YouActivity extends UiScreen {
             try {
                 AccountSaves.Result r = AccountSaves.pull(this);
                 if (r.places == 0) {
-                    problem = "Your account's saved lists aren't on this phone yet. Sign in, open Saved in Maps once, then pull again.";
+                    problem = Shapes.microgPatched()
+                            ? "Your account's saved lists aren't on this phone yet. Sign in, open Saved in Maps once, then pull again."
+                            : "Ungoogled Maps isn't signed in to a Google account, so there are no account lists to pull. "
+                                    + "To bring your lists over, use Import with Google Takeout's Saved Places.json.";
                 } else {
                     done = "Pulled " + count(r.places) + (r.lists == 0 ? "" : " from " + (r.lists == 1 ? "1 list" : r.lists + " lists"))
                             + (r.added == 0 ? ", nothing new" : r.added == 1 ? ", 1 new" : ", " + r.added + " new");

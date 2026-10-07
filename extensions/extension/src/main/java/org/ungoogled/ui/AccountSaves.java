@@ -46,7 +46,7 @@ final class AccountSaves {
 
     static Result pull(Context c) throws Exception {
         File file = c.getDatabasePath(DB);
-        if (!file.exists()) throw new IllegalStateException("Maps has not synced any saved lists to this phone");
+        if (!file.exists()) return new Result();   // never synced anything: nothing to pull
         Map<String, String> where = new HashMap<>();          // account list id -> list here, "" = none
         Map<String, String> names = new LinkedHashMap<>();    // list here -> name, for the account's own lists
         List<SavedStore.Place> found = new ArrayList<>();
@@ -85,6 +85,7 @@ final class AccountSaves {
         Result r = new Result();
         r.lists = lists;
         r.places = found.size();
+        if (found.isEmpty()) return r;
         r.added = SavedStore.mergePulled(c, names, found);
         c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_PULLED_AT, System.currentTimeMillis()).apply();
         return r;
