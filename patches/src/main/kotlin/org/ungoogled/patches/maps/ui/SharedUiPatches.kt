@@ -12,6 +12,7 @@ import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc
+import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
@@ -153,6 +154,47 @@ internal val applicationStartHookPatch = bytecodePatch(
  * Never applied to the extension itself: its shims call the real framework
  * methods, and rewriting those calls would make them call themselves.
  */
+/**
+ * Avatars -- a signed-in account's picture, drawn inside Google's coloured account ring, which
+ * is drawn round. Squared by Rectangle Shapes, the picture sat in the ring as a square, so the
+ * code that makes avatars round keeps its circles; its colours still go through the shims. The
+ * picture is cut round by a circle crop and the letter avatar painted by a monogram painter,
+ * both found by what they draw (see [drawsAvatar]); the avatar view keeps its round clip.
+ */
+private val ROUND_AVATARS = setOf(
+    "Lcom/google/android/libraries/onegoogle/account/disc/AvatarView;",
+    "Lcom/google/android/libraries/onegoogle/account/disc/SimpleAvatarView;",
+)
+
+private fun MethodReference.isCall(owner: String, name: String, parameters: String) =
+    definingClass == owner && this.name == name && parameterTypes.joinToString("") == parameters
+
+private enum class AvatarPainter { CIRCLE_CROP, MONOGRAM }
+
+/**
+ * The circle crop (a new bitmap: a circle drawn as a mask, then the picture drawn into it with
+ * SRC_IN) and the monogram painter (a circle with a centred letter, drawn onto a new bitmap).
+ */
+private fun avatarPainter(classDef: ClassDef): AvatarPainter? {
+    for (method in classDef.methods) {
+        val calls = method.implementation?.instructions
+            ?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }.orEmpty()
+        fun has(owner: String, name: String, parameters: String) = calls.any { it.isCall(owner, name, parameters) }
+        val canvas = "Landroid/graphics/Canvas;"
+        val paint = "Landroid/graphics/Paint;"
+        if (!has("Landroid/graphics/Bitmap;", "createBitmap", "IILandroid/graphics/Bitmap\$Config;") ||
+            !has(canvas, "drawCircle", "FFF$paint")
+        ) continue
+        if (has(paint, "setXfermode", "Landroid/graphics/Xfermode;") && has(canvas, "drawBitmap", "Landroid/graphics/Bitmap;FF$paint")) {
+            return AvatarPainter.CIRCLE_CROP
+        }
+        if (has(paint, "setTextAlign", "Landroid/graphics/Paint\$Align;") && has(canvas, "drawText", "Ljava/lang/String;FF$paint")) {
+            return AvatarPainter.MONOGRAM
+        }
+    }
+    return null
+}
+
 internal val shapeShimsPatch = bytecodePatch(
     description = "Routes framework shape and colour calls through the UI extension.",
 ) {
@@ -169,7 +211,7 @@ internal val shapeShimsPatch = bytecodePatch(
         val paint = "Landroid/graphics/Paint;"
 
         // (owner, method, parameters) -- the shim takes (owner, parameters...), same name, void.
-        val virtuals = listOf(
+        val shapeVirtuals = listOf(
             Triple(gd, "setCornerRadius", "F"), Triple(gd, "setCornerRadii", "[F"), Triple(gd, "setShape", "I"),
             Triple(path, "addRoundRect", rectF + "FF" + dir), Triple(path, "addRoundRect", rectF + "[F" + dir),
             Triple(path, "addRoundRect", "FFFFFF$dir"), Triple(path, "addRoundRect", "FFFF[F$dir"),
@@ -178,6 +220,8 @@ internal val shapeShimsPatch = bytecodePatch(
             Triple(canvas, "drawCircle", "FFF$paint"), Triple(canvas, "drawOval", rectF + paint), Triple(canvas, "drawOval", "FFFF$paint"),
             Triple(outline, "setRoundRect", "IIIIF"), Triple(outline, "setRoundRect", rect + "F"),
             Triple(outline, "setOval", "IIII"), Triple(outline, "setOval", rect),
+        )
+        val virtuals = shapeVirtuals + listOf(
             // Black theme: literal colours handed to the framework
             Triple(gd, "setColor", "I"), Triple("Landroid/graphics/drawable/ColorDrawable;", "setColor", "I"),
             Triple(paint, "setColor", "I"), Triple("Landroid/view/View;", "setBackgroundColor", "I"),
@@ -208,6 +252,8 @@ internal val shapeShimsPatch = bytecodePatch(
             val ps = params(p)
             rules[key(owner, name, ps, "V")] = ImmutableMethodReference(SHAPES, name, listOf(owner) + ps, "V")
         }
+        val shapeKeys = shapeVirtuals.map { (owner, name, p) -> key(owner, name, params(p), "V") }.toSet()
+        val colourRules = rules.filterKeys { it !in shapeKeys }
         val csl = "Landroid/content/res/ColorStateList;"
         val staticRules = mapOf(
             key(csl, "valueOf", listOf("I"), csl) to ImmutableMethodReference(SHAPES, "valueOf", listOf("I"), csl),
@@ -226,12 +272,20 @@ internal val shapeShimsPatch = bytecodePatch(
         var classes = 0
         val work = mutableListOf<Pair<String, Method>>()
         val reparent = mutableListOf<String>()
+        val roundAvatars = ROUND_AVATARS.toMutableSet()
+        val painters = mutableSetOf<AvatarPainter>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            avatarPainter(classDef)?.let { painters += it; roundAvatars += classDef.type }
+        }
+        if (painters.size != AvatarPainter.entries.size) throw PatchException("avatar circle crop or monogram painter not found: $painters")
         classDefForEach { classDef ->
             if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
             if (classDef.superclass in shapeSubclasses) reparent += classDef.type
+            val classRules = if (classDef.type in roundAvatars) colourRules else rules
             for (method in classDef.methods) {
                 val instructions = method.implementation?.instructions ?: continue
-                if (instructions.any { insn -> rewriteKind(insn, rules, staticRules, shapeSubclasses, ctorColourArgs) != null }) {
+                if (instructions.any { insn -> rewriteKind(insn, classRules, staticRules, shapeSubclasses, ctorColourArgs) != null }) {
                     work += classDef.type to method
                 }
             }
@@ -247,7 +301,7 @@ internal val shapeShimsPatch = bytecodePatch(
             val mutableMethod = mutableClass.methods.first {
                 it.name == method.name && it.parameterTypes == method.parameterTypes && it.returnType == method.returnType
             }
-            sites += rewriteMethod(mutableMethod, rules, staticRules, shapeSubclasses, ctorColourArgs)
+            sites += rewriteMethod(mutableMethod, if (type in roundAvatars) colourRules else rules, staticRules, shapeSubclasses, ctorColourArgs)
             classes++
         }
         if (sites == 0) throw PatchException("no framework shape or colour calls found to reroute")
@@ -273,6 +327,7 @@ internal val shapeShimsPatch = bytecodePatch(
                     if (insn.opcode == Opcode.INVOKE_SUPER || insn.opcode == Opcode.INVOKE_SUPER_RANGE) continue
                     val ref = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: continue
                     val k = key(ref.definingClass, ref.name, ref.parameterTypes.map { it.toString() }, ref.returnType)
+                    if (classDef.type in roundAvatars && k in shapeKeys) continue
                     if (watched.containsMatchIn(k)) leftovers += "${classDef.type}->${method.name}: $k"
                 }
             }
