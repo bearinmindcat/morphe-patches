@@ -14,6 +14,9 @@ private const val ICON = "@mipmap/maps_2025"
 private const val ROUND_ICON = "@mipmap/maps_2025_round"
 private const val LEGACY = "ungoogled_legacy_icon"
 private const val PIN = "@drawable/product_logo_maps_color_192"
+/** MapsActivity's Android 12+ splash theme, which shows a pin of its own (the 2025 one). */
+private const val SPLASH_THEME = "GmmTheme.BaseSplashScreen2025"
+private const val SPLASH_ICON = "android:windowSplashScreenAnimatedIcon"
 
 /**
  * microG's C -- its own launcher logo, four arcs open to the right -- for microG Maps'
@@ -68,8 +71,8 @@ private fun microgC(): String {
 @Suppress("unused")
 val legacyIconPatch = resourcePatch(
     name = "Legacy icon",
-    description = "Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon. " +
-        "With Add microG support, microG's C sits in the pin's circle.",
+    description = "Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon " +
+        "and on the screen Maps opens with. With Add microG support, microG's C sits in the pin's circle.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -111,6 +114,24 @@ val legacyIconPatch = resourcePatch(
             </adaptive-icon>
             """.trimIndent() + "\n",
         )
+
+        // The screen Maps opens with (Android 12+) shows the same pin, not its 2025 one.
+        var splash = 0
+        document("res/values-v31/styles.xml").use { styles ->
+            val list = styles.getElementsByTagName("style")
+            for (i in 0 until list.length) {
+                val style = list.item(i) as Element
+                if (style.getAttribute("name") != SPLASH_THEME) continue
+                val items = style.getElementsByTagName("item")
+                for (j in 0 until items.length) {
+                    val item = items.item(j) as Element
+                    if (item.getAttribute("name") != SPLASH_ICON) continue
+                    item.textContent = "@drawable/${LEGACY}_foreground"
+                    splash++
+                }
+            }
+        }
+        if (splash != 1) throw PatchException("splash screen icon not found in $SPLASH_THEME ($splash)")
 
         var icons = 0
         var roundIcons = 0
