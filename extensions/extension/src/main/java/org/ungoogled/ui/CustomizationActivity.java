@@ -28,37 +28,21 @@ public final class CustomizationActivity extends Activity {
     // neutral6 surface (#131314) / neutral90 text; Black theme = pure black surface.
     private static final int BG = 0xFFFFFFFF, TEXT = 0xFF1B1B1F, SUMMARY = 0xFF5F6368;
     private static final int BG_D = 0xFF131314, TEXT_D = 0xFFE3E3E3, SUMMARY_D = 0xFFC4C7C5;
-    /** Which page: the main list, or Power Saving Options (this same screen, opened again). */
+    /** Which page: the main list, or Power Saving Options (this same screen, opened from its own account sheet row). */
     static final String EXTRA_PAGE = "org.ungoogled.ui.page";
     static final String PAGE_POWER = "power";
     private static final String POWER_TITLE = "Power Saving Options";
     private boolean dark, black;
-    private TextView proxySub, powerSub;
+    private TextView proxySub;
 
     private String proxySummary() {
         String effective = Shapes.proxy(this);
         return effective.isEmpty() ? "Off" : effective;
     }
 
-    /** What is switched on in Power Saving Options, for its row on the main page. */
-    private String powerSummary() {
-        java.util.List<String> on = new java.util.ArrayList<>();
-        if (PowerSaving.allPhones(this) || PowerSaving.nativeMinMode(this)) on.add("Power saving mode");
-        if (PowerSaving.unlocked(this)) on.add("without locking");
-        if (PowerSaving.idleSeconds(this) > 0) on.add("auto-switch");
-        if (PowerSaving.speedometer(this)) on.add("speedometer");
-        if (PowerSaving.lowFps(this) != PowerSaving.LOW_FPS_OFF) on.add("lower frame rate");
-        if (PowerSaving.theme(this) != PowerSaving.THEME_OFF) on.add("black map");
-        if (on.isEmpty()) return "Off";
-        StringBuilder s = new StringBuilder(on.get(0));
-        for (int i = 1; i < on.size(); i++) s.append(", ").append(on.get(i));
-        return s.toString();
-    }
-
     @Override protected void onResume() {
         super.onResume();
         if (proxySub != null) proxySub.setText(proxySummary());
-        if (powerSub != null) powerSub.setText(powerSummary());
     }
 
     private int bg() { return black ? 0xFF000000 : dark ? BG_D : BG; }
@@ -155,15 +139,6 @@ public final class CustomizationActivity extends Activity {
                 Shapes.setNavZoomEnabled(this, on);
                 // no restart: the navigation ticker adds and removes the tiles live
             });
-        }
-
-        if (Shapes.powerSavingPatched()) {
-            // its own page: Power saving mode and the options around it
-            LinearLayout powerRow = rowBase(POWER_TITLE, powerSummary());
-            powerSub = (TextView) ((LinearLayout) powerRow.getChildAt(0)).getChildAt(1);
-            powerRow.setOnClickListener(v -> startActivity(new android.content.Intent(this, CustomizationActivity.class)
-                    .putExtra(EXTRA_PAGE, PAGE_POWER)));
-            body.addView(powerRow);
         }
 
         if (Shapes.highRefreshPatched()) {
@@ -438,6 +413,72 @@ public final class CustomizationActivity extends Activity {
             Shapes.SKIP_DISMISS = true;
             context.startActivity(new android.content.Intent()
                     .setClassName(context.getPackageName(), CustomizationActivity.class.getName()));
+        }
+    }
+
+    /** The Power Saving Options row on the account sheet: this screen's power page, the sheet left open behind it. */
+    public static final class OpenPower implements View.OnClickListener {
+        private final android.content.Context context;
+
+        public OpenPower(android.content.Context context) { this.context = context; }
+
+        @Override
+        public void onClick(View v) {
+            Shapes.SKIP_DISMISS = true;
+            context.startActivity(new android.content.Intent()
+                    .setClassName(context.getPackageName(), CustomizationActivity.class.getName())
+                    .putExtra(EXTRA_PAGE, PAGE_POWER));
+        }
+    }
+
+    /**
+     * The Power Saving Options row's icon: Android's battery saver, a battery outline with a
+     * plus, cut out of Maps' own solid battery (gs_battery_full_fill1) so it is tinted like the
+     * sheet's other icons, in every theme.
+     */
+    public static android.graphics.drawable.Drawable powerRowIcon(android.graphics.drawable.Drawable battery) {
+        return battery == null ? null : new BatterySaverIcon(battery);
+    }
+
+    /** [battery] seen through a stencil on Maps' 24 x 24 icon grid: its walls, and a plus inside. */
+    static final class BatterySaverIcon extends android.graphics.drawable.DrawableWrapper {
+        private final android.graphics.Path stencil = new android.graphics.Path(), scaled = new android.graphics.Path();
+        private final android.graphics.Matrix matrix = new android.graphics.Matrix();
+
+        BatterySaverIcon(android.graphics.drawable.Drawable battery) {
+            super(battery);
+            stencil.setFillType(android.graphics.Path.FillType.EVEN_ODD);
+            stencil.addRect(-1, -1, 25, 25, android.graphics.Path.Direction.CW);
+            // The battery's inside, as Maps' empty battery (gs_battery_0_bar) has it ...
+            stencil.addRect(9, 6, 15, 20, android.graphics.Path.Direction.CW);
+            // ... with a plus in its middle, clear of the walls.
+            float cx = 12, cy = 13, a = 2.2f, t = 0.9f;
+            stencil.moveTo(cx - t, cy - a);
+            stencil.lineTo(cx + t, cy - a);
+            stencil.lineTo(cx + t, cy - t);
+            stencil.lineTo(cx + a, cy - t);
+            stencil.lineTo(cx + a, cy + t);
+            stencil.lineTo(cx + t, cy + t);
+            stencil.lineTo(cx + t, cy + a);
+            stencil.lineTo(cx - t, cy + a);
+            stencil.lineTo(cx - t, cy + t);
+            stencil.lineTo(cx - a, cy + t);
+            stencil.lineTo(cx - a, cy - t);
+            stencil.lineTo(cx - t, cy - t);
+            stencil.close();
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            if (b.isEmpty()) return;
+            matrix.setScale(b.width() / 24f, b.height() / 24f);
+            matrix.postTranslate(b.left, b.top);
+            stencil.transform(matrix, scaled);
+            int saved = c.save();
+            c.clipPath(scaled);
+            super.draw(c);
+            c.restoreToCount(saved);
         }
     }
 }

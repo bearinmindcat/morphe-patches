@@ -262,7 +262,7 @@ public final class PowerSaving {
     }
 
     // ---- Power Saving Options -----------------------------------------------------
-    // Customization > Power Saving Options. Everything here is off until switched on.
+    // The account sheet's Power Saving Options row. Everything here is off until switched on.
 
     public static final String KEY_UNLOCKED = "power_saving_unlocked";
     public static final String KEY_SPEEDOMETER = "power_saving_speedometer";
