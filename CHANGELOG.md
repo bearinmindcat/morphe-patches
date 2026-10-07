@@ -1,3 +1,9 @@
+## [1.7.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.3...v1.7.4) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+* pull from google account in ungoogled maps' local saved too ([b5e4b94](https://github.com/bearinmindcat/morphe-patches/commit/b5e4b940e8a11f7e3fadfd6d6279a2b8f17f935e))
+
 ## [1.7.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.2...v1.7.3) (2026-10-07)
 
 ### 🐛 Bug Fixes
