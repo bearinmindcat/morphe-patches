@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.5.0...v1.5.1) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+* merge related patches into fewer patches (33 to 21) ([871e40b](https://github.com/bearinmindcat/morphe-patches/commit/871e40b8ba3e2ace5ef2c393aa79c2593746a1ff))
+
 ## [1.5.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.4...v1.5.0) (2026-10-07)
 
 ### ✨ New Features
