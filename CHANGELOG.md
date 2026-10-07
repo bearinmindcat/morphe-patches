@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.4...v1.5.0) (2026-10-07)
+
+### ✨ New Features
+
+* add power saving options (open without locking, idle switch, speedometer, lower frame rate, black map) ([3ce8b9d](https://github.com/bearinmindcat/morphe-patches/commit/3ce8b9df60dd458234d1b1660e64899edea1e277))
+
 ## [1.4.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.3...v1.4.4) (2026-10-06)
 
 ### 🐛 Bug Fixes
