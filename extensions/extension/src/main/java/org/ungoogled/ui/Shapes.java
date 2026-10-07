@@ -85,6 +85,8 @@ public final class Shapes {
     public static boolean hideAiPatched() { return false; }
     public static boolean highRefreshPatched() { return false; }
     public static boolean timelinePatched() { return false; }
+    /** Add microG support: microG Maps, which signs in through microG. */
+    public static boolean microgPatched() { return false; }
     /** Location provider toggle's option: rewritten to return true when it defaults to Play services. */
     public static boolean playLocationByDefault() { return false; }
 
@@ -196,7 +198,9 @@ public final class Shapes {
     }
 
     public static boolean hideTabsEnabled(Context c) {
-        return hideTabsPatched() && prefs(c).getBoolean(KEY_HIDE_TABS, true);
+        // Shown by default in microG Maps: the You and Contribute tabs hold the account's
+        // saved lists and contributions.
+        return hideTabsPatched() && prefs(c).getBoolean(KEY_HIDE_TABS, !microgPatched());
     }
 
     public static void setHideTabsEnabled(Context c, boolean on) {
@@ -293,8 +297,9 @@ public final class Shapes {
         refreshPlayLocation(c);
     }
 
-    /** Play services is installed and enabled. */
+    /** Play services is installed and enabled -- microG, in microG Maps. */
     public static boolean playServicesUsable(Context c) {
+        if (microgPatched()) return MicroG.installed(c);
         try {
             return c.getPackageManager().getApplicationInfo(PLAY_SERVICES, 0).enabled;
         } catch (Throwable t) {
@@ -321,7 +326,9 @@ public final class Shapes {
 
     /** Called with the package and service action of every Play services connection Maps opens. */
     public static String locationPackage(String pkg, String action) {
-        if (action != null && action.startsWith("com.google.android.location.") && !playLocation()) {
+        // MicroG-RE answers the location service under its own name (MicroG.locationAction).
+        if (action != null && (action.startsWith("com.google.android.location.")
+                || action.startsWith("app.revanced.android.location.")) && !playLocation()) {
             return "org.ungoogled.no.play.location";
         }
         return pkg;
@@ -583,6 +590,7 @@ public final class Shapes {
             HIDE_AI = hideAiEnabled(base);
             HIGH_REFRESH = highRefreshEnabled(base);
             PowerSaving.refresh(base);
+            if (microgPatched()) MicroG.track(base);
             SavedPlaces.track(base);
             BETTER_OFFLINE = betterOfflineEnabled(base);
             NAV_ZOOM_BUTTONS = navZoomEnabled(base);

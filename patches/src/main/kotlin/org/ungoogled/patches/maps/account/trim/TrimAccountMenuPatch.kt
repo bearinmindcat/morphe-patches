@@ -8,6 +8,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 /**
  * Every row before its own call is set up identically: `move-object vN, v6`
@@ -73,12 +74,13 @@ private val YOUR_DATA: (MethodReference) -> Boolean =
 val trimAccountMenuPatch = bytecodePatch(
     name = "Trim account menu",
     description = "Removes Your Timeline, Location sharing, Your data in Maps and Help & feedback " +
-        "from the account sheet.",
+        "from the account sheet. Left out with Add microG support, whose account features need them.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
+        if (MicrogSelection.replaces(this, "Trim account menu")) return@execute
         // Modern builder: three independent cuts, each a pure removal -- the
         // rows on both sides of every cut are left completely alone, so
         // nothing needs to be reconstructed.

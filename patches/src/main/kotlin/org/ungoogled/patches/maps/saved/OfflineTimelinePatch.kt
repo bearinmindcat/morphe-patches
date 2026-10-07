@@ -5,6 +5,7 @@ import app.morphe.patcher.patch.resourcePatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 /**
  * Declares the Timeline screen and its recorder: a location-type foreground
@@ -14,6 +15,7 @@ import org.w3c.dom.Element
  */
 private val timelineManifestPatch = resourcePatch(description = "Declares the Timeline screen and recorder.") {
     execute {
+        if (MicrogSelection.replaces(this, "Offline saved places")) return@execute
         document("AndroidManifest.xml").use { manifest ->
             val application = manifest.getElementsByTagName("application").item(0) as Element
             val activity = manifest.createElement("activity")
@@ -40,6 +42,7 @@ internal val localTimelinePatch = bytecodePatch(
     dependsOn(localSavedPlacesPatch, timelineManifestPatch)
 
     execute {
+        if (MicrogSelection.replaces(this, "Offline saved places")) return@execute
         markPatched("timelinePatched")
     }
 }

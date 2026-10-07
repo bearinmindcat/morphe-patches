@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.misc
 
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
 
@@ -29,12 +30,13 @@ val removePermissionsPatch = resourcePatch(
     description = "Removes permissions that only serve Google-account features or Google's data " +
         "collection: background location, physical activity, contacts, microphone (voice search stops " +
         "working), camera (Lens and Live View stop working), car speed, advertising ID, push messages " +
-        "and Google services settings.",
+        "and Google services settings. Left out with Add microG support, whose account features need them.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
+        if (MicrogSelection.replaces(this, "Remove permissions")) return@execute
         var removed = 0
         document("AndroidManifest.xml").use { manifest ->
             val root = manifest.documentElement

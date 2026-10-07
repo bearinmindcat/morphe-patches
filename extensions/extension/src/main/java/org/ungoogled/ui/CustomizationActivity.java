@@ -236,9 +236,11 @@ public final class CustomizationActivity extends Activity {
             // out and unselectable while Play services is missing or disabled.
             final boolean playAvailable = Shapes.playServicesUsable(this);
             final boolean usePlay = playAvailable && Shapes.playLocationEnabled(this);
-            View locRow = row("Location source", usePlay ? "Google Play Services" : "Android API");
+            // In microG Maps the second source is microG's, which stands in for Play services.
+            final String playName = Shapes.microgPatched() ? "microG" : "Google Play Services";
+            View locRow = row("Location source", usePlay ? playName : "Android API");
             locRow.setOnClickListener(v -> {
-                final String[] options = {"Android API", "Google Play Services"};
+                final String[] options = {"Android API", playName};
                 ChoiceAdapter adapter = new ChoiceAdapter(this, options, playAvailable, text(), dark ? 0xFF6B6B6B : 0xFFB0B0B0);
                 new AlertDialog.Builder(this, dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
                         .setTitle("Location source")

@@ -9,6 +9,7 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
 @Suppress("unused")
@@ -17,7 +18,8 @@ val removeTelemetryPatch = bytecodePatch(
     description = "Points the Firebase Installations and Play services compliance check-ins at " +
         "an unresolvable host, stops every ad impression and click ping from being sent, and " +
         "deregisters Google's logging, performance-monitoring, survey and Location History libraries " +
-        "and the on-device federated-learning services.",
+        "and the on-device federated-learning services. With Add microG support, Firebase Installations " +
+        "and Location History are left alone, so Timeline, account sync and push messages keep working.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -33,8 +35,12 @@ val removeTelemetryPatch = bytecodePatch(
         // Blocking is deliberately done here rather than by removing the call
         // sites: the callers retry and cache, so a host that cannot resolve is
         // both simpler and closer to what the SDKs expect than a missing method.
-        listOf(
-            FirebaseInstallationsHostFingerprint to "firebaseinstallations.invalid",
+        //
+        // Not Firebase Installations in microG Maps: push messages to a signed-in
+        // account (location sharing, for one) need the installation it registers.
+        val microg = MicrogSelection.builds(this, "Remove telemetry")
+        listOfNotNull(
+            if (microg) null else FirebaseInstallationsHostFingerprint to "firebaseinstallations.invalid",
             GmsComplianceHostFingerprint to "gmscompliance-pa.invalid",
         ).forEach { (fingerprint, unresolvableHost) ->
             val index = fingerprint.instructionMatches.first().index

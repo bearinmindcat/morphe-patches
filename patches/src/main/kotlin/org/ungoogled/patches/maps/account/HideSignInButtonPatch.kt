@@ -4,6 +4,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import com.android.tools.smali.dexlib2.Opcode
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 internal val hideSignInButtonPatch = bytecodePatch(
     description = "Removes the \"Sign in\" pill from the account sheet.",
@@ -11,6 +12,7 @@ internal val hideSignInButtonPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
+        if (MicrogSelection.replaces(this, "Remove sign-in prompts")) return@execute
         // Every constructor ends by hiding the view. p1 is the Context in all of
         // them and is dead by the time the constructor returns, so it can hold
         // the GONE constant without adding a register.

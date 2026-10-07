@@ -29,6 +29,7 @@ import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.shared.addInstructionsAtLabel
 import org.w3c.dom.Element
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 /** org.ungoogled.ui.SavedPlaces, the extension half. */
 private const val SAVED_PLACES = "Lorg/ungoogled/ui/SavedPlaces;"
@@ -43,6 +44,7 @@ private const val SUITCASE_ICON = 0x7f080879
 /** Declares the Local saved screen; it is launched by explicit class name from inside the app only. */
 private val savedManifestPatch = resourcePatch(description = "Declares the Local saved screen.") {
     execute {
+        if (MicrogSelection.replaces(this, "Offline saved places")) return@execute
         document("AndroidManifest.xml").use { manifest ->
             val application = manifest.getElementsByTagName("application").item(0) as Element
             val activity = manifest.createElement("activity")
@@ -140,6 +142,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
     dependsOn(sharedExtensionPatch, activityContextHookPatch, customizationScreenPatch, savedManifestPatch)
 
     execute {
+        if (MicrogSelection.replaces(this, "Offline saved places")) return@execute
         // ---- what Maps' place object offers, read off the Save button's state class ----
         val stateClass = mutableClassDefBy(SaveButtonIconFingerprint.method.definingClass)
         val ctor = stateClass.methods.singleOrNull { it.name == "<init>" }

@@ -13,7 +13,8 @@ val offlineSavedPlacesPatch = bytecodePatch(
         "labels (Home, Work, your own) -- with export and import (backup file, KML, Google Takeout's Saved " +
         "Places.json). It also has a Timeline: where the phone has been, grouped into days and visits, kept " +
         "only on the phone, with GPX export. Recording is off until switched on there; it shows a " +
-        "notification while it runs.",
+        "notification while it runs. Left out with Add microG support, where Maps' own Save syncs to your " +
+        "account.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)

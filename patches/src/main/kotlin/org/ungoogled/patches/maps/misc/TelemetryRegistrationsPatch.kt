@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.misc
 
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.w3c.dom.Element
 
 /**
@@ -20,6 +21,21 @@ private val PHENOTYPE_PACKAGES = listOf(
     "com.google.android.libraries.surveys",
     "com.google.android.libraries.impress",
     "com.google.android.gms.icing_mdd",
+    "com.google.android.gms.ulr",
+    "com.google.android.libraries.personalization.footprints",
+    "com.google.android.libraries.consent_flows.footprints",
+    "com.google.android.libraries.consent_flows.location",
+    "com.google.android.libraries.mdi.sync",
+    "com.google.android.libraries.gmscore.semanticlocation.device",
+)
+
+/**
+ * Kept registered in microG Maps (Add microG support), which signs in: Location History / location
+ * sharing (ulr), activity controls (footprints), location consent, account sync and
+ * the on-device Timeline. Deregistered, their features are switched off for a
+ * signed-in account too.
+ */
+private val ACCOUNT_PACKAGES = setOf(
     "com.google.android.gms.ulr",
     "com.google.android.libraries.personalization.footprints",
     "com.google.android.libraries.consent_flows.footprints",
@@ -55,7 +71,9 @@ internal val telemetryRegistrationsPatch = resourcePatch(
     description = "Deregisters Google's data-collection libraries and removes their components.",
 ) {
     execute {
-        val wanted = PHENOTYPE_PACKAGES.map(::normalised).toSet()
+        val microg = MicrogSelection.builds(this, "Remove telemetry")
+        val deregistered = if (microg) PHENOTYPE_PACKAGES.filter { it !in ACCOUNT_PACKAGES } else PHENOTYPE_PACKAGES
+        val wanted = deregistered.map(::normalised).toSet()
         var keys = 0
         var components = 0
         document("AndroidManifest.xml").use { manifest ->
@@ -74,15 +92,17 @@ internal val telemetryRegistrationsPatch = resourcePatch(
         }
 
         var assets = 0
-        for (pkg in PHENOTYPE_PACKAGES) {
+        for (pkg in deregistered) {
             val path = "assets/phenotype/${pkg.replace('.', '_')}_package_metadata.binarypb"
             if (!get(path).exists()) continue
             delete(path)
             assets++
         }
 
-        if (keys != 30 || assets != 11 || components != 6) {
-            throw PatchException("expected 30 registration keys, 11 assets and 6 components; found $keys, $assets and $components")
+        // 17 keys and 6 assets of those belong to the packages microG Maps deregisters.
+        val (expectedKeys, expectedAssets) = if (microg) 17 to 6 else 30 to 11
+        if (keys != expectedKeys || assets != expectedAssets || components != 6) {
+            throw PatchException("expected $expectedKeys registration keys, $expectedAssets assets and 6 components; found $keys, $assets and $components")
         }
     }
 }

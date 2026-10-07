@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.resources
 
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
+import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
 
@@ -16,6 +17,8 @@ import org.w3c.dom.Element
  */
 private const val STOCK_LABEL = "@string/MAPS_APP_NAME"
 private const val NEW_LABEL = "@string/ungoogled_app_name"
+private const val UNGOOGLED_NAME = "Ungoogled Maps"
+private const val MICROG_NAME = "microG Maps"
 
 @Suppress("unused")
 val changeAppNamePatch = resourcePatch(
@@ -27,13 +30,16 @@ val changeAppNamePatch = resourcePatch(
 
     val appName = stringOption(
         key = "appName",
-        default = "Ungoogled Maps",
+        default = UNGOOGLED_NAME,
         title = "App name",
-        description = "The name shown under the launcher icon and in the app switcher.",
+        description = "The name shown under the launcher icon and in the app switcher. Left at " +
+            "$UNGOOGLED_NAME, Add microG support names the app $MICROG_NAME instead.",
         required = true,
     )
 
     execute {
+        val microg = MicrogSelection.builds(this, "Change app name")
+        val name = appName.value!!.let { if (microg && it == UNGOOGLED_NAME) MICROG_NAME else it }
         var relabeled = 0
         document("AndroidManifest.xml").use { manifest ->
             val elements = manifest.getElementsByTagName("*")
@@ -53,7 +59,7 @@ val changeAppNamePatch = resourcePatch(
             val resources = strings.getElementsByTagName("resources").item(0) as Element
             val stringElement = strings.createElement("string")
             stringElement.setAttribute("name", "ungoogled_app_name")
-            stringElement.textContent = appName.value
+            stringElement.textContent = name
             resources.appendChild(stringElement)
         }
     }

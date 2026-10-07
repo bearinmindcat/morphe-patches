@@ -3,11 +3,15 @@ package org.ungoogled.patches.maps.resources
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
+import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 private const val STOCK_PACKAGE = "com.google.android.apps.maps"
+private const val UNGOOGLED_PACKAGE = "org.ungoogled.android.apps.maps"
+/** microG Maps' own, so it installs beside Ungoogled Maps. */
+private const val MICROG_PACKAGE = "org.ungoogled.android.apps.maps.microg"
 
 /** `old` itself, or `old` followed by one of [separators], moved under `new`; anything else is not ours. */
 private fun moved(value: String, old: String, new: String, separators: String = "."): String? = when {
@@ -66,9 +70,10 @@ val changePackageNamePatch = resourcePatch(
 
     val packageName = stringOption(
         key = "packageName",
-        default = "org.ungoogled.android.apps.maps",
+        default = UNGOOGLED_PACKAGE,
         title = "Package name",
-        description = "The package name to install under. Must be a valid Android package name.",
+        description = "The package name to install under. Must be a valid Android package name. Left at " +
+            "$UNGOOGLED_PACKAGE, Add microG support installs under $MICROG_PACKAGE instead.",
         required = true,
     ) {
         it != null && it.matches(Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$"))
@@ -76,7 +81,8 @@ val changePackageNamePatch = resourcePatch(
 
     execute {
         val old = STOCK_PACKAGE
-        val new = packageName.value!!
+        val microg = MicrogSelection.builds(this, "Change package name")
+        val new = packageName.value!!.let { if (microg && it == UNGOOGLED_PACKAGE) MICROG_PACKAGE else it }
         val counts = linkedMapOf<String, Int>()
         fun rename(element: Element, attribute: String, separators: String = ".", what: String = attribute): Boolean {
             val value = element.getAttribute(attribute)

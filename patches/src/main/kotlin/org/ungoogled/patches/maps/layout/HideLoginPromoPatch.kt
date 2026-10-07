@@ -3,6 +3,7 @@ package org.ungoogled.patches.maps.layout
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 internal val hideLoginPromoPatch = bytecodePatch(
     description = "Hides the full-screen \"Make it your map\" page shown on first launch.",
@@ -10,6 +11,7 @@ internal val hideLoginPromoPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
+        if (MicrogSelection.replaces(this, "Remove sign-in prompts")) return@execute
         // The gate reads its discriminator field and branches away before this
         // string is loaded, so execution only reaches the string when this is
         // the login-promo instance. Returning false right here disables that

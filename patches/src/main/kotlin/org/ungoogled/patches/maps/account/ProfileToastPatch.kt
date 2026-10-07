@@ -6,6 +6,7 @@ import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.shared.replaceBlockAtLabel
+import org.ungoogled.patches.maps.microg.MicrogSelection
 
 private const val TOAST_TEXT = "Can't sign in"
 
@@ -33,6 +34,7 @@ internal val profileToastPatch = bytecodePatch(
     dependsOn(sharedExtensionPatch)
 
     execute {
+        if (MicrogSelection.replaces(this, "Remove sign-in prompts")) return@execute
         // Modern builder: 10 real instructions, this row's whole case.
         ProfileClickModernFingerprint.let { fp ->
             val matches = fp.instructionMatches
