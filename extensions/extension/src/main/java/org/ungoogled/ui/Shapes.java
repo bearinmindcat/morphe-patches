@@ -177,6 +177,7 @@ public final class Shapes {
      */
     public static void processStart(Context c) {
         try {
+            if (microgPatched()) MicroG.processStart(c);
             refreshPlayLocation(c);
             applyProxy(c);
         } catch (Throwable ignored) {}

@@ -3,7 +3,6 @@ package org.ungoogled.ui;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
-import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -63,6 +62,124 @@ public final class MicroG {
                 && PACKAGE.equals(r.serviceInfo.packageName);
     }
 
+    /** Google's own Play services. */
+    private static final String PLAY_SERVICES = "com.google.android.gms";
+    private static volatile String modules;   // decided at process start
+
+    /** From Shapes.processStart, before anything in Maps runs: where Play services modules come from. */
+    static void processStart(Context c) {
+        modules = playServicesPresent(c) ? PLAY_SERVICES : PACKAGE;
+    }
+
+    /** Google's Play services is installed, enabled or not. */
+    private static boolean playServicesPresent(Context c) {
+        try {
+            c.getPackageManager().getApplicationInfo(PLAY_SERVICES, PackageManager.MATCH_DISABLED_COMPONENTS);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * In place of the Play services package in Maps' module loader (DynamiteModule): Google's
+     * own Play services whenever it is installed, and microG only on phones without it. Its
+     * modules are code Maps runs in its own process -- Cronet, certificate checks, the security
+     * provider -- not account services, which stay with microG. ReVanced GmsCore builds
+     * modules from Google's Play services APK whenever that is installed, without the context
+     * Google's own loader sets up: on Play services 26.36 its Cronet started but no request
+     * ever finished, and Maps sat on its splash screen. A disabled Play services offers no
+     * modules, which Maps handles as on a phone without any.
+     */
+    public static String modulesPackage() {
+        String m = modules;
+        if (m == null) {
+            Context c = Shapes.appContext();
+            m = c != null && playServicesPresent(c) ? PLAY_SERVICES : PACKAGE;
+            if (c != null) modules = m;
+        }
+        return m;
+    }
+
+    /** The module provider's authority in [modulesPackage]. */
+    public static String modulesAuthority() {
+        return modulesPackage() + ".chimera";
+    }
+
+    /**
+     * In place of Maps' instantiation of a Play services module's class (DynamiteModule's
+     * instantiate): the same, except that a class which throws while it is constructed counts
+     * as a missing module -- Maps' own module exception, [failure], which every caller handles
+     * -- instead of crashing Maps. ReVanced GmsCore builds modules from Google's Play services
+     * APK whenever Google's is installed too, and outside Google's own module loader Play
+     * services 26.36's GoogleCertificatesImpl throws "Missing DynamiteApplicationContext".
+     */
+    public static android.os.IBinder moduleObject(ClassLoader loader, String name, Class<?> failure) {
+        try {
+            return (android.os.IBinder) loader.loadClass(name).newInstance();
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "Play services module class " + name + " did not load", t);
+            Throwable missing;
+            try {
+                missing = (Throwable) failure.getConstructor(String.class, Throwable.class)
+                        .newInstance("Failed to instantiate module class: " + name, t);
+            } catch (Throwable reflection) {
+                missing = new IllegalStateException(t);
+            }
+            throw MicroG.<RuntimeException>sneaky(missing);
+        }
+    }
+
+    private static volatile java.util.concurrent.Executor binds;
+
+    /**
+     * The executor Maps' Google-auth helper connects to the token service on, in place of none,
+     * which means the main thread. On its first start Maps waits on its main thread for each
+     * Google account's id (the "Make it your map" page), and that id comes over a connection
+     * delivered on the main thread: with an account in microG, Maps froze on its splash screen.
+     */
+    public static java.util.concurrent.Executor bindExecutor() {
+        java.util.concurrent.Executor e = binds;
+        if (e == null) {
+            synchronized (MicroG.class) {
+                if (binds == null) {
+                    binds = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                        Thread t = new Thread(r, "UA-gms-bind");
+                        t.setDaemon(true);
+                        return t;
+                    });
+                }
+                e = binds;
+            }
+        }
+        return e;
+    }
+
+    /**
+     * In place of the auth helper's wait for the token service, which had no time limit: a
+     * service that never connects (microG turning Maps away, say) now fails after 15 s as an
+     * unreachable service, which Maps handles, instead of holding Maps forever.
+     */
+    public static Object takeService(java.util.concurrent.BlockingQueue<?> queue) {
+        try {
+            Object service = queue.poll(15, java.util.concurrent.TimeUnit.SECONDS);
+            if (service == null) {
+                throw MicroG.<RuntimeException>sneaky(new java.util.concurrent.TimeoutException("the token service did not connect"));
+            }
+            return service;
+        } catch (InterruptedException e) {
+            throw MicroG.<RuntimeException>sneaky(e);
+        }
+    }
+
+    /** Throws a checked exception (Maps' module exception) from code that does not declare it. */
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> T sneaky(Throwable t) throws T {
+        throw (T) t;
+    }
+
     private static volatile Boolean cronet;   // null = not tried yet
 
     /**
@@ -89,32 +206,6 @@ public final class MicroG {
         return v;
     }
 
-    /**
-     * microG hands this app the user's Google accounts. MicroG-RE does, from 7.2.1, by
-     * honouring the stock package and certificate the manifest names; ReVanced GmsCore
-     * 0.3 does not and refuses the account provider ("missing google package permission
-     * or GET_ACCOUNTS"), so a sign-in there never reaches Maps. Asks the provider the
-     * same question Maps asks. Off the main thread: it may have to start microG. And
-     * through an unstable reference -- with a stable one, Android kills Maps along with
-     * microG if microG's process dies mid-call, which a slow start can make it do.
-     */
-    static boolean sharesAccounts(Context c) {
-        ContentProviderClient client = null;
-        try {
-            client = c.getContentResolver().acquireUnstableContentProviderClient(
-                    Uri.parse("content://" + PACKAGE + ".auth.accounts"));
-            if (client == null) return true;   // no provider to ask: do not nag
-            client.call("get_accounts", "app.revanced", null);
-            return true;
-        } catch (SecurityException e) {
-            return false;
-        } catch (Throwable t) {
-            return true;   // could not tell: do not nag
-        } finally {
-            if (client != null) client.close();
-        }
-    }
-
     /** From Shapes.wrap, at every Activity attach: once per process, watch for the main screen. */
     static void track(Context c) {
         if (tracked) return;
@@ -125,12 +216,11 @@ public final class MicroG {
     }
 
     private static final String KEY_QUIET_MISSING = "microg_quiet_missing";
-    private static final String KEY_QUIET_ACCOUNTS = "microg_quiet_accounts";
 
     /**
-     * When the main screen first shows, once per launch: say so if microG is missing,
-     * or is one that will not let Maps see the account. Maps works either way, signed
-     * out -- the map, search and navigation need no account. Each can be silenced.
+     * When the main screen first shows, once per launch: say so if microG is missing. Maps
+     * works without it, signed out -- the map, search and navigation need no account. It
+     * can be silenced.
      */
     static final class MissingNotice implements Application.ActivityLifecycleCallbacks {
         @Override public void onActivityResumed(Activity a) {
@@ -140,21 +230,11 @@ public final class MicroG {
             new Thread(() -> {
                 // Not in the middle of Maps' own start, which binds microG a dozen times.
                 try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
-                String key, title, message;
-                if (!installed(a)) {
-                    key = KEY_QUIET_MISSING;
-                    title = "microG is not installed";
-                    message = "Signing in, saved places, Timeline and location sharing need MicroG-RE "
-                            + "7.2.1 or newer. Maps works without it, signed out.";
-                } else if (!sharesAccounts(a)) {
-                    key = KEY_QUIET_ACCOUNTS;
-                    title = "This microG can't sign Maps in";
-                    message = "The installed microG (ReVanced GmsCore, or an older MicroG-RE) does not give "
-                            + "Maps your Google account, so signing in won't take. MicroG-RE 7.2.1 or newer does. "
-                            + "Maps works signed out either way.";
-                } else {
-                    return;
-                }
+                if (installed(a)) return;
+                String key = KEY_QUIET_MISSING;
+                String title = "microG is not installed";
+                String message = "Signing in, saved places, Timeline and location sharing need microG "
+                        + "(MicroG-RE or ReVanced GmsCore). Maps works without it, signed out.";
                 if (prefs.getBoolean(key, false)) return;
                 a.runOnUiThread(() -> show(a, prefs, key, title, message));
             }, "UA-microg-check").start();

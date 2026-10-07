@@ -10,13 +10,17 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
+import org.ungoogled.patches.maps.ui.applicationStartHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
@@ -42,6 +46,8 @@ private const val MICROG_CLASS = "Lorg/ungoogled/ui/MicroG;"
 private const val LOCATION_ACTION = "com.google.android.location.internal.GoogleLocationManagerService.START"
 private const val CRONET_PROVIDER = "Lcom/google/android/gms/net/PlayServicesCronetProvider;"
 private const val USE_LOCATION_FAILED = "Failed to get 'Use Location for Services' setting"
+private const val MODULE_CLASS_FAILED = "Failed to instantiate module class: "
+private const val COULD_NOT_BIND = "Could not bind to service."
 
 /** Play services permissions microG declares under its own names. */
 private val PERMISSION_ROUTES = mapOf(
@@ -130,8 +136,8 @@ val microgSupportPatch = bytecodePatch(
     description = "Builds microG Maps, a separate app (org.ungoogled.android.apps.maps.microg) that signs in to your " +
         "Google account through microG: saved places and lists, Timeline, location sharing, contributions and push " +
         "messages. Remove sign-in prompts, Trim account menu, Offline saved places and Remove permissions are left " +
-        "out of this build, and its icon carries microG's C. Needs MicroG-RE 7.2.1 or newer; ReVanced GmsCore runs " +
-        "the map but does not pass your account to Maps. Not for root (mount) installs.",
+        "out of this build, and its icon carries microG's C. Needs microG: MicroG-RE or ReVanced GmsCore. Not for " +
+        "root (mount) installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -140,9 +146,10 @@ val microgSupportPatch = bytecodePatch(
     availability(AvailabilityResolver { installer, _ ->
         if (installer == InstallerType.MOUNT) PatchAvailability.UNAVAILABLE else PatchAvailability.DISABLED
     })
-    // Shapes.wrap starts the microG notice (missing, or keeping the account from Maps), and the
-    // location-source switch reads microgPatched().
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, microgManifestPatch)
+    // Shapes.wrap starts the microG notice (missing, or keeping the account from Maps), the
+    // location-source switch reads microgPatched(), and Shapes.processStart decides where Play
+    // services modules come from before Maps loads any.
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, applicationStartHookPatch, microgManifestPatch)
 
     execute {
         MicrogSelection.select(this)
@@ -230,6 +237,133 @@ val microgSupportPatch = bytecodePatch(
             val register = (read as TwoRegisterInstruction).registerA
             if (register > 15) throw PatchException("flag register v$register out of const/4 range")
             replaceInstruction(0, "const/4 v$register, 0x0")
+        }
+
+        // 5. Play services modules (code Maps loads from Play services: certificate checks,
+        //    Cronet, the security provider). ReVanced GmsCore builds each from Google's Play
+        //    services APK whenever Google's is installed too, without the context Google's own
+        //    loader sets up, and Play services 26.36's GoogleCertificatesImpl throws "Missing
+        //    DynamiteApplicationContext" from its constructor -- an exception Maps' module code
+        //    does not expect, so Maps crashed at start. Instantiating a module's class now goes
+        //    through the extension, which turns any failure into Maps' own "module unavailable"
+        //    exception; every caller already carries on without the module then.
+        val instantiators = mutableListOf<Pair<String, String>>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (method in classDef.methods) {
+                if (method.returnType != "Landroid/os/IBinder;" || method.parameterTypes.map { it.toString() } != listOf("Ljava/lang/String;")) continue
+                val found = method.implementation?.instructions?.any {
+                    it.opcode == Opcode.CONST_STRING && ((it as ReferenceInstruction).reference as StringReference).string == MODULE_CLASS_FAILED
+                } == true
+                if (found) instantiators += classDef.type to method.name
+            }
+        }
+        val (moduleClass, instantiate) = instantiators.singleOrNull()
+            ?: throw PatchException("expected one module class instantiation, found ${instantiators.size}")
+        mutableClassDefBy(moduleClass).methods.single {
+            it.name == instantiate && it.returnType == "Landroid/os/IBinder;" && it.parameterTypes.map { p -> p.toString() } == listOf("Ljava/lang/String;")
+        }.apply {
+            val instructions = implementation!!.instructions.toList()
+            val context = instructions.firstNotNullOfOrNull { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? FieldReference)
+                    ?.takeIf { insn.opcode == Opcode.IGET_OBJECT && it.type == "Landroid/content/Context;" }
+            } ?: throw PatchException("module class instantiation no longer reads its Context")
+            val failure = instructions.firstNotNullOfOrNull { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? TypeReference)?.takeIf { insn.opcode == Opcode.NEW_INSTANCE }?.type
+            } ?: throw PatchException("module class instantiation no longer throws an exception of its own")
+            // .registers 3: v0, then p0 (this) and p1 (the class name); p0 is reused once read.
+            if (implementation!!.registerCount != 3) throw PatchException("module class instantiation changed its registers")
+            addInstructions(
+                0,
+                """
+                    iget-object p0, p0, ${context.definingClass}->${context.name}:Landroid/content/Context;
+                    invoke-virtual { p0 }, Landroid/content/Context;->getClassLoader()Ljava/lang/ClassLoader;
+                    move-result-object p0
+                    const-class v0, $failure
+                    invoke-static { p0, p1, v0 }, $MICROG_CLASS->moduleObject(Ljava/lang/ClassLoader;Ljava/lang/String;Ljava/lang/Class;)Landroid/os/IBinder;
+                    move-result-object p0
+                    return-object p0
+                """,
+            )
+        }
+
+        // 6. Where those modules come from: Google's own Play services whenever it is installed
+        //    -- its loader is the one its modules work with, as in Ungoogled Maps -- and microG
+        //    only on phones without it (MicroG.modulesPackage). The loader names Play services
+        //    twice (to load Google's module loader, and as the module provider's owner) and the
+        //    provider twice; each name becomes a call, which also keeps it out of the rewrite to
+        //    microG's names in finalize below.
+        val calls = mapOf(
+            "com.google.android.gms" to "modulesPackage",
+            "com.google.android.gms.chimera" to "modulesAuthority",
+        )
+        val replaced = mutableMapOf<String, Int>()
+        for (method in mutableClassDefBy(moduleClass).methods) {
+            val instructions = method.implementation?.instructions?.toList() ?: continue
+            for (index in instructions.indices.reversed()) {
+                val insn = instructions[index]
+                if (insn.opcode != Opcode.CONST_STRING) continue
+                val string = ((insn as ReferenceInstruction).reference as StringReference).string
+                val call = calls[string] ?: continue
+                val register = (insn as OneRegisterInstruction).registerA
+                method.replaceInstruction(index, "invoke-static { }, $MICROG_CLASS->$call()Ljava/lang/String;")
+                method.addInstruction(index + 1, "move-result-object v$register")
+                replaced[string] = (replaced[string] ?: 0) + 1
+            }
+        }
+        if (calls.keys.any { replaced[it] != 2 }) throw PatchException("module loader names Play services differently now: $replaced")
+
+        // 7. The Google-auth helper's connection to the token service (account ids, tokens).
+        //    It binds with no executor, so the connection arrives on the main thread, and then
+        //    waits for it with no time limit. On its first start Maps waits for each Google
+        //    account's id on that same main thread (the "Make it your map" page): with an
+        //    account in microG -- ReVanced GmsCore turns Maps' account lookup away, so Maps
+        //    asks the token service instead -- Maps froze on its splash screen. The helper now
+        //    connects on a background executor and gives up after 15 s.
+        val helpers = mutableListOf<Pair<String, String>>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (method in classDef.methods) {
+                if (method.parameterTypes.size != 3 || method.parameterTypes[1].toString() != "Landroid/content/ComponentName;") continue
+                val found = method.implementation?.instructions?.any {
+                    it.opcode == Opcode.CONST_STRING && ((it as ReferenceInstruction).reference as StringReference).string == COULD_NOT_BIND
+                } == true
+                if (found) helpers += classDef.type to method.name
+            }
+        }
+        val (helperClass, helperName) = helpers.singleOrNull()
+            ?: throw PatchException("expected one token service connection, found ${helpers.size}")
+        mutableClassDefBy(helperClass).methods.single {
+            it.name == helperName && it.parameterTypes.size == 3 && it.parameterTypes[1].toString() == "Landroid/content/ComponentName;"
+        }.apply {
+            val instructions = implementation!!.instructions.toList()
+            // The bind: supervisor.f(descriptor, connection, executor), the executor a null constant.
+            val bind = instructions.indexOfFirst { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                    it.parameterTypes.size == 3 &&
+                        it.parameterTypes[1].toString() == "Landroid/content/ServiceConnection;" &&
+                        it.parameterTypes[2].toString() == "Ljava/util/concurrent/Executor;" &&
+                        it.returnType == "Lcom/google/android/gms/common/ConnectionResult;"
+                } == true
+            }
+            if (bind < 1) throw PatchException("token service bind not found")
+            val executor = (instructions[bind] as Instruction35c).registerF
+            val none = instructions[bind - 1]
+            if (none.opcode != Opcode.CONST_4 || (none as OneRegisterInstruction).registerA != executor ||
+                (none as NarrowLiteralInstruction).narrowLiteral != 0
+            ) throw PatchException("token service bind no longer passes a null executor")
+            // The wait: BlockingQueue.take() on the connection's queue.
+            val take = instructions.indexOfFirst { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                    it.definingClass == "Ljava/util/concurrent/BlockingQueue;" && it.name == "take"
+                } == true
+            }
+            if (take < 0) throw PatchException("token service wait not found")
+            val queue = (instructions[take] as Instruction35c).registerC
+            // Replace the wait first: it comes after the bind, so the bind's index stays put.
+            replaceInstruction(take, "invoke-static { v$queue }, $MICROG_CLASS->takeService(Ljava/util/concurrent/BlockingQueue;)Ljava/lang/Object;")
+            replaceInstruction(bind - 1, "invoke-static { }, $MICROG_CLASS->bindExecutor()Ljava/util/concurrent/Executor;")
+            addInstruction(bind, "move-result-object v$executor")
         }
     }
 
