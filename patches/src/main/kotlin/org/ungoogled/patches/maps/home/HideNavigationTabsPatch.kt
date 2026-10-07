@@ -9,12 +9,9 @@ import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val hideNavigationTabsPatch = bytecodePatch(
-    name = "Hide navigation tabs",
+internal val hideNavigationTabsPatch = bytecodePatch(
     description = "Hides the Explore / Contribute / You strip at the bottom of the home screen. Can be " +
         "switched back on on the Customization screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch, activityContextHookPatch)

@@ -5,12 +5,9 @@ import app.morphe.patcher.extensions.InstructionExtensions.removeInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val networkLocationFallbackPatch = bytecodePatch(
-    name = "Network location fallback",
+internal val networkLocationFallbackPatch = bytecodePatch(
     description = "Keeps the network (Wi-Fi/cell) location provider registered when no fused " +
         "location provider answers, instead of GPS-only, so a fix does not go stale indoors.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

@@ -13,12 +13,9 @@ import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.shared.addInstructionsAtLabel
 
-@Suppress("unused")
-val hideExploreFeedPatch = bytecodePatch(
-    name = "Hide explore feed",
+internal val hideExploreFeedPatch = bytecodePatch(
     description = "Hides the home tab's Explore feed sheet (\"Local vibe\"). Can be switched back on " +
         "on the Customization screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch, activityContextHookPatch)

@@ -18,11 +18,13 @@ val locationProviderTogglePatch = bytecodePatch(
     description = "Adds a Location source choice to the Customization screen: Android's own location " +
         "providers, or Google Play services' fused provider. With Android, Play services is never asked " +
         "for a location. Play services is never used while it is missing or disabled, so location keeps " +
-        "working on phones without it.",
+        "working on phones without it. Also keeps the network (Wi-Fi/cell) provider registered when no " +
+        "fused provider answers, instead of GPS only, so a fix does not go stale indoors.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, applicationStartHookPatch, activityContextHookPatch)
+    // Network location fallback used to be a patch of its own.
+    dependsOn(sharedExtensionPatch, applicationStartHookPatch, activityContextHookPatch, networkLocationFallbackPatch)
 
     val useFusedProvider = booleanOption(
         key = "useFusedProvider",

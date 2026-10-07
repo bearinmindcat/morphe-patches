@@ -5,11 +5,8 @@ import app.morphe.patcher.patch.bytecodePatch
 import com.android.tools.smali.dexlib2.Opcode
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val hideSignInButtonPatch = bytecodePatch(
-    name = "Hide sign-in button",
+internal val hideSignInButtonPatch = bytecodePatch(
     description = "Removes the \"Sign in\" pill from the account sheet.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

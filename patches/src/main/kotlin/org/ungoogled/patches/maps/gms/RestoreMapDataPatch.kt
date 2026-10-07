@@ -20,14 +20,11 @@ private const val GENUINE_PACKAGE = "com.google.android.apps.maps"
  */
 private const val GENUINE_CERT = "38918A453D07199354F8B19AF05EC6562CED5788"
 
-@Suppress("unused")
-val restoreMapDataPatch = bytecodePatch(
-    name = "Restore map data",
+internal val restoreMapDataPatch = bytecodePatch(
     description = "Lets a re-signed Maps load tiles, search and routing, by sending Google's own " +
         "package and certificate in the identity headers the Maps backend checks, and by " +
         "degrading instead of crashing when Play services rejects the re-signed app -- including " +
         "skipping a view property that fails for that reason instead of crashing the screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

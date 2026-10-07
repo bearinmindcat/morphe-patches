@@ -31,16 +31,13 @@ private val timelineManifestPatch = resourcePatch(description = "Declares the Ti
     }
 }
 
-@Suppress("unused")
-val offlineTimelinePatch = bytecodePatch(
-    name = "Offline timeline",
+internal val localTimelinePatch = bytecodePatch(
     description = "Adds a Timeline to the Local saved screen: a record of where the phone has been, grouped into days " +
         "and visits, kept only on the phone, with GPX export. Recording is off until switched on there; it " +
         "shows a notification while it runs.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(offlineSavedPlacesPatch, timelineManifestPatch)
+    dependsOn(localSavedPlacesPatch, timelineManifestPatch)
 
     execute {
         markPatched("timelinePatched")

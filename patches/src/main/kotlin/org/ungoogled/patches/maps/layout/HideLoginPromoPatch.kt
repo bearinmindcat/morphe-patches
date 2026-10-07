@@ -4,11 +4,8 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val hideLoginPromoPatch = bytecodePatch(
-    name = "Hide login promo",
+internal val hideLoginPromoPatch = bytecodePatch(
     description = "Hides the full-screen \"Make it your map\" page shown on first launch.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

@@ -20,11 +20,8 @@ private object PromotedPinAdsRequestFingerprint : Fingerprint(
     parameters = listOf("Lcdsx;", "Lcjlj;", "Z"),
 )
 
-@Suppress("unused")
-val hideAdsPatch = bytecodePatch(
-    name = "Hide ads",
+internal val hideAdsPatch = bytecodePatch(
     description = "Hides promoted map pins and \"Sponsored\" search result rows.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // Every edit below reads Shapes.HIDE_ADS, so the Customization screen's

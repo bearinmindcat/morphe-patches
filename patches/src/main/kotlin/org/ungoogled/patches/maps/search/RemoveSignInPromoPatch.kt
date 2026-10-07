@@ -4,11 +4,8 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val removeSignInPromoPatch = bytecodePatch(
-    name = "Remove sign-in promo",
+internal val removeSignInPromoPatch = bytecodePatch(
     description = "Removes the \"Tired of typing?\" sign-in card from the search screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

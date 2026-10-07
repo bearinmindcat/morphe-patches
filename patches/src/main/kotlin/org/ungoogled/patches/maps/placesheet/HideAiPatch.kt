@@ -44,13 +44,10 @@ private val SUMMARY_CHECK = listOf(
     Opcode.CONST_4, Opcode.RETURN, Opcode.CONST_4, Opcode.RETURN,
 )
 
-@Suppress("unused")
-val hideAiPatch = bytecodePatch(
-    name = "Hide AI",
+internal val hideAiPatch = bytecodePatch(
     description = "Hides Gemini's AI summaries: the \"Know before you go\" card on place sheets and the " +
         "review summary (\"Summarized with Gemini\") on the Reviews tab. Can be switched off on the " +
         "Customization screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // HIDE_AI is refreshed from the Customization switch at every Activity attach.

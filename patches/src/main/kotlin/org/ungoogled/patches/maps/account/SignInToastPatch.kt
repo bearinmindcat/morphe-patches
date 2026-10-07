@@ -7,11 +7,8 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
 private const val TOAST_TEXT = "Can't sign in"
 
-@Suppress("unused")
-val signInToastPatch = bytecodePatch(
-    name = "Sign-in toast",
+internal val signInToastPatch = bytecodePatch(
     description = "The \"Sign in\" pill shows a \"Can't sign in\" toast instead of failing silently.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 

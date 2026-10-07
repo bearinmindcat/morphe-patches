@@ -20,13 +20,10 @@ private val CAROUSEL_GETTER = listOf(
     Opcode.IGET_OBJECT, Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT,
 )
 
-@Suppress("unused")
-val hideDirectoryCarouselPatch = bytecodePatch(
-    name = "Hide suggestions",
+internal val hideDirectoryCarouselPatch = bytecodePatch(
     description = "Hides the row of businesses under an address on its place sheet: a preview of the " +
         "address's Directory (the restaurants, shops and offices at that address). The Directory button " +
         "still lists them. Can be switched off on the Customization screen.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // HIDE_DIRECTORY is refreshed from the Customization switch at every Activity attach.

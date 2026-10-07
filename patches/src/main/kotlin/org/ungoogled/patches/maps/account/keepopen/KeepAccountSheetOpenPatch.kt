@@ -107,12 +107,9 @@ private object SettingsRowClickFingerprint : Fingerprint(
     ),
 )
 
-@Suppress("unused")
-val keepAccountSheetOpenPatch = bytecodePatch(
-    name = "Keep account sheet open",
+internal val keepAccountSheetOpenPatch = bytecodePatch(
     description = "Returning from Settings or Customization, or tapping \"Your profile\", " +
         "leaves the account sheet open instead of dropping back to the map.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch, accountSheetNoDismissPatch)

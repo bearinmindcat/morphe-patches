@@ -25,11 +25,8 @@ private const val TOAST_TEXT = "Can't sign in"
  * neighbouring row's code instead of the toast. The new body is placed AT the
  * case label and returns; the old one is left behind it, unreachable.
  */
-@Suppress("unused")
-val profileToastPatch = bytecodePatch(
-    name = "Your profile toast",
+internal val profileToastPatch = bytecodePatch(
     description = "Tapping \"Your profile\" shows a \"Can't sign in\" toast instead of opening nothing.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // Shapes.SKIP_DISMISS: with Keep account sheet open, the sheet stays up behind the toast.

@@ -129,15 +129,12 @@ private val SAVE_ENTRY_SHAPE = listOf(
     Opcode.INVOKE_DIRECT, Opcode.INVOKE_VIRTUAL, Opcode.RETURN_VOID,
 )
 
-@Suppress("unused")
-val offlineSavedPlacesPatch = bytecodePatch(
-    name = "Offline saved places",
+internal val localSavedPlacesPatch = bytecodePatch(
     description = "Save places without a Google account, kept only on the phone: Save opens Maps' own \"Place " +
         "saved\" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a " +
         "\"Local saved\" row on the account sheet rebuilds Maps' You tab -- your recent places (looked at, " +
         "routed to, called, shared or saved), your lists and labels (Home, Work, your own) -- with export and " +
         "import (backup file, KML, Google Takeout's Saved Places.json).",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch, activityContextHookPatch, customizationScreenPatch, savedManifestPatch)

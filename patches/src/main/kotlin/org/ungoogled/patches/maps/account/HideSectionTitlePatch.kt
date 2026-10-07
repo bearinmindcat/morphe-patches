@@ -6,11 +6,8 @@ import app.morphe.patcher.patch.bytecodePatch
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-@Suppress("unused")
-val hideSectionTitlePatch = bytecodePatch(
-    name = "Hide section title",
+internal val hideSectionTitlePatch = bytecodePatch(
     description = "Removes the \"More from this app\" label from the account sheet.",
-    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
 
