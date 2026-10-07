@@ -130,8 +130,8 @@ val microgSupportPatch = bytecodePatch(
     description = "Builds microG Maps, a separate app (org.ungoogled.android.apps.maps.microg) that signs in to your " +
         "Google account through microG: saved places and lists, Timeline, location sharing, contributions and push " +
         "messages. Remove sign-in prompts, Trim account menu, Offline saved places and Remove permissions are left " +
-        "out of this build. Needs MicroG-RE 7.2.1 or newer; ReVanced GmsCore runs the map but does not pass your " +
-        "account to Maps. Not for root (mount) installs.",
+        "out of this build, and its icon carries microG's C. Needs MicroG-RE 7.2.1 or newer; ReVanced GmsCore runs " +
+        "the map but does not pass your account to Maps. Not for root (mount) installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
