@@ -1,3 +1,11 @@
+## [1.7.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.0...v1.7.1) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+* account picture stays round inside its ring ([54b9f9f](https://github.com/bearinmindcat/morphe-patches/commit/54b9f9f745783799483c09fa968778ad32f97d9c))
+* microG Maps no longer crashes or freezes at start ([c7d4723](https://github.com/bearinmindcat/morphe-patches/commit/c7d472383ff4d196fefa3bb0f7abf50995546ddd))
+* splash screen shows the app's own icon ([b2d512e](https://github.com/bearinmindcat/morphe-patches/commit/b2d512e655db74a34d8564e69283d07841cf63bb))
+
 ## [1.6.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.5.1...v1.6.0) (2026-10-07)
 
 ### ✨ New Features
