@@ -1,3 +1,9 @@
+## [1.7.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.2...v1.7.3) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+* local saved in microG Maps, with pull from Google account ([c6b8d13](https://github.com/bearinmindcat/morphe-patches/commit/c6b8d13c94d12b10fb50527680e6e0440cd0731a))
+
 ## [1.7.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.1...v1.7.2) (2026-10-07)
 
 ### 🐛 Bug Fixes
