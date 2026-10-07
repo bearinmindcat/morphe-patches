@@ -582,6 +582,7 @@ public final class Shapes {
             HIDE_DIRECTORY = hideDirectoryEnabled(base);
             HIDE_AI = hideAiEnabled(base);
             HIGH_REFRESH = highRefreshEnabled(base);
+            PowerSaving.refresh(base);
             SavedPlaces.track(base);
             BETTER_OFFLINE = betterOfflineEnabled(base);
             NAV_ZOOM_BUTTONS = navZoomEnabled(base);
@@ -779,11 +780,18 @@ public final class Shapes {
             if (NAV_TRACE) android.util.Log.w("UA", "NAVCAM controller published: " + controller.getClass().getName());
             // Attach on THIS frame rather than waiting for the next tick: the
             // tiles were visibly appearing after the rest of the nav chrome.
-            try { new android.os.Handler(android.os.Looper.getMainLooper()).post(new NavTicker()); }
+            // The one ticker, brought forward -- not a new one: each new controller
+            // used to start another ticker that never stopped, and they piled up
+            // (13 found queued in one process, each walking every window).
+            try { MAIN.removeCallbacks(TICKER); MAIN.post(TICKER); }
             catch (Throwable t) { }
         }
         startNavTicker();
     }
+
+    /** The navigation ticker, and the one Handler that schedules it, so it can be rescheduled in place. */
+    static final android.os.Handler MAIN = new android.os.Handler(android.os.Looper.getMainLooper());
+    static final NavTicker TICKER = new NavTicker();
 
     // ---- nav zoom: hold an override on the navigation camera --------------
     //
@@ -1134,6 +1142,13 @@ public final class Shapes {
         return null;
     }
 
+    /** The window's top on screen: below the status bar when the window is not drawn behind it. */
+    static int decorTop(android.view.View decor) {
+        int[] o = new int[2];
+        decor.getLocationOnScreen(o);
+        return o[1];
+    }
+
     /** The badge CARD, found by walking up from the "mph" label to the largest
      *  ancestor that is still badge-sized.
      *
@@ -1403,6 +1418,58 @@ public final class Shapes {
         return t;
     }
 
+    /** Power Saving Options > Open without locking: a tile like the zoom ones, a battery saver icon on it. */
+    static android.view.View powerTile(Context ctx) {
+        android.view.View t = tile(ctx, "", 0f);
+        t.setOnClickListener(new PowerSaving.OpenClick());
+        t.setForeground(new BatteryIcon(ctx.getResources().getDisplayMetrics().density,
+                                        navDarkScheme() ? 0xFFFFFFFF : 0xFF1F1F1F));
+        t.setContentDescription("Power saving screen");
+        return t;
+    }
+
+    /**
+     * Android's battery saver icon -- a battery outline with a plus -- drawn with the
+     * reset icon's stroke so the tiles match. Only the centre of the bounds is used.
+     * Named class, not anonymous: d8 NPEs on anonymous classes in this build.
+     */
+    static final class BatteryIcon extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint stroke =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint fill =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final float d;
+
+        BatteryIcon(float density, int colour) {
+            this.d = density;
+            stroke.setColor(colour);
+            stroke.setStyle(android.graphics.Paint.Style.STROKE);
+            stroke.setStrokeWidth(2.6f * density);
+            stroke.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            fill.setColor(colour);
+            fill.setStyle(android.graphics.Paint.Style.FILL);
+        }
+
+        public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            float cx = b.exactCenterX(), cy = b.exactCenterY() + 1.5f * d;
+            float w = 14f * d, h = 22f * d;
+            android.graphics.RectF body = new android.graphics.RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2);
+            c.drawRoundRect(body, 2.5f * d, 2.5f * d, stroke);
+            c.drawRoundRect(new android.graphics.RectF(cx - 3.5f * d, body.top - 3.5f * d, cx + 3.5f * d, body.top),
+                    1f * d, 1f * d, fill);
+            float p = 3.6f * d;
+            c.drawLine(cx - p, cy, cx + p, cy, stroke);
+            c.drawLine(cx, cy - p, cx, cy + p, stroke);
+        }
+
+        public void setAlpha(int alpha) { stroke.setAlpha(alpha); fill.setAlpha(alpha); }
+        public void setColorFilter(android.graphics.ColorFilter cf) {
+            stroke.setColorFilter(cf); fill.setColorFilter(cf);
+        }
+        public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+
     static final class ZoomClick implements android.view.View.OnClickListener {
         final float dx;                        // 0 = reset to Maps' automatic zoom
         ZoomClick(float dx) { this.dx = dx; }
@@ -1421,6 +1488,8 @@ public final class Shapes {
     }
 
     static android.view.View navTiles;
+    /** What the column was built with, so a change of either switch rebuilds it. */
+    private static boolean navTilesZoom, navTilesPower;
 
     private static int navAttachTries;
     /** Where the tiles last sat. The speed badge we position against is not in
@@ -1502,13 +1571,23 @@ public final class Shapes {
         }
         ClipColumn col = new ClipColumn(ctx);
         col.setOrientation(android.widget.LinearLayout.VERTICAL);
-        android.view.View plus  = tile(ctx, "+", +1f),
-                          minus = tile(ctx, "\u2212", -1f),
-                          reset = tile(ctx, null, 0f);        // null glyph -> the drawn ResetIcon
-        // Top to bottom reset / + / -: "+" is the one nearer the top, as on Maps' own controls
-        col.addView(reset, new android.widget.LinearLayout.LayoutParams(side, side));
-        col.addView(plus,  lmargin(side, gap));
-        col.addView(minus, lmargin(side, gap));
+        boolean zoom = NAV_ZOOM_BUTTONS, power = PowerSaving.navButton();
+        java.util.List<android.view.View> tiles = new java.util.ArrayList<>();
+        // Top to bottom reset / + / -: "+" is the one nearer the top, as on Maps' own controls.
+        // Power saving (Open without locking) goes on top of them in portrait, and below them
+        // in landscape, where the column starts level with Maps' topmost button.
+        if (power && !land) tiles.add(powerTile(ctx));
+        if (zoom) {
+            tiles.add(tile(ctx, null, 0f));                    // null glyph -> the drawn ResetIcon
+            tiles.add(tile(ctx, "+", +1f));
+            tiles.add(tile(ctx, "\u2212", -1f));
+        }
+        if (power && land) tiles.add(powerTile(ctx));
+        if (tiles.isEmpty()) return;
+        for (int i = 0; i < tiles.size(); i++) {
+            col.addView(tiles.get(i), i == 0 ? new android.widget.LinearLayout.LayoutParams(side, side) : lmargin(side, gap));
+        }
+        int rows = tiles.size();
 
         android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1529,6 +1608,7 @@ public final class Shapes {
             int step = side + gap;                               // one row of the grid
             if (badge != null && decor.getHeight() > 0) {
                 int[] at = new int[2]; badge.getLocationOnScreen(at);
+                at[1] -= decorTop(decor);                        // the window need not start at the screen's top
                 // at[1] is the badge's VIEW top, which carries the same transparent
                 // mask padding our own views do -- so the margin between the two
                 // VIEW boxes that yields a 21dp visible gap is `gap`, not
@@ -1544,7 +1624,8 @@ public final class Shapes {
             android.view.View fab = findNavFab(decor);
             if (fab != null && fab.getHeight() > 0 && step > 0) {
                 int[] fat = new int[2]; fab.getLocationOnScreen(fat);
-                int colTop = decor.getHeight() - bottom - (3 * side + 2 * gap);
+                fat[1] -= decorTop(decor);
+                int colTop = decor.getHeight() - bottom - (rows * side + (rows - 1) * gap);
                 int delta = ((fat[1] - colTop) % step + step) % step;
                 if (delta > step / 2) delta -= step;             // nearest row, either way
                 if (Math.abs(delta) <= gap) bottom -= delta;     // only a nudge, never a jump
@@ -1556,6 +1637,8 @@ public final class Shapes {
         }
         decor.addView(col, lp);
         navTiles = col;
+        navTilesZoom = zoom;
+        navTilesPower = power;
         watchCovers(decor);
         navLandscape = land;
         navAttachTries = 0;   // so a LATER attach (rotation -> new decor) waits for the badge too
@@ -1681,6 +1764,7 @@ public final class Shapes {
             int pad = tilePad(decor.getContext());
             int gap = Math.max(0, Math.round(21f * d) - 2 * pad);
             int[] at = new int[2]; card.getLocationOnScreen(at);
+            at[1] -= decorTop(decor);
             int b = decor.getHeight() - at[1] + gap;
             int lo = Math.round(80f * d), hi = Math.round(decor.getHeight() * 0.7f);
             if (b < lo || b > hi) return;
@@ -1755,15 +1839,25 @@ public final class Shapes {
     static void findCovers(android.view.ViewGroup decor) {
         coverViews.clear();
         int w = decor.getWidth(), h = decor.getHeight();
-        if (w > 0 && h > 0) collectCovers(decor, w, h, new int[2]);
+        if (w <= 0 || h <= 0) return;
+        int[] at = new int[2];
+        decor.getLocationOnScreen(at);
+        collectCovers(decor, w, h, at[1], new int[2]);
     }
 
-    private static void collectCovers(android.view.View v, int w, int h, int[] at) {
+    /**
+     * @param top the window's own top on screen. Positions are taken relative to it: a
+     * window that does not start at the top of the screen (not drawn behind the status
+     * bar) otherwise counted ITSELF as a panel over the tiles, and they were clipped away
+     * entirely -- seen as zoom tiles that never appeared.
+     */
+    private static void collectCovers(android.view.View v, int w, int h, int top, int[] at) {
         if (v == navTiles || v.getVisibility() != android.view.View.VISIBLE) return;
         android.graphics.drawable.Drawable bg = v.getBackground();
         if (bg != null && v.getWidth() >= w * 0.3f && v.getHeight() >= h / 6f && painted(bg)) {
             v.getLocationOnScreen(at);
-            boolean window = at[1] <= h * 0.05f && v.getHeight() >= h * 0.9f;
+            boolean window = v.getParent() == null || v.getRootView() == v
+                    || (at[1] - top <= h * 0.05f && v.getHeight() >= h * 0.9f);
             if (!window) {
                 coverViews.add(new java.lang.ref.WeakReference<>(v));
                 if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM cover candidate " + v.getClass().getName()
@@ -1772,7 +1866,7 @@ public final class Shapes {
         }
         if (v instanceof android.view.ViewGroup) {
             android.view.ViewGroup g = (android.view.ViewGroup) v;
-            for (int i = 0; i < g.getChildCount(); i++) collectCovers(g.getChildAt(i), w, h, at);
+            for (int i = 0; i < g.getChildCount(); i++) collectCovers(g.getChildAt(i), w, h, top, at);
         }
     }
 
@@ -1837,13 +1931,19 @@ public final class Shapes {
                             + " navUp=" + navUp + " tiles=" + (navTiles != null)
                             + " tries=" + navAttachTries
                             + (decor != null ? " decor=" + decor.getWidth() + "x" + decor.getHeight() : ""));
-                if (!NAV_ZOOM_BUTTONS && navTiles == null) { reschedule(); return; }  // nothing to do
+                // Power Saving Options: lower frame rate in navigation, auto-switch when idle.
+                PowerSaving.navTick(decor, navUp);
+                boolean power = PowerSaving.navButton();
+                boolean any = NAV_ZOOM_BUTTONS || power;
+                if (!any && navTiles == null) { reschedule(); return; }  // nothing to do
                 boolean guidance = (android.os.SystemClock.uptimeMillis() - navCamAt) < 3000L;
-                if (navUp && NAV_ZOOM_BUTTONS && decor != null) {
+                if (navUp && any && decor != null) {
                     // Maps does not recreate the navigation Activity on rotation,
-                    // so the DecorView and our margins survive it. Rebuild.
-                    if (navTiles != null && decor.getWidth() > 0
-                            && (decor.getWidth() > decor.getHeight()) != navLandscape) {
+                    // so the DecorView and our margins survive it. Rebuild -- and when
+                    // a switch adds or removes tiles.
+                    if (navTiles != null && ((decor.getWidth() > 0
+                            && (decor.getWidth() > decor.getHeight()) != navLandscape)
+                            || navTilesZoom != NAV_ZOOM_BUTTONS || navTilesPower != power)) {
                         android.view.ViewParent p = navTiles.getParent();
                         if (p instanceof android.view.ViewGroup) ((android.view.ViewGroup) p).removeView(navTiles);
                         navTiles = null;                    // keep navZoom: the override still stands
@@ -1854,7 +1954,7 @@ public final class Shapes {
                     // Guidance still live but no usable window = picture-in-picture:
                     // take the tiles away without dropping the user's zoom, so it
                     // is still there when the full screen comes back.
-                    if (guidance && NAV_ZOOM_BUTTONS) hideTiles();
+                    if (guidance && any) hideTiles();
                     else detachTiles();                     // nav ended, or toggle off
                 }
             } catch (Throwable t) { if (NAV_TRACE) android.util.Log.w("UA", "NAVZOOM tick " + t); }
@@ -1864,7 +1964,7 @@ public final class Shapes {
             // Fast while guidance is live so a retry (badge not laid out yet)
             // costs ~150ms, not a second; slow when idle so it stays cheap.
             long ms = (android.os.SystemClock.uptimeMillis() - navCamAt) < 3000L ? 150L : 1000L;
-            try { new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this, ms); } catch (Throwable t) { }
+            try { MAIN.removeCallbacks(this); MAIN.postDelayed(this, ms); } catch (Throwable t) { }
         }
     }
 
@@ -1905,7 +2005,7 @@ public final class Shapes {
     static void startNavTicker() {
         if (navTickerStarted) return;
         navTickerStarted = true;
-        try { new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new NavTicker(), 1500); }
+        try { MAIN.removeCallbacks(TICKER); MAIN.postDelayed(TICKER, 1500); }
         catch (Throwable t) { navTickerStarted = false; }
     }
 

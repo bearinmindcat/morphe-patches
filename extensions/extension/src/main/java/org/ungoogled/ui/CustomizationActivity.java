@@ -28,17 +28,37 @@ public final class CustomizationActivity extends Activity {
     // neutral6 surface (#131314) / neutral90 text; Black theme = pure black surface.
     private static final int BG = 0xFFFFFFFF, TEXT = 0xFF1B1B1F, SUMMARY = 0xFF5F6368;
     private static final int BG_D = 0xFF131314, TEXT_D = 0xFFE3E3E3, SUMMARY_D = 0xFFC4C7C5;
+    /** Which page: the main list, or Power Saving Options (this same screen, opened again). */
+    static final String EXTRA_PAGE = "org.ungoogled.ui.page";
+    static final String PAGE_POWER = "power";
+    private static final String POWER_TITLE = "Power Saving Options";
     private boolean dark, black;
-    private TextView proxySub;
+    private TextView proxySub, powerSub;
 
     private String proxySummary() {
         String effective = Shapes.proxy(this);
         return effective.isEmpty() ? "Off" : effective;
     }
 
+    /** What is switched on in Power Saving Options, for its row on the main page. */
+    private String powerSummary() {
+        java.util.List<String> on = new java.util.ArrayList<>();
+        if (PowerSaving.allPhones(this) || PowerSaving.nativeMinMode(this)) on.add("Power saving mode");
+        if (PowerSaving.unlocked(this)) on.add("without locking");
+        if (PowerSaving.idleSeconds(this) > 0) on.add("auto-switch");
+        if (PowerSaving.speedometer(this)) on.add("speedometer");
+        if (PowerSaving.lowFps(this) != PowerSaving.LOW_FPS_OFF) on.add("lower frame rate");
+        if (PowerSaving.theme(this) != PowerSaving.THEME_OFF) on.add("black map");
+        if (on.isEmpty()) return "Off";
+        StringBuilder s = new StringBuilder(on.get(0));
+        for (int i = 1; i < on.size(); i++) s.append(", ").append(on.get(i));
+        return s.toString();
+    }
+
     @Override protected void onResume() {
         super.onResume();
         if (proxySub != null) proxySub.setText(proxySummary());
+        if (powerSub != null) powerSub.setText(powerSummary());
     }
 
     private int bg() { return black ? 0xFF000000 : dark ? BG_D : BG; }
@@ -58,7 +78,9 @@ public final class CustomizationActivity extends Activity {
         String darkMode = getSharedPreferences("settings_preference", MODE_PRIVATE).getString("dark_mode", "FOLLOW_SYSTEM");
         boolean systemNight = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         dark = black || "ON".equals(darkMode) || (!"OFF".equals(darkMode) && systemNight);
-        setTitle("Customization");
+        boolean powerPage = PAGE_POWER.equals(getIntent().getStringExtra(EXTRA_PAGE));
+        String pageTitle = powerPage ? POWER_TITLE : "Customization";
+        setTitle(pageTitle);
         if (getActionBar() != null) getActionBar().hide();
         getWindow().getDecorView().setBackgroundColor(bg());
         getWindow().setStatusBarColor(bg());
@@ -77,7 +99,7 @@ public final class CustomizationActivity extends Activity {
         android.widget.FrameLayout header = new android.widget.FrameLayout(this);
         header.setPadding(dp(20), dp(20), dp(20), dp(12));
         TextView title = new TextView(this);
-        title.setText("Customization");
+        title.setText(pageTitle);
         title.setTextColor(text());
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
         title.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
@@ -95,6 +117,16 @@ public final class CustomizationActivity extends Activity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(0, dp(4), 0, dp(24));
 
+        if (powerPage) buildPowerPage(body);
+        else buildMainPage(body);
+
+        ScrollView sv = new ScrollView(this);
+        sv.addView(body);
+        root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(root);
+    }
+
+    private void buildMainPage(LinearLayout body) {
         if (Shapes.rectShapesPatched()) {
             Switch rect = new Switch(this);
             rect.setChecked(Shapes.enabled(this));
@@ -126,14 +158,12 @@ public final class CustomizationActivity extends Activity {
         }
 
         if (Shapes.powerSavingPatched()) {
-            Switch power = new Switch(this);
-            power.setChecked(PowerSaving.allPhones(this));
-            body.addView(toggleRow("Power saving mode", "Enables the power saving mode from pixels for all devices", power));
-            power.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
-                PowerSaving.setAllPhones(this, on);
-                // Maps asks whether to offer the feature when it starts
-                restartSoon(b);
-            });
+            // its own page: Power saving mode and the options around it
+            LinearLayout powerRow = rowBase(POWER_TITLE, powerSummary());
+            powerSub = (TextView) ((LinearLayout) powerRow.getChildAt(0)).getChildAt(1);
+            powerRow.setOnClickListener(v -> startActivity(new android.content.Intent(this, CustomizationActivity.class)
+                    .putExtra(EXTRA_PAGE, PAGE_POWER)));
+            body.addView(powerRow);
         }
 
         if (Shapes.highRefreshPatched()) {
@@ -232,11 +262,100 @@ public final class CustomizationActivity extends Activity {
             proxyRow.setOnClickListener(v -> startActivity(new android.content.Intent(this, ProxyActivity.class)));
             body.addView(proxyRow);
         }
+    }
 
-        ScrollView sv = new ScrollView(this);
-        sv.addView(body);
-        root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
-        setContentView(root);
+    private static final String[] IDLE_LABELS = {"Off", "After 15 seconds", "After 30 seconds", "After 1 minute", "After 2 minutes"};
+    private static final String[] LOW_FPS_LABELS = {"Off", "While navigating", "Everywhere"};
+
+    private static String idleSummary(int seconds) {
+        for (int i = 0; i < PowerSaving.IDLE_CHOICES.length; i++) {
+            if (PowerSaving.IDLE_CHOICES[i] == seconds) return IDLE_LABELS[i];
+        }
+        return seconds > 0 ? "After " + seconds + " seconds" : "Off";
+    }
+
+    private static String lowFpsSummary(int mode) {
+        if (mode <= 0 || mode >= LOW_FPS_LABELS.length) return "Off";
+        return LOW_FPS_LABELS[mode] + ": 15 fps and 30 Hz, as on the power saving screen";
+    }
+
+    /** Power Saving Options: Power saving mode itself, then the options around it. */
+    private void buildPowerPage(LinearLayout body) {
+        Switch power = new Switch(this);
+        power.setChecked(PowerSaving.allPhones(this));
+        body.addView(toggleRow("Power saving mode", "Enables the power saving mode from pixels for all devices", power));
+        power.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+            PowerSaving.setAllPhones(this, on);
+            // Maps asks whether to offer the feature when it starts
+            restartSoon(b);
+        });
+
+        Switch unlocked = new Switch(this);
+        unlocked.setChecked(PowerSaving.unlocked(this));
+        body.addView(toggleRow("Open without locking", "A button in navigation opens the power saving screen", unlocked));
+        // no restart: the navigation ticker adds and removes the button live
+        unlocked.setOnCheckedChangeListener((CompoundButton b, boolean on) -> PowerSaving.setUnlocked(this, on));
+
+        LinearLayout idleRow = rowBase("Auto-switch when idle", idleSummary(PowerSaving.idleSeconds(this)));
+        TextView idleSub = (TextView) ((LinearLayout) idleRow.getChildAt(0)).getChildAt(1);
+        idleRow.setOnClickListener(v -> {
+            int current = 0;
+            for (int i = 0; i < PowerSaving.IDLE_CHOICES.length; i++) {
+                if (PowerSaving.IDLE_CHOICES[i] == PowerSaving.idleSeconds(this)) current = i;
+            }
+            choose("Auto-switch when idle", IDLE_LABELS, current, which -> {
+                // read on every navigation tick, so no restart
+                PowerSaving.setIdleSeconds(this, PowerSaving.IDLE_CHOICES[which]);
+                idleSub.setText(IDLE_LABELS[which]);
+            });
+        });
+        body.addView(idleRow);
+
+        Switch speedo = new Switch(this);
+        speedo.setChecked(PowerSaving.speedometer(this));
+        body.addView(toggleRow("Speedometer", "Your speed and the speed limit on the power saving screen", speedo));
+        // read each time the power saving screen opens, so no restart
+        speedo.setOnCheckedChangeListener((CompoundButton b, boolean on) -> PowerSaving.setSpeedometer(this, on));
+
+        LinearLayout fpsRow = rowBase("Lower frame rate", lowFpsSummary(PowerSaving.lowFps(this)));
+        fpsRow.setOnClickListener(v -> choose("Lower frame rate", LOW_FPS_LABELS, PowerSaving.lowFps(this), which -> {
+            if (which == PowerSaving.lowFps(this)) return;
+            PowerSaving.setLowFps(this, which);
+            // the window's rate is set when Maps starts
+            restartSoon(v);
+        }));
+        body.addView(fpsRow);
+
+        LinearLayout themeRow = rowBase("Power saving theme", themeSummary(PowerSaving.theme(this)));
+        themeRow.setOnClickListener(v -> choose("Power saving theme", THEME_LABELS, PowerSaving.theme(this), which -> {
+            if (which == PowerSaving.theme(this)) return;
+            PowerSaving.setTheme(this, which);
+            // the map picks its style when it is built
+            restartSoon(v);
+        }));
+        body.addView(themeRow);
+    }
+
+    private static final String[] THEME_LABELS = {"Off", "While navigating", "Everywhere"};
+
+    private static String themeSummary(int mode) {
+        if (mode == PowerSaving.THEME_NAV) return "While navigating: the power saving screen's black map";
+        if (mode == PowerSaving.THEME_ALL) return "Everywhere: the power saving screen's black map, roads only, no place names";
+        return "Off";
+    }
+
+    private interface Choice { void chosen(int which); }
+
+    /** A single-choice dialog in Maps' theme, as the Location source row uses. */
+    private void choose(String title, String[] labels, int checked, Choice then) {
+        new AlertDialog.Builder(this, dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, checked, (d, which) -> {
+                    d.dismiss();
+                    then.chosen(which);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     /** Single-choice list whose second entry (Google Play Services) is greyed out and unselectable

@@ -1,8 +1,13 @@
 package org.ungoogled.ui;
 
+import android.app.Activity;
 import android.content.Context;
 import android.hardware.display.DisplayManager;
 import android.view.Display;
+import android.view.Window;
+import android.view.WindowManager;
+
+import java.lang.ref.WeakReference;
 
 /**
  * "120 Hz": Maps holds itself to 60 Hz twice over. Its main Activity asks for a
@@ -20,30 +25,52 @@ import android.view.Display;
  * Maps like any other app (up to its fastest rate while things move), and the map
  * may draw as fast as the screen refreshes, every frame. Maps' own deliberately low
  * rates stay: power saving mode's 15 fps and 30 Hz window, and the 10 fps states.
+ *
+ * Power Saving Options > Lower frame rate goes the other way: the power saving
+ * screen's own 15 fps and 30 Hz, while navigating or everywhere. It wins over
+ * 120 Hz wherever it applies.
  */
 public final class RefreshRate {
     private static volatile float screenMax;
+    /** The frame-rate controller (bktq) and the last target Maps gave it, to apply it again. */
+    private static volatile WeakReference<Object> controller = new WeakReference<>(null);
+    private static volatile int asked;
+    /** The navigation window's own rate, put back on that same window when navigation ends. */
+    private static float navWindowWas = -1f;
+    private static WeakReference<Activity> navWindowOf = new WeakReference<>(null);
 
     private RefreshRate() {}
 
     /** In place of the rate Maps' main window asks for: nothing instead of its 60 Hz cap. */
     public static float window(float requested) {
-        return Shapes.HIGH_REFRESH && requested == 60f ? 0f : requested;
+        if (requested != 60f) return requested;
+        if (PowerSaving.lowFpsEverywhere()) return PowerSaving.SAVER_HZ;
+        return Shapes.HIGH_REFRESH ? 0f : requested;
     }
 
     /** bjmr.h: the map's target frame rate, 0 meaning Maps' default of 30. */
     public static long map(long fps) {
-        if (!Shapes.HIGH_REFRESH || (fps != 0 && fps < 30)) return fps;
-        return Math.max(fps, Math.round(screenMax()));
+        if (Shapes.HIGH_REFRESH && (fps == 0 || fps >= 30)) fps = Math.max(fps, Math.round(screenMax()));
+        return cap(fps);
     }
 
     /**
      * bktq.b: the target as the frame-rate controller gets it, for either renderer, 0
      * meaning the renderer's default (30 on the old one, 60 on the newer one).
      */
-    public static int map(int fps) {
-        if (!Shapes.HIGH_REFRESH || (fps != 0 && fps < 30)) return fps;
-        return Math.max(fps, Math.round(screenMax()));
+    public static int map(Object controller, int fps) {
+        if (controller != null) {
+            if (RefreshRate.controller.get() != controller) RefreshRate.controller = new WeakReference<>(controller);
+            asked = fps;
+        }
+        if (Shapes.HIGH_REFRESH && (fps == 0 || fps >= 30)) fps = Math.max(fps, Math.round(screenMax()));
+        return (int) cap(fps);
+    }
+
+    /** Lower frame rate: no faster than the power saving screen where it applies; 0 = default, capped too. */
+    private static long cap(long fps) {
+        int cap = PowerSaving.fpsCap();
+        return cap > 0 && (fps == 0 || fps > cap) ? cap : fps;
     }
 
     /**
@@ -54,6 +81,51 @@ public final class RefreshRate {
      */
     public static boolean adaptive(boolean on) {
         return on && !Shapes.HIGH_REFRESH;
+    }
+
+    /**
+     * Navigation started or ended while Lower frame rate is set to navigation only: the
+     * map takes Maps' last target again, through the cap.
+     */
+    static void navChanged() {
+        Object c = controller.get();
+        if (c == null) return;
+        try { c.getClass().getMethod("uaTarget", int.class).invoke(c, asked); }
+        catch (Throwable ignored) {}
+    }
+
+    /**
+     * Lower frame rate set to navigation only, every navigation tick: the navigation
+     * window asks for 30 Hz while navigating, and for what it asked before once it
+     * stops. Held rather than set once, so nothing that happens around the start of
+     * navigation can leave it at Maps' own rate.
+     */
+    static void navWindow(Activity nav, boolean navigating) {
+        try {
+            if (!navigating || navWindowOf.get() != nav) restoreNavWindow();
+            if (!navigating || nav == null) return;
+            Window w = nav.getWindow();
+            WindowManager.LayoutParams lp = w.getAttributes();
+            if (lp.preferredRefreshRate == PowerSaving.SAVER_HZ) return;
+            if (navWindowWas < 0) {
+                navWindowWas = lp.preferredRefreshRate;
+                navWindowOf = new WeakReference<>(nav);
+            }
+            lp.preferredRefreshRate = PowerSaving.SAVER_HZ;
+            w.setAttributes(lp);
+        } catch (Throwable ignored) {}
+    }
+
+    private static void restoreNavWindow() {
+        Activity was = navWindowOf.get();
+        float rate = navWindowWas;
+        navWindowWas = -1f;
+        navWindowOf = new WeakReference<>(null);
+        if (rate < 0 || was == null) return;
+        Window w = was.getWindow();
+        WindowManager.LayoutParams lp = w.getAttributes();
+        lp.preferredRefreshRate = rate;
+        w.setAttributes(lp);
     }
 
     /** The fastest refresh rate the main screen offers. */
