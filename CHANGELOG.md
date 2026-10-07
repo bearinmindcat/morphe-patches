@@ -1,3 +1,10 @@
+## [1.6.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.5.1...v1.6.0) (2026-10-07)
+
+### ✨ New Features
+
+* add microG Maps (separate app that signs in through MicroG-RE) ([78d3edc](https://github.com/bearinmindcat/morphe-patches/commit/78d3edcac5f9fd458f87216d8f84197b0c5e3a97))
+* give microG Maps its own icon ([920a8ad](https://github.com/bearinmindcat/morphe-patches/commit/920a8ad26013ac3fdfa8805bed765d3f436c4a10))
+
 ## [1.5.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.5.0...v1.5.1) (2026-10-07)
 
 ### 🐛 Bug Fixes
