@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.1...v1.7.2) (2026-10-07)
+
+### 🐛 Bug Fixes
+
+* power saving options has its own row on the account sheet ([b30ab45](https://github.com/bearinmindcat/morphe-patches/commit/b30ab4502ec2dddb2b4a056906c7e21de5f67e53))
+
 ## [1.7.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.0...v1.7.1) (2026-10-07)
 
 ### 🐛 Bug Fixes
