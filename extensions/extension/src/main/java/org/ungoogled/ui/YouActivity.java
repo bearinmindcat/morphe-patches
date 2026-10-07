@@ -157,22 +157,8 @@ public final class YouActivity extends UiScreen {
     // ---- the You page ------------------------------------------------------------------
 
     private void renderYou() {
-        body.addView(sectionTitle("Your recent places", "From your Maps history and saves", null, null));
-        body.addView(filterRow(true));
-        List<Item> recent = items(0, null, null, "");
-        if (recent.isEmpty()) {
-            body.addView(hint(HistoryStore.enabled(this)
-                    ? "Places you look at, get directions to, call, share or save show up here. They stay on this phone."
-                    : "Remembering the places you look at is off. Turn it on below."));
-        }
-        for (int i = 0; i < Math.min(3, recent.size()); i++) body.addView(placeRow(recent.get(i)));
-        body.addView(pill("See all", v -> places(0, null, null, false)));
-        // What fills this section, and forgetting it: Maps keeps these in the Google account's
-        // settings; here they sit with the places they are about.
-        body.addView(switchRow(drawable(GS_HISTORY, accent(), new PathIcon(PathIcon.TIMELINE, accent())),
-                "Remember places I look at", HistoryStore.enabled(this), on -> { HistoryStore.setEnabled(this, on); render(); }));
-        body.addView(listLikeRow(drawable(GS_DELETE, accent(), new PathIcon(PathIcon.ADD, accent())),
-                "Clear recent places", null, v -> confirmClear(), null));
+        if (Shapes.microgPatched()) renderAccount();
+        else renderRecent();
 
         body.addView(bandView());
         body.addView(sectionTitle("Your saves", null, "New list", v ->
@@ -203,6 +189,70 @@ public final class YouActivity extends UiScreen {
         body.addView(listLikeRow(new PathIcon(PathIcon.UPLOAD, accent()), "Import",
                 null /* "A backup, KML, or Google Takeout's Saved Places.json" */, v -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
                         .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), IMPORT), null));
+    }
+
+    /**
+     * microG Maps saves to the Google account, as Maps does: in place of the recent places it
+     * keeps no history of, the page offers a copy of the account's lists to keep on the phone.
+     */
+    private void renderAccount() {
+        body.addView(sectionTitle("Your Google account", "Saving stays with your account. Pull copies its saved lists here, to keep on this phone.", null, null));
+        long at = getSharedPreferences(Shapes.PREFS, MODE_PRIVATE).getLong(AccountSaves.KEY_PULLED_AT, 0);
+        body.addView(listLikeRow(new PathIcon(PathIcon.DOWNLOAD, accent()), "Pull from Google account",
+                at == 0 ? null : System.currentTimeMillis() - at < DateUtils.MINUTE_IN_MILLIS ? "Last pulled just now"
+                        : "Last pulled " + DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+                v -> pullFromAccount(), null));
+    }
+
+    private boolean pulling;
+
+    /** Reads the account's lists off the phone (no network) and adds what is new here. */
+    private void pullFromAccount() {
+        if (pulling) return;
+        pulling = true;
+        new Thread(() -> {
+            String done = null, problem = null;
+            try {
+                AccountSaves.Result r = AccountSaves.pull(this);
+                if (r.places == 0) {
+                    problem = "Your account's saved lists aren't on this phone yet. Sign in, open Saved in Maps once, then pull again.";
+                } else {
+                    done = "Pulled " + count(r.places) + (r.lists == 0 ? "" : " from " + (r.lists == 1 ? "1 list" : r.lists + " lists"))
+                            + (r.added == 0 ? ", nothing new" : r.added == 1 ? ", 1 new" : ", " + r.added + " new");
+                }
+            } catch (Throwable t) {
+                android.util.Log.w("UA", "Pull from Google account", t);
+                problem = "Couldn't read your account's saved lists: " + t.getMessage();
+            }
+            String ok = done, failed = problem;
+            runOnUiThread(() -> {
+                pulling = false;
+                if (isFinishing() || isDestroyed()) return;
+                if (ok != null) Toast.makeText(this, ok, Toast.LENGTH_LONG).show();
+                else new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
+                        .setTitle("Nothing to pull").setMessage(failed).setPositiveButton("OK", null).show();
+                render();
+            });
+        }, "UA-pull").start();
+    }
+
+    private void renderRecent() {
+        body.addView(sectionTitle("Your recent places", "From your Maps history and saves", null, null));
+        body.addView(filterRow(true));
+        List<Item> recent = items(0, null, null, "");
+        if (recent.isEmpty()) {
+            body.addView(hint(HistoryStore.enabled(this)
+                    ? "Places you look at, get directions to, call, share or save show up here. They stay on this phone."
+                    : "Remembering the places you look at is off. Turn it on below."));
+        }
+        for (int i = 0; i < Math.min(3, recent.size()); i++) body.addView(placeRow(recent.get(i)));
+        body.addView(pill("See all", v -> places(0, null, null, false)));
+        // What fills this section, and forgetting it: Maps keeps these in the Google account's
+        // settings; here they sit with the places they are about.
+        body.addView(switchRow(drawable(GS_HISTORY, accent(), new PathIcon(PathIcon.TIMELINE, accent())),
+                "Remember places I look at", HistoryStore.enabled(this), on -> { HistoryStore.setEnabled(this, on); render(); }));
+        body.addView(listLikeRow(drawable(GS_DELETE, accent(), new PathIcon(PathIcon.ADD, accent())),
+                "Clear recent places", null, v -> confirmClear(), null));
     }
 
     /** The lists, most recently used first (by their newest place), empty ones last. */
@@ -620,8 +670,10 @@ public final class YouActivity extends UiScreen {
         if (isList) {
             LinearLayout pills = new LinearLayout(this);
             pills.setPadding(dp(20), dp(20), dp(20), 0);
-            pills.addView(tonalPill(ADD_PLACE, "Add", v -> SavedPlaces.addPlaceTo(this, listId)));
-            pills.addView(tonalPill(EDIT, "Edit", v -> editList(title)), leftGap(8, 0));
+            // microG Maps adds places to lists in Maps, on the account; there is no local Add.
+            boolean add = !Shapes.microgPatched();
+            if (add) pills.addView(tonalPill(ADD_PLACE, "Add", v -> SavedPlaces.addPlaceTo(this, listId)));
+            pills.addView(tonalPill(EDIT, "Edit", v -> editList(title)), add ? leftGap(8, 0) : new LinearLayout.LayoutParams(-2, -2));
             body.addView(pills);
         }
         body.addView(bandView());

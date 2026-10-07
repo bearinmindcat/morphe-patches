@@ -293,6 +293,32 @@ final class SavedStore {
         save(c);
     }
 
+    /**
+     * microG Maps' Pull from Google account: [names] are the account's own lists (id here -> name),
+     * added or renamed; [found] its saved places, each in the lists it is in. A place already here
+     * joins those lists and keeps its own note unless it has none; nothing here is removed.
+     * Returns how many places are new.
+     */
+    static synchronized int mergePulled(Context c, Map<String, String> names, List<Place> found) {
+        load(c);
+        lists.putAll(names);
+        int added = 0;
+        for (Place p : found) {
+            Place old = places.get(p.key());
+            if (old == null) {
+                places.put(p.key(), p);
+                added++;
+                continue;
+            }
+            old.lists.addAll(p.lists);
+            if (old.note.isEmpty()) old.note = p.note;
+            if (old.lat == 0 && old.lng == 0) { old.lat = p.lat; old.lng = p.lng; }
+        }
+        ensureDefaultLists();
+        save(c);
+        return added;
+    }
+
     static synchronized void setHome(Context c, Place p) { home = p; save(c); }
     static synchronized void setWork(Context c, Place p) { work = p; save(c); }
 

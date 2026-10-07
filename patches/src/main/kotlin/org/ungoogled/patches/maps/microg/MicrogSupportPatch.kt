@@ -135,9 +135,10 @@ val microgSupportPatch = bytecodePatch(
     name = "Add microG support",
     description = "Builds microG Maps, a separate app (org.ungoogled.android.apps.maps.microg) that signs in to your " +
         "Google account through microG: saved places and lists, Timeline, location sharing, contributions and push " +
-        "messages. Remove sign-in prompts, Trim account menu, Offline saved places and Remove permissions are left " +
-        "out of this build, and its icon carries microG's C. Needs microG: MicroG-RE or ReVanced GmsCore. Not for " +
-        "root (mount) installs.",
+        "messages. Remove sign-in prompts, Trim account menu and Remove permissions are left out of this build, " +
+        "Offline saved places keeps only its Local saved screen, which copies your account's saved lists to the " +
+        "phone (Pull from Google account), and its icon carries microG's C. Needs microG: MicroG-RE or ReVanced " +
+        "GmsCore. Not for root (mount) installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
