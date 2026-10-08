@@ -191,7 +191,7 @@ public final class YouActivity extends UiScreen {
                 null /* "A backup file, or KML for other map apps" */, v -> exportMenu(), null));
         body.addView(listLikeRow(new PathIcon(PathIcon.UPLOAD, accent()), "Import",
                 null /* "A backup, KML, or Google Takeout's Saved Places.json" */, v -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), IMPORT), null));
+                        .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), IMPORT), null));
     }
 
     /**
@@ -759,7 +759,7 @@ public final class YouActivity extends UiScreen {
         n.setPadding(0, dp(3), 0, 0);
         lines.addView(n);
         if (!Float.isNaN(p.rating)) lines.addView(ratingLine(p.rating, p.reviews));
-        String dist = here != null ? distance(meters(here, p)) : null;
+        String dist = here != null && p.located() ? distance(meters(here, p)) : null;
         String line = p.category.isEmpty() ? (dist != null ? dist : "") : dist != null ? p.category + " · " + dist : p.category;
         if (!line.isEmpty()) lines.addView(secondLine(line));
         if (!p.note.isEmpty()) {
@@ -844,7 +844,9 @@ public final class YouActivity extends UiScreen {
     /** [places] come newest first; Distance puts the nearest first, Editor's order the first added. */
     private List<SavedStore.Place> sorted(List<SavedStore.Place> places, android.location.Location here) {
         List<SavedStore.Place> out = new ArrayList<>(places);
-        if (sort == 1 && here != null) out.sort((a, b) -> Float.compare(meters(here, a), meters(here, b)));
+        // Places without a position yet (from a Takeout list) last.
+        if (sort == 1 && here != null) out.sort((a, b) -> a.located() != b.located() ? (a.located() ? -1 : 1)
+                : a.located() ? Float.compare(meters(here, a), meters(here, b)) : 0);
         else if (sort == 2) java.util.Collections.reverse(out);
         return out;
     }
@@ -1322,22 +1324,63 @@ public final class YouActivity extends UiScreen {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
-        if (result != RESULT_OK || data == null || data.getData() == null) return;
+        if (result != RESULT_OK || data == null) return;
+        if (request == IMPORT) {
+            importChosen(data);
+            return;
+        }
         Uri uri = data.getData();
+        if (uri == null) return;
         try {
             if (request == EXPORT_JSON) SavedStore.exportJson(this, uri);
             else if (request == EXPORT_KML) SavedStore.exportKml(this, uri);
             else if (request == EXPORT_RECENT) SavedStore.exportRecentKml(this, uri);
-            if (request != IMPORT) {
-                Toast.makeText(this, "Exported", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            int added = SavedStore.importFile(this, uri);
-            Toast.makeText(this, added == 1 ? "Added 1 place" : "Added " + added + " places", Toast.LENGTH_SHORT).show();
-            render();
+            Toast.makeText(this, "Exported", Toast.LENGTH_SHORT).show();
         } catch (Throwable t) {
             Toast.makeText(this, "That didn't work: " + t.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    /**
+     * The files picked for Import, several at once if wanted: Google Takeout's saved lists (a CSV
+     * each), its whole .zip, Saved Places.json, KML or a backup. Read off the main thread -- a
+     * Takeout .zip can be large.
+     */
+    private void importChosen(Intent data) {
+        List<Uri> uris = new ArrayList<>();
+        android.content.ClipData clip = data.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri u = clip.getItemAt(i).getUri();
+                if (u != null) uris.add(u);
+            }
+        } else if (data.getData() != null) {
+            uris.add(data.getData());
+        }
+        if (uris.isEmpty()) return;
+        new Thread(() -> {
+            String title, message;
+            try {
+                SavedStore.Imported r = SavedStore.importFiles(this, uris);
+                title = r.places == 0 ? "Nothing new" : "Imported";
+                message = r.places == 0 ? "Everything in " + (r.files == 1 ? "that file" : "those files") + " is here already."
+                        : "Added " + count(r.places) + (r.lists == 0 ? "" : r.lists == 1 ? " and 1 list" : " and " + r.lists + " lists") + ".";
+                if (r.unlocated > 0) {
+                    message += "\n\n" + (r.unlocated == 1 ? "1 place has" : r.unlocated + " places have") + " no position yet: Google "
+                            + "Takeout's lists leave it out. Each place gets it the first time you open it in Maps; until then "
+                            + "it shows no distance, and Directions opens the place first.";
+                }
+            } catch (Throwable t) {
+                title = "That didn't work";
+                message = String.valueOf(t.getMessage());
+            }
+            String ti = title, m = message;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                render();
+                new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle(ti).setMessage(m).setPositiveButton("OK", null).show();
+            });
+        }, "UA-import").start();
     }
 
     // ---- words ----------------------------------------------------------------------------

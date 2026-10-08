@@ -243,10 +243,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
     execute {
         // microG Maps saves to the Google account, as Maps does: it gets only the Local saved
         // screen, whose Pull from Google account copies the account's lists to the phone.
-        if (MicrogSelection.builds(this, "Offline saved places")) {
-            addLocalSavedRow()
-            return@execute
-        }
+        val accountSaves = MicrogSelection.builds(this, "Offline saved places")
         // ---- what Maps' place object offers, read off the Save button's state class ----
         val stateClass = mutableClassDefBy(SaveButtonIconFingerprint.method.definingClass)
         val ctor = stateClass.methods.singleOrNull { it.name == "<init>" }
@@ -280,6 +277,29 @@ internal val localSavedPlacesPatch = bytecodePatch(
         }
         val state = intFields.single { it.name == stateName }
         val count = intFields.single { it.name != stateName }
+
+        if (accountSaves) {
+            addLocalSavedRow()
+            // A place imported from Google Takeout still takes its position from Maps when shown;
+            // read only -- the Save button keeps the account's state.
+            val last = ctor.implementation!!.instructions.indexOfLast { it.opcode == Opcode.RETURN_VOID }
+            if (last < 0 || ctor.implementation!!.instructions.count { it.opcode == Opcode.RETURN_VOID } != 1) {
+                throw PatchException("Save button state constructor no longer has one return")
+            }
+            ctor.addInstructionsAtLabel(
+                last,
+                """
+                    iget-object v0, p0, ${stateClass.type}->${placeField.name}:$placeType
+                    invoke-virtual { v0 }, $placeType->${featureIdGetter.name}()${featureIdGetter.returnType}
+                    move-result-object v0
+                    iget-object v1, p0, ${stateClass.type}->${placeField.name}:$placeType
+                    invoke-virtual { v1 }, $placeType->${positionGetter.name}()${positionGetter.returnType}
+                    move-result-object v1
+                    invoke-static { v0, v1 }, $SAVED_PLACES->placeShown(Ljava/lang/Object;Ljava/lang/Object;)V
+                """,
+            )
+            return@execute
+        }
 
         // ---- 1. Save: a single place goes to the extension's list picker -----------------
         val controller = mutableClassDefBy(SaveControllerFingerprint.method.definingClass)
@@ -344,6 +364,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
         )
 
         // ---- 2. The Save button says "Saved" for places saved here ------------------------
+        //         (and a saved place from a Google Takeout list, which has no position, takes Maps')
         val end = ctor.implementation!!.instructions.indexOfLast { it.opcode == Opcode.RETURN_VOID }
         if (end < 0 || ctor.implementation!!.instructions.count { it.opcode == Opcode.RETURN_VOID } != 1) {
             throw PatchException("Save button state constructor no longer has one return")
@@ -363,6 +384,10 @@ internal val localSavedPlacesPatch = bytecodePatch(
                 invoke-static { v0, v1 }, $SAVED_PLACES->buttonCount(Ljava/lang/Object;I)I
                 move-result v1
                 iput v1, p0, ${stateClass.type}->${count.name}:I
+                iget-object v1, p0, ${stateClass.type}->${placeField.name}:$placeType
+                invoke-virtual { v1 }, $placeType->${positionGetter.name}()${positionGetter.returnType}
+                move-result-object v1
+                invoke-static { v0, v1 }, $SAVED_PLACES->placeShown(Ljava/lang/Object;Ljava/lang/Object;)V
             """,
         )
 

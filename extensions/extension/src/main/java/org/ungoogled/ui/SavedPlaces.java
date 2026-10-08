@@ -214,6 +214,23 @@ public final class SavedPlaces {
                 return;
             }
             HistoryStore.record(c, p, kind);
+            // A saved place Maps shows: it takes what it lacks (a Takeout list's place has no position or photos).
+            SavedStore.refresh(c, p);
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * End of the Save button state's constructor, which every place sheet builds: a saved place
+     * without a position -- from a Google Takeout list -- takes the one Maps shows.
+     */
+    public static void placeShown(Object ftid, Object latLng) {
+        try {
+            if (ftid == null || latLng == null) return;
+            Context c = Shapes.appContext();
+            if (c == null) return;
+            SavedStore.load(c);
+            SavedStore.Place at = place(null, ftid, latLng);
+            if (at != null && at.ftid != null) SavedStore.locate(c, at.ftid, at.lat, at.lng);
         } catch (Throwable ignored) {}
     }
 
@@ -323,6 +340,11 @@ public final class SavedPlaces {
 
     /** Directions from here to [p], in Maps' own directions screen. */
     static void directions(Context c, SavedStore.Place p) {
+        // A Takeout list's place Maps has not shown yet: its own sheet, whose Directions knows where it is.
+        if (!p.located()) {
+            open(c, p);
+            return;
+        }
         start(c, Uri.parse(String.format(Locale.US,
                 "https://www.google.com/maps/dir/?api=1&destination=%.7f,%.7f", p.lat, p.lng)));
     }

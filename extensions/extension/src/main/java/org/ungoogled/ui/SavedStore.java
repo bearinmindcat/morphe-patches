@@ -59,6 +59,11 @@ final class SavedStore {
         long added;
         final Set<String> lists = new LinkedHashSet<>();
 
+        /** Has a position: a place from a Google Takeout list has none until Maps shows it. */
+        boolean located() {
+            return lat != 0 || lng != 0;
+        }
+
         /** The feature id when there is one, else the spot itself. */
         String key() {
             return ftid != null ? ftid : String.format(Locale.US, "%.6f,%.6f", lat, lng);
@@ -407,6 +412,7 @@ final class SavedStore {
     }
 
     private static void kmlPlace(StringBuilder k, Place p, String name) {
+        if (!p.located()) return;   // a Takeout list's place Maps has not shown yet
         k.append("<Placemark><name>").append(xml(name)).append("</name><Point><coordinates>")
                 .append(String.format(Locale.US, "%.7f,%.7f", p.lng, p.lat)).append("</coordinates></Point></Placemark>\n");
     }
@@ -422,34 +428,307 @@ final class SavedStore {
         }
     }
 
+    /** What an import added: places, new lists, places still without a position, and files read. */
+    static final class Imported {
+        int places, lists, unlocated, files;
+    }
+
     /**
-     * Merges a file into the store: our own export, GeoJSON (Google Takeout's
-     * "Saved Places.json" is one), or KML (folders become lists). Returns how
-     * many places were added.
+     * Merges files into the store: our own export, GeoJSON (Google Takeout's "Saved
+     * Places.json" is one), KML (folders become lists), Google Takeout's saved lists (one
+     * CSV per list, named after the list) or a whole Takeout .zip, whose Saved lists and
+     * Saved Places.json are all taken.
      */
-    static int importFile(Context c, Uri from) throws Exception {
-        String text;
-        try (InputStream in = c.getContentResolver().openInputStream(from)) {
-            if (in == null) throw new java.io.IOException("cannot read " + from);
-            text = readAll(in);
-        }
+    static Imported importFiles(Context c, List<Uri> from) throws Exception {
+        load(c);
+        Imported r = new Imported();
         int before;
+        Set<String> listsBefore;
         synchronized (SavedStore.class) {
             before = places.size();
-            String t = text.trim();
+            listsBefore = new LinkedHashSet<>(lists.keySet());
+        }
+        for (Uri uri : from) {
+            try (InputStream raw = c.getContentResolver().openInputStream(uri)) {
+                if (raw == null) throw new java.io.IOException("cannot read " + uri);
+                java.io.BufferedInputStream in = new java.io.BufferedInputStream(raw);
+                in.mark(4);
+                byte[] head = new byte[4];
+                int n = in.read(head);
+                in.reset();
+                if (n == 4 && head[0] == 'P' && head[1] == 'K' && head[2] == 3 && head[3] == 4) importZip(c, in, r);
+                else {
+                    importText(c, readAll(in), displayName(c, uri));
+                    r.files++;
+                }
+            }
+        }
+        // A place looked at in Maps recently has its position (and photos) in the recent places already.
+        HistoryStore.load(c);
+        synchronized (SavedStore.class) {
+            for (Place p : places.values()) {
+                if (p.located()) continue;
+                HistoryStore.Entry seen = HistoryStore.find(p.key());
+                if (seen == null) continue;
+                Place known = seen.asPlace();
+                p.fillFrom(known);
+                if (known.located()) { p.lat = known.lat; p.lng = known.lng; }
+            }
+            ensureDefaultLists();
+            r.places = places.size() - before;
+            for (String id : lists.keySet()) if (!listsBefore.contains(id)) r.lists++;
+            for (Place p : places.values()) if (!p.located()) r.unlocated++;
+        }
+        save(c);
+        return r;
+    }
+
+    /** One file's text, by what it holds; [name] is its file name, which names a Takeout list. */
+    private static void importText(Context c, String text, String name) throws Exception {
+        String t = text.startsWith("\uFEFF") ? text.substring(1) : text;
+        t = t.trim();
+        synchronized (SavedStore.class) {
             if (t.startsWith("{")) {
                 JSONObject root = new JSONObject(t);
                 if (root.has("places") || root.has("lists")) read(root, false);
                 else importGeoJson(root);
                 JSONArray history = root.optJSONArray("history");
                 if (history != null) HistoryStore.merge(c, history);
-            } else {
+            } else if (t.startsWith("<")) {
                 importKml(c, t);
+            } else {
+                importCsv(t, name);
             }
-            ensureDefaultLists();
         }
+    }
+
+    /** A Takeout .zip: every saved list (Takeout/Saved/<list>.csv) and the starred places (Saved Places.json). */
+    private static void importZip(Context c, InputStream in, Imported r) throws Exception {
+        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in);
+        for (java.util.zip.ZipEntry e; (e = zip.getNextEntry()) != null; ) {
+            if (e.isDirectory()) continue;
+            String path = e.getName().replace('\\', '/');
+            String file = path.substring(path.lastIndexOf('/') + 1);
+            String lower = ("/" + path).toLowerCase(Locale.ROOT);
+            boolean list = lower.endsWith(".csv") && lower.contains("/saved/");
+            boolean starred = file.equalsIgnoreCase("Saved Places.json");
+            if (!list && !starred) continue;
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = zip.read(buf)) > 0; ) b.write(buf, 0, n);
+            importText(c, b.toString("UTF-8"), file);
+            r.files++;
+        }
+    }
+
+    private static String displayName(Context c, Uri uri) {
+        try (android.database.Cursor q = c.getContentResolver().query(uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (q != null && q.moveToFirst()) return q.getString(0);
+        } catch (Throwable ignored) {}
+        String last = uri.getLastPathSegment();
+        return last != null ? last : "";
+    }
+
+    // ---- Google Takeout's saved lists ------------------------------------------------------
+
+    private static final java.util.regex.Pattern FEATURE_ID = java.util.regex.Pattern.compile("!1s(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)");
+    private static final java.util.regex.Pattern CID = java.util.regex.Pattern.compile("[?&]cid=(\\d+)");
+    private static final java.util.regex.Pattern PIN = java.util.regex.Pattern.compile("!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)");
+    private static final java.util.regex.Pattern SPOT = java.util.regex.Pattern.compile(
+            "(?:/search/|/place/|[?&](?:q|query|ll|destination)=|@)\\s*(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*\\+?(-?\\d{1,3}(?:\\.\\d+)?)");
+
+    /**
+     * One saved list from Google Takeout: a CSV (Title, Note, URL, Tags, Comment) whose links
+     * name each place by Maps' feature id -- no position, which the place takes from Maps the
+     * first time Maps shows it -- or, for a dropped pin, by its coordinates.
+     */
+    private static void importCsv(String text, String fileName) {
+        List<List<String>> rows = csv(text);
+        if (rows.isEmpty()) return;
+        List<String> header = rows.get(0);
+        int title = column(header, 0, "title"), note = column(header, 1, "note"), url = column(header, 2, "url"),
+                comment = column(header, 4, "comment");
+        String list = listForCsv(fileName);
+        long now = System.currentTimeMillis();
+        // The list's first row on top here too: the store keeps its newest last.
+        for (int i = rows.size() - 1; i >= 1; i--) {
+            List<String> row = rows.get(i);
+            String link = cell(row, url);
+            // A link written without quotes splits at its commas (a dropped pin's "lat,lng", a
+            // viewport's "@lat,lng,zoom"): the extra cells are its pieces.
+            int extra = row.size() - header.size();
+            if (extra > 0 && link.startsWith("http")) {
+                StringBuilder joined = new StringBuilder(link);
+                for (int k = 1; k <= extra; k++) joined.append(',').append(cell(row, url + k));
+                link = joined.toString();
+            }
+            Place p = fromMapsLink(link, cell(row, title));
+            if (p == null) continue;
+            String n = cell(row, note), m = cell(row, comment);
+            p.note = n.isEmpty() ? m : m.isEmpty() || m.equals(n) ? n : n + "\n" + m;
+            if (list != null) p.lists.add(list);
+            p.added = now - i;
+            Place old = places.get(p.key());
+            if (old == null && p.ftid != null && p.ftid.startsWith("0x0:")) {
+                // Known only by its customer id: the place saved under its full feature id, if there is one.
+                String cid = p.ftid.substring(3);
+                for (Place q : places.values()) if (q.ftid != null && q.ftid.endsWith(cid)) { old = q; break; }
+            }
+            if (old == null) {
+                places.put(p.key(), p);
+                continue;
+            }
+            old.lists.addAll(p.lists);
+            if (old.note.isEmpty()) old.note = p.note;
+            if (!old.located() && p.located()) { old.lat = p.lat; old.lng = p.lng; }
+        }
+    }
+
+    private static int column(List<String> header, int fallback, String name) {
+        for (int i = 0; i < header.size(); i++) if (header.get(i).trim().equalsIgnoreCase(name)) return i;
+        return fallback;
+    }
+
+    private static String cell(List<String> row, int i) {
+        return i >= 0 && i < row.size() ? row.get(i).trim() : "";
+    }
+
+    /** A place from a Maps link: its feature id (or customer id), else the spot a dropped pin's link names. */
+    static Place fromMapsLink(String url, String title) {
+        Place p = new Place();
+        String link = Uri.decode(url == null ? "" : url);
+        java.util.regex.Matcher m = FEATURE_ID.matcher(link);
+        if (m.find()) {
+            try {
+                p.ftid = "0x" + Long.toHexString(Long.parseUnsignedLong(m.group(1).substring(2), 16))
+                        + ":0x" + Long.toHexString(Long.parseUnsignedLong(m.group(2).substring(2), 16));
+            } catch (Throwable ignored) {}
+        }
+        if (p.ftid == null && (m = CID.matcher(link)).find()) {
+            try {
+                p.ftid = "0x0:0x" + Long.toHexString(Long.parseUnsignedLong(m.group(1)));
+            } catch (Throwable ignored) {}
+        }
+        // A position only where the link really names the spot: a place's own (!3d!4d), or a dropped pin's.
+        m = PIN.matcher(link);
+        boolean spot = m.find();
+        if (!spot && p.ftid == null) {
+            m = SPOT.matcher(link);
+            spot = m.find();
+        }
+        if (spot) {
+            try {
+                double lat = Double.parseDouble(m.group(1)), lng = Double.parseDouble(m.group(2));
+                if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) { p.lat = lat; p.lng = lng; }
+            } catch (Throwable ignored) {}
+        }
+        if (p.ftid == null && !p.located()) return null;
+        String name = title == null ? "" : title.trim();
+        if (name.isEmpty()) {
+            int at = link.indexOf("/place/");
+            if (at >= 0) {
+                String rest = link.substring(at + 7);
+                int end = rest.indexOf('/');
+                name = (end >= 0 ? rest.substring(0, end) : rest).replace('+', ' ').trim();
+            }
+        }
+        p.name = name.isEmpty() ? String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng) : name;
+        return p;
+    }
+
+    /** The list a Takeout CSV goes into: Maps' own four by their Takeout names, any other by its name. */
+    private static String listForCsv(String fileName) {
+        String name = fileName == null ? "" : fileName.replaceAll("(?i)\\.csv$", "").trim();
+        switch (name.toLowerCase(Locale.ROOT)) {
+            case "favorite places": case "favourite places": case "favorites": case "favourites": return FAVOURITES;
+            case "want to go": return WANT_TO_GO;
+            case "travel plans": return TRAVEL;
+            case "starred places": return STARRED;
+            case "": return null;
+        }
+        for (Map.Entry<String, String> e : lists.entrySet()) if (e.getValue().equalsIgnoreCase(name)) return e.getKey();
+        String id = "l" + System.nanoTime();
+        lists.put(id, name);
+        return id;
+    }
+
+    /** RFC 4180: quoted fields may hold commas, line breaks and doubled quotes. */
+    static List<List<String>> csv(String s) {
+        List<List<String>> rows = new ArrayList<>();
+        List<String> row = new ArrayList<>();
+        StringBuilder f = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (quoted) {
+                if (ch != '"') f.append(ch);
+                else if (i + 1 < s.length() && s.charAt(i + 1) == '"') { f.append('"'); i++; }
+                else quoted = false;
+            } else if (ch == '"') {
+                quoted = true;
+            } else if (ch == ',') {
+                row.add(f.toString());
+                f.setLength(0);
+            } else if (ch == '\n' || ch == '\r') {
+                if (ch == '\r' && i + 1 < s.length() && s.charAt(i + 1) == '\n') i++;
+                row.add(f.toString());
+                f.setLength(0);
+                rows.add(row);
+                row = new ArrayList<>();
+            } else {
+                f.append(ch);
+            }
+        }
+        if (f.length() > 0 || !row.isEmpty()) {
+            row.add(f.toString());
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    /** Maps showed [p] in detail: the saved place of the same key takes what it lacks, its position too. */
+    static synchronized void refresh(Context c, Place p) {
+        Place stored = places.get(p.key());
+        if (stored == null) return;
+        boolean changed = false;
+        if (stored.category.isEmpty() && p.category != null && !p.category.isEmpty()) changed = true;
+        if (stored.photos.isEmpty() && !p.photos.isEmpty()) changed = true;
+        if (Float.isNaN(stored.rating) && !Float.isNaN(p.rating)) changed = true;
+        if (stored.reviews == 0 && p.reviews > 0) changed = true;
+        stored.fillFrom(p);
+        if (!stored.located() && p.located()) {
+            stored.lat = p.lat;
+            stored.lng = p.lng;
+            changed = true;
+        }
+        if (changed) save(c);
+    }
+
+    /**
+     * Maps showed a place (any place sheet): a saved place without a position -- from a
+     * Takeout list -- takes Maps' own, and one known only by its customer id takes its
+     * full feature id.
+     */
+    static synchronized void locate(Context c, String ftid, double lat, double lng) {
+        if (ftid == null || (lat == 0 && lng == 0)) return;
+        Place p = places.get(ftid);
+        if (p == null) {
+            int colon = ftid.indexOf(':');
+            if (colon < 0) return;
+            String byCid = "0x0" + ftid.substring(colon);
+            p = places.get(byCid);
+            if (p == null) return;
+            // Re-keyed under its full feature id, in place.
+            Map<String, Place> copy = new LinkedHashMap<>(places);
+            places.clear();
+            for (Map.Entry<String, Place> e : copy.entrySet()) places.put(e.getKey().equals(byCid) ? ftid : e.getKey(), e.getValue());
+            p.ftid = ftid;
+        } else if (p.located()) {
+            return;
+        }
+        p.lat = lat;
+        p.lng = lng;
         save(c);
-        return places.size() - before;
     }
 
     private static void importGeoJson(JSONObject root) throws Exception {
