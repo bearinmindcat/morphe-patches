@@ -67,6 +67,8 @@ val changePackageNamePatch = resourcePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
+    // The one place Maps looks itself up by package name and breaks under a new one: Location sharing.
+    dependsOn(stockPackageLookupPatch)
 
     val packageName = stringOption(
         key = "packageName",

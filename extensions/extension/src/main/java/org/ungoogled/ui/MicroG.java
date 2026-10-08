@@ -56,6 +56,23 @@ public final class MicroG {
         return GOOGLE_LOCATION_ACTION;
     }
 
+    /**
+     * In place of a Play services client's service action, for the services MicroG-RE answers
+     * only under app.revanced names -- Location sharing's reporter and location reporting
+     * (issue #30): the name the installed microG answers, Google's own first (ReVanced GmsCore).
+     */
+    public static String serviceAction(String google) {
+        Context c = Shapes.appContext();
+        if (c == null || !google.startsWith(PLAY_SERVICES + ".")) return google;
+        try {
+            PackageManager pm = c.getPackageManager();
+            if (answers(pm, google)) return google;
+            String renamed = PACKAGE + google.substring(PLAY_SERVICES.length());
+            if (answers(pm, renamed)) return renamed;
+        } catch (Throwable ignored) {}
+        return google;
+    }
+
     private static boolean answers(PackageManager pm, String action) {
         ResolveInfo r = pm.resolveService(new Intent(action).setPackage(PACKAGE), 0);
         return r != null && r.serviceInfo != null && r.serviceInfo.exported && r.serviceInfo.enabled

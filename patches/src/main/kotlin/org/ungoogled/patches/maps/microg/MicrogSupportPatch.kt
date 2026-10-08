@@ -44,6 +44,11 @@ private const val VENDOR = "app.revanced"
 private const val C2DM = "$VENDOR.android.c2dm"
 private const val MICROG_CLASS = "Lorg/ungoogled/ui/MicroG;"
 private const val LOCATION_ACTION = "com.google.android.location.internal.GoogleLocationManagerService.START"
+/** Location sharing's Play services services, which MicroG-RE answers only under app.revanced names. */
+private val SHARING_ACTIONS = setOf(
+    "com.google.android.gms.locationsharingreporter.service.START",
+    "com.google.android.gms.location.reporting.service.START",
+)
 private const val CRONET_PROVIDER = "Lcom/google/android/gms/net/PlayServicesCronetProvider;"
 private const val USE_LOCATION_FAILED = "Failed to get 'Use Location for Services' setting"
 private const val MODULE_CLASS_FAILED = "Failed to instantiate module class: "
@@ -178,6 +183,38 @@ val microgSupportPatch = bytecodePatch(
                 val register = (implementation!!.instructions[0] as OneRegisterInstruction).registerA
                 replaceInstruction(0, "invoke-static {}, $MICROG_CLASS->locationAction()Ljava/lang/String;")
                 addInstruction(1, "move-result-object v$register")
+            }
+        }
+
+        // 1b. Location sharing's reporter and location reporting (issue #30): their clients name
+        //     the service the same way, and MicroG-RE answers both under app.revanced names only,
+        //     so the action is picked at runtime too.
+        val sharingGetters = mutableListOf<Triple<String, com.android.tools.smali.dexlib2.iface.Method, String>>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (method in classDef.methods) {
+                if (method.returnType != "Ljava/lang/String;" || method.parameterTypes.isNotEmpty()) continue
+                val instructions = method.implementation?.instructions?.toList() ?: continue
+                if (instructions.size != 2 || instructions[1].opcode != Opcode.RETURN_OBJECT) continue
+                val string = ((instructions[0] as? ReferenceInstruction)?.reference as? StringReference)?.string
+                if (string in SHARING_ACTIONS) sharingGetters += Triple(classDef.type, method, string!!)
+            }
+        }
+        if (sharingGetters.map { it.third }.sorted() != SHARING_ACTIONS.sorted()) {
+            throw PatchException("expected one getter for each Location sharing service, found ${sharingGetters.map { it.third }}")
+        }
+        for ((type, getter, _) in sharingGetters) {
+            mutableClassDefBy(type).methods.single {
+                it.name == getter.name && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;"
+            }.apply {
+                val register = (implementation!!.instructions[0] as OneRegisterInstruction).registerA
+                addInstructions(
+                    1,
+                    """
+                        invoke-static { v$register }, $MICROG_CLASS->serviceAction(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v$register
+                    """,
+                )
             }
         }
 

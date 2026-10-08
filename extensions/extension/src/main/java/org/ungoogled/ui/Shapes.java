@@ -87,6 +87,16 @@ public final class Shapes {
     public static boolean timelinePatched() { return false; }
     /** Add microG support: microG Maps, which signs in through microG. */
     public static boolean microgPatched() { return false; }
+
+    /**
+     * Change package name: in place of the app's package name where Maps looks itself up in its
+     * table of Google's own builds (Location sharing's client number, keyed by package). A new
+     * package name is not in it, the lookup came back empty, and opening Location sharing crashed
+     * Maps (issue #30). To that table the app is stock Maps.
+     */
+    public static String mapsPackage(String actual) {
+        return actual != null && actual.startsWith("com.google.android.apps.") ? actual : "com.google.android.apps.maps";
+    }
     /** Location provider toggle's option: rewritten to return true when it defaults to Play services. */
     public static boolean playLocationByDefault() { return false; }
 
