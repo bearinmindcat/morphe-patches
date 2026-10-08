@@ -1,3 +1,9 @@
+## [1.7.5](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.4...v1.7.5) (2026-10-08)
+
+### 🐛 Bug Fixes
+
+* location sharing no longer crashes microG Maps; issue [#30](https://github.com/bearinmindcat/morphe-patches/issues/30) ([89f82cd](https://github.com/bearinmindcat/morphe-patches/commit/89f82cd87ed8f82463c5d90897b1a0505849928c))
+
 ## [1.7.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.3...v1.7.4) (2026-10-07)
 
 ### 🐛 Bug Fixes
