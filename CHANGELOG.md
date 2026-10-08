@@ -1,3 +1,9 @@
+## [1.7.6](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.5...v1.7.6) (2026-10-08)
+
+### 🐛 Bug Fixes
+
+* import google takeout saved lists (csv files or the whole zip, several at once); issue [#23](https://github.com/bearinmindcat/morphe-patches/issues/23) ([991db7f](https://github.com/bearinmindcat/morphe-patches/commit/991db7f397083bb6ff63ca8ed0acc742fe346bbc))
+
 ## [1.7.5](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.4...v1.7.5) (2026-10-08)
 
 ### 🐛 Bug Fixes
