@@ -53,31 +53,31 @@
 
 ### ✨ New Features
 
-* add power saving options (open without locking, idle switch, speedometer, lower frame rate, black map) ([3ce8b9d](https://github.com/bearinmindcat/morphe-patches/commit/3ce8b9df60dd458234d1b1660e64899edea1e277))
+* add power saving options (open without locking, idle switch, speedometer, lower frame rate, black map); issue [#22](https://github.com/bearinmindcat/morphe-patches/issues/22), [#26](https://github.com/bearinmindcat/morphe-patches/issues/26) ([3ce8b9d](https://github.com/bearinmindcat/morphe-patches/commit/3ce8b9df60dd458234d1b1660e64899edea1e277))
 
 ## [1.4.4](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.3...v1.4.4) (2026-10-06)
 
 ### 🐛 Bug Fixes
 
-* 120 refresh rate now keeps navigation smooth ([f323173](https://github.com/bearinmindcat/morphe-patches/commit/f32317373b574bbe89eb45964bac18c5addb0090))
+* 120 refresh rate now keeps navigation smooth; issue [#21](https://github.com/bearinmindcat/morphe-patches/issues/21) ([f323173](https://github.com/bearinmindcat/morphe-patches/commit/f32317373b574bbe89eb45964bac18c5addb0090))
 
 ## [1.4.3](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.2...v1.4.3) (2026-10-06)
 
 ### 🐛 Bug Fixes
 
-* customization screen no longer removes other account menu rows ([269e0ef](https://github.com/bearinmindcat/morphe-patches/commit/269e0ef335990d713c46ff49ddf5d8cc4d8f5de6))
+* customization screen no longer removes other account menu rows; issue [#24](https://github.com/bearinmindcat/morphe-patches/issues/24) ([269e0ef](https://github.com/bearinmindcat/morphe-patches/commit/269e0ef335990d713c46ff49ddf5d8cc4d8f5de6))
 
 ## [1.4.2](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.1...v1.4.2) (2026-10-06)
 
 ### 🐛 Bug Fixes
 
-* customization and other screens no longer crash on android 10 ([9bac165](https://github.com/bearinmindcat/morphe-patches/commit/9bac165b01a94c97699376b692c46def333dfc89))
+* customization and other screens no longer crash on android 10; issue [#8](https://github.com/bearinmindcat/morphe-patches/issues/8) ([9bac165](https://github.com/bearinmindcat/morphe-patches/commit/9bac165b01a94c97699376b692c46def333dfc89))
 
 ## [1.4.1](https://github.com/bearinmindcat/morphe-patches/compare/v1.4.0...v1.4.1) (2026-10-06)
 
 ### 🐛 Bug Fixes
 
-* black theme no longer overrides the theme picked in maps settings ([5d9df9e](https://github.com/bearinmindcat/morphe-patches/commit/5d9df9e14f7af9662ad2fa1948e8d7167a9c8883))
+* black theme no longer overrides the theme picked in maps settings; issue [#11](https://github.com/bearinmindcat/morphe-patches/issues/11) ([5d9df9e](https://github.com/bearinmindcat/morphe-patches/commit/5d9df9e14f7af9662ad2fa1948e8d7167a9c8883))
 
 ## [1.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.3.0...v1.4.0) (2026-10-06)
 
@@ -88,7 +88,7 @@
 
 ### ✨ New Features
 
-* add hide ai toggle (know before you go & gemini review summaries) ([efc79d7](https://github.com/bearinmindcat/morphe-patches/commit/efc79d71a2fe72b581724a0c54e120024934cc9c))
+* add hide ai toggle (know before you go & gemini review summaries); issue [#19](https://github.com/bearinmindcat/morphe-patches/issues/19) ([efc79d7](https://github.com/bearinmindcat/morphe-patches/commit/efc79d71a2fe72b581724a0c54e120024934cc9c))
 
 ## [1.3.0](https://github.com/bearinmindcat/morphe-patches/compare/v1.2.0...v1.3.0) (2026-09-30)
 
