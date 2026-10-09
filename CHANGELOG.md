@@ -1,3 +1,9 @@
+## [1.7.7](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.6...v1.7.7) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* pick any music app as the default media app in navigation; issue [#9](https://github.com/bearinmindcat/morphe-patches/issues/9) ([e831ff1](https://github.com/bearinmindcat/morphe-patches/commit/e831ff186a4660978eae26076bd2bf8df8b9bb12))
+
 ## [1.7.6](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.5...v1.7.6) (2026-10-08)
 
 ### 🐛 Bug Fixes
