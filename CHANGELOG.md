@@ -1,3 +1,9 @@
+## [1.7.9](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.8...v1.7.9) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* Customization and the other added screens open on root mount installs; issue [#25](https://github.com/bearinmindcat/morphe-patches/issues/25) ([00ddf32](https://github.com/bearinmindcat/morphe-patches/commit/00ddf32177525aa99b1ac9bb4db0f492055c4404))
+
 ## [1.7.8](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.7...v1.7.8) (2026-10-09)
 
 ### 🐛 Bug Fixes
