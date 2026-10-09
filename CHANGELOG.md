@@ -1,3 +1,9 @@
+## [1.7.12](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.11...v1.7.12) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* Home, Work and your own labels work in Maps' search and Add label; issue [#36](https://github.com/bearinmindcat/morphe-patches/issues/36) ([a504eab](https://github.com/bearinmindcat/morphe-patches/commit/a504eab1af955c58a758a99d7bedc8199212eed1))
+
 ## [1.7.11](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.10...v1.7.11) (2026-10-09)
 
 ### 🐛 Bug Fixes
