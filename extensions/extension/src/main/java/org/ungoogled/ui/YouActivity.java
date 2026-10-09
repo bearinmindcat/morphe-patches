@@ -6,7 +6,6 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.InputType;
 import android.text.format.DateUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -126,6 +125,13 @@ public final class YouActivity extends UiScreen {
     @Override protected void onPause() {
         super.onPause();
         SavedPlaces.refreshButtons();
+    }
+
+    /** The Labeled page: Home, Work and the user's own labels (where Maps' search sends a Home that is not set). */
+    static Intent labeledIntent(android.content.Context c) {
+        Intent i = Screens.intent(c, YouActivity.class).putExtra(EXTRA_PAGE, LABELED);
+        if (!(c instanceof android.app.Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return i;
     }
 
     /** One of the user's lists' page (after a place is added to it from Maps' "Add a place"). */
@@ -1045,27 +1051,7 @@ public final class YouActivity extends UiScreen {
 
     /** Names [p]; [old] is the label being renamed, or null. "Home" and "Work" set those. */
     private void labelDialog(SavedStore.Place p, String old) {
-        EditText field = new EditText(this);
-        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        field.setHint("Label, like Gym");
-        if (old != null) field.setText(old);
-        FrameLayout box = new FrameLayout(this);
-        box.setPadding(dp(20), dp(8), dp(20), 0);
-        box.addView(field);
-        new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
-                .setTitle(old != null ? "Rename label" : "Label " + name(p))
-                .setView(box)
-                .setPositiveButton("Save", (d, w) -> {
-                    String label = field.getText().toString().trim();
-                    if (label.isEmpty()) return;
-                    if (old != null) SavedStore.removeLabel(this, old);
-                    if (label.equalsIgnoreCase("home")) SavedStore.setHome(this, SavedStore.aliasOf(p));
-                    else if (label.equalsIgnoreCase("work")) SavedStore.setWork(this, SavedStore.aliasOf(p));
-                    else SavedStore.setLabel(this, label, p);
-                    render();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        SavedPlaces.labelDialog(this, p, old, label -> render());
     }
 
     // ---- place rows ---------------------------------------------------------------------------

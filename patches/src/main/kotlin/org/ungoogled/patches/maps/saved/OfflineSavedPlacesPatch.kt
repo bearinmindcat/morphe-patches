@@ -3,6 +3,7 @@ package org.ungoogled.patches.maps.saved
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.literal
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
@@ -14,9 +15,11 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -117,6 +120,10 @@ private object AddPlaceFingerprint : Fingerprint(
 
 /** string/ADD_PLACE_TO_LIST_HINT ("Add a place"), the screen's search hint. */
 private const val ADD_PLACE_HINT = 0x7f140166
+/** ALIAS_SETTING_SIGN_IN_PROMPT: "Sign in to search for "%1$s" and your other personal places." */
+private const val ALIAS_SIGN_IN_PROMPT = 0x7f1401fe
+/** ALIASING_NEW_PLACE_SIGN_IN_PROMPT: "To label places and quickly find them on Maps, sign in." */
+private const val LABEL_SIGN_IN_PROMPT = 0x7f1401e1
 
 /** SavedPlaces.PICKED: a place picked on "Add a place" for one of the user's lists. */
 private const val PICKED = 64
@@ -787,6 +794,30 @@ internal val localSavedPlacesPatch = bytecodePatch(
             """,
             ExternalLabel("maps_pick", pick.implementation!!.instructions.first()),
         )
+
+        // ---- 7. Home and Work searched in Maps' own search box (issue #36) ----------------
+        personalPlaceSearch()
+
+        // ---- 8. Maps' own "Add label" labels the place in Local saved (issue #36) ----------
+        localLabels(placeType, nameGetter, featureIdGetter, positionGetter)
+
+        // ---- 9. The search box opens the user's labels -- Home, Work, their own (issue #36) --
+        SearchSubmitFingerprint.method.apply {
+            if (parameterTypes.firstOrNull()?.toString() != "Ljava/lang/String;" || returnType != "V") {
+                throw PatchException("search submit no longer takes the query first")
+            }
+            if (implementation!!.registerCount - parameterTypes.size - 1 < 1) throw PatchException("search submit has no room for the hook")
+            addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { p1 }, $SAVED_PLACES->searchLabel(Ljava/lang/String;)Z
+                    move-result v0
+                    if-eqz v0, :maps_search
+                    return-void
+                """,
+                ExternalLabel("maps_search", implementation!!.instructions.first()),
+            )
+        }
     }
 }
 
@@ -796,3 +827,280 @@ private typealias MutableMethodType = app.morphe.patcher.util.proxy.mutableTypes
 private object InvalidateFingerprint : Fingerprint(
     filters = listOf(string("VPB.invalidate ")),
 )
+
+/** The search box's submit (query, ...), SearchSuggestFragment.onQueryTextSubmit: its trace label is unique. */
+private object SearchSubmitFingerprint : Fingerprint(
+    filters = listOf(string("SearchSuggestFragment.onQueryTextSubmit")),
+)
+
+/**
+ * Searching "Home" or "Work", Maps' server answers with a personal-place block, and Maps shows one
+ * of three dialogs over the map: sign in, turn on history, or set the address -- Home and Work live
+ * in the Google account. Signed out it is always "sign in", even with Home set in Local saved
+ * (issue #36). Each dialog's show now goes through SavedPlaces.showAliasDialog, which opens the
+ * local Home or Work instead; the block is handed over just before the dialog's arguments are built.
+ */
+private fun BytecodePatchContext.personalPlaceSearch() {
+    fun Instruction.method() = (this as? ReferenceInstruction)?.reference as? MethodReference
+    // The sign-in dialog's view model: the class that names the sign-in prompt.
+    val promptOwners = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        val names = c.methods.any { m ->
+            m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == ALIAS_SIGN_IN_PROMPT.toLong() } == true
+        }
+        if (names) promptOwners += c.type
+    }
+    val viewModel = promptOwners.singleOrNull()
+        ?: throw PatchException("expected one view model naming the personal place sign-in prompt, found $promptOwners")
+    // Its base class reads the block's first entry: block.list.get(0) as entry, entry.place, place.kind.
+    val base = classDefByOrNull(viewModel)?.superclass ?: throw PatchException("$viewModel has no base class")
+    val reader = classDefByOrNull(base)!!.methods.singleOrNull { m ->
+        m.implementation?.instructions?.any { it.method()?.let { r -> r.definingClass == "Ljava/util/List;" && r.name == "get" } == true } == true
+    } ?: throw PatchException("$base no longer reads one personal place")
+    val code = reader.implementation!!.instructions.toList()
+    val get = code.indexOfFirst { it.method()?.let { r -> r.definingClass == "Ljava/util/List;" && r.name == "get" } == true }
+    val listField = code.subList(0, get).lastOrNull { it.opcode == Opcode.IGET_OBJECT }?.let { (it as ReferenceInstruction).reference as FieldReference }
+        ?: throw PatchException("personal place list field not found")
+    val entryType = code.subList(get, code.size).firstOrNull { it.opcode == Opcode.CHECK_CAST }?.let { ((it as ReferenceInstruction).reference as TypeReference).type }
+        ?: throw PatchException("personal place entry type not found")
+    val placeField = code.firstOrNull { it.opcode == Opcode.IGET_OBJECT && ((it as ReferenceInstruction).reference as FieldReference).definingClass == entryType }
+        ?.let { (it as ReferenceInstruction).reference as FieldReference } ?: throw PatchException("personal place field not found")
+    val kindField = code.firstOrNull { it.opcode == Opcode.IGET && ((it as ReferenceInstruction).reference as FieldReference).definingClass == placeField.type }
+        ?.let { (it as ReferenceInstruction).reference as FieldReference } ?: throw PatchException("personal place kind field not found")
+    val blockType = listField.definingClass
+
+    // The sign-in dialog, and the one method that shows it: the search answer's handler.
+    fun Instruction.creates(type: String) =
+        opcode == Opcode.NEW_INSTANCE && ((this as ReferenceInstruction).reference as TypeReference).type == type
+    val dialogs = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.methods.any { m -> m.implementation?.instructions?.any { it.creates(viewModel) } == true }) dialogs += c.type
+    }
+    val signInDialog = dialogs.singleOrNull() ?: throw PatchException("expected one personal place sign-in dialog, found $dialogs")
+    val handlers = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+    classDefForEach { c ->
+        for (m in c.methods) if (m.implementation?.instructions?.any { it.creates(signInDialog) } == true) handlers += c.type to m
+    }
+    val (handlerType, found) = handlers.singleOrNull() ?: throw PatchException("expected one search answer handler, found ${handlers.size}")
+    val handler = mutableClassDefBy(handlerType).methods.single {
+        it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == found.returnType
+    }
+    val ins = handler.implementation!!.instructions.toList()
+
+    // Each dialog: arguments built from (helper, block, callback), set, then the dialog shown.
+    class Dialog(val build: Int, val block: Int, val show: Int, val dialog: Int, val activity: Int, val showName: String)
+    val shown = ins.indices.filter { i ->
+        ins[i].opcode == Opcode.INVOKE_STATIC && ins[i].method()?.let { r ->
+            r.returnType == "Landroid/os/Bundle;" && r.parameterTypes.map(CharSequence::toString).contains(blockType)
+        } == true
+    }.map { b ->
+        val build = ins[b] as Instruction35c
+        val position = build.reference.let { (it as MethodReference).parameterTypes.map(CharSequence::toString).indexOf(blockType) }
+        val block = listOf(build.registerC, build.registerD, build.registerE, build.registerF, build.registerG)[position]
+        val setArguments = (b + 1 until ins.size).firstOrNull { j ->
+            ins[j].opcode == Opcode.INVOKE_VIRTUAL && ins[j].method()?.parameterTypes?.map(CharSequence::toString) == listOf("Landroid/os/Bundle;")
+        } ?: throw PatchException("personal place dialog arguments are not set")
+        val dialog = (ins[setArguments] as Instruction35c).registerC
+        val show = (setArguments + 1 until ins.size).firstOrNull { k ->
+            ins[k].opcode == Opcode.INVOKE_VIRTUAL && (ins[k] as Instruction35c).let { it.registerCount == 2 && it.registerC == dialog } &&
+                ins[k].method()?.let { it.returnType == "V" && it.parameterTypes.single().toString() != "Landroid/os/Bundle;" } == true
+        } ?: throw PatchException("personal place dialog is not shown")
+        val call = ins[show] as Instruction35c
+        if (ins[b].location.labels.isNotEmpty()) throw PatchException("personal place dialog arguments are a branch target")
+        if (block > 15 || call.registerC > 15 || call.registerD > 15) throw PatchException("personal place dialog registers out of range")
+        Dialog(b, block, show, call.registerC, call.registerD, ins[show].method()!!.name)
+    }
+    if (shown.size != 3) throw PatchException("expected three personal place dialogs, found ${shown.size}")
+    val showName = shown.map { it.showName }.distinct().singleOrNull()
+        ?: throw PatchException("personal place dialogs are shown by different methods: ${shown.map { it.showName }}")
+    if (shown.sortedBy { it.build }.zipWithNext().any { (a, b) -> a.show >= b.build }) {
+        throw PatchException("personal place dialogs overlap in ${handler.definingClass}")
+    }
+    // Later dialogs first, so the earlier indices stay put.
+    for (d in shown.sortedByDescending { it.build }) {
+        handler.replaceInstruction(
+            d.show,
+            "invoke-static { v${d.dialog}, v${d.activity} }, $SAVED_PLACES->showAliasDialog(Ljava/lang/Object;Ljava/lang/Object;)V",
+        )
+        handler.addInstructions(d.build, "invoke-static { v${d.block} }, $SAVED_PLACES->aliasAnswer(Ljava/lang/Object;)V")
+    }
+
+    // The extension reads the block's kind and calls Maps' show by these.
+    val extension = mutableClassDefBy(SAVED_PLACES)
+    extension.methods.remove(extension.methods.single { it.name == "aliasKind" })
+    extension.methods.add(
+        ImmutableMethod(
+            SAVED_PLACES, "aliasKind", listOf(ImmutableMethodParameter("Ljava/lang/Object;", null, null)), "I",
+            AccessFlags.STATIC.value, null, null, MutableMethodImplementation(3),
+        ).toMutable().apply {
+            addInstructions(
+                0,
+                """
+                    check-cast p0, $blockType
+                    iget-object v0, p0, $blockType->${listField.name}:${listField.type}
+                    const/4 v1, 0x0
+                    invoke-interface { v0, v1 }, Ljava/util/List;->get(I)Ljava/lang/Object;
+                    move-result-object v0
+                    check-cast v0, $entryType
+                    iget-object v0, v0, $entryType->${placeField.name}:${placeField.type}
+                    iget v0, v0, ${placeField.type}->${kindField.name}:I
+                    return v0
+                """,
+            )
+        },
+    )
+    extension.methods.single { it.name == "showMethod" && it.parameterTypes.isEmpty() }.apply {
+        val first = implementation!!.instructions.first()
+        if (first.opcode != Opcode.CONST_STRING) throw PatchException("SavedPlaces.showMethod() no longer starts with const-string")
+        replaceInstruction(0, "const-string v${(first as OneRegisterInstruction).registerA}, \"$showName\"")
+    }
+}
+
+/**
+ * Maps' "Add label" -- on the place sheet's More, and in the older overflow menu -- labels the place
+ * in Local saved: Maps keeps labels in the Google account, so signed out both only asked to sign in
+ * (issue #36). Each menu builds its own subclass of one prompt, whose gate opens Maps' label editor
+ * when signed in and the sign-in prompt otherwise. Each subclass gets uaLabel(activity), which reads
+ * the place where its own editor opener does and hands it to SavedPlaces.label, and the gate asks it
+ * first. "Add to contacts" -- the same prompt with its contact flag set -- keeps Maps' own.
+ */
+private fun BytecodePatchContext.localLabels(
+    placeType: String, nameGetter: MethodReference, featureIdGetter: MethodReference, positionGetter: MethodReference,
+) {
+    fun Instruction.ref() = (this as? ReferenceInstruction)?.reference
+    // The prompt's text: the one class naming "To label places ... sign in".
+    val texts = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        if (c.methods.any { m -> m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == LABEL_SIGN_IN_PROMPT.toLong() } == true }) {
+            texts += c.type
+        }
+    }
+    val text = texts.singleOrNull() ?: throw PatchException("expected one label sign-in prompt, found $texts")
+    // The prompts: the classes that build that text, one per menu.
+    val prompts = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.methods.any { m -> m.implementation?.instructions?.any { it.opcode == Opcode.NEW_INSTANCE && (it.ref() as TypeReference).type == text } == true }) {
+            prompts += c.type
+        }
+    }
+    if (prompts.size != 2) throw PatchException("expected two label prompts, found $prompts")
+    val baseType = prompts.map { classDefByOrNull(it)?.superclass }.distinct().singleOrNull()
+        ?: throw PatchException("label prompts $prompts have different base classes")
+    val base = mutableClassDefBy(baseType)
+    // Its abstract editor opener, the gate that calls it when signed in, and the Activity it shows over.
+    val opener = base.methods.singleOrNull {
+        AccessFlags.ABSTRACT.isSet(it.accessFlags) && it.returnType == "V" && it.parameterTypes.isEmpty()
+    } ?: throw PatchException("$baseType has no single abstract label editor opener")
+    val gate = base.methods.singleOrNull { m ->
+        m.implementation?.instructions?.any {
+            (it.ref() as? MethodReference)?.let { r -> r.definingClass == baseType && r.name == opener.name && r.parameterTypes.isEmpty() } == true
+        } == true
+    } ?: throw PatchException("$baseType has no single gate opening the label editor")
+    fun isActivity(type: String): Boolean {
+        var t: String? = type
+        repeat(12) {
+            if (t == "Landroid/app/Activity;") return true
+            t = t?.let { classDefByOrNull(it)?.superclass } ?: return false
+        }
+        return false
+    }
+    val activity = base.fields.singleOrNull { isActivity(it.type) } ?: throw PatchException("$baseType holds no single Activity")
+
+    // Where an editor opener reads a register from: a field chain starting at this (empty: this itself).
+    fun chain(code: List<Instruction>, before: Int, register: Int, self: Int): List<FieldReference> {
+        for (i in before - 1 downTo 0) {
+            val insn = code[i]
+            if (!insn.opcode.setsRegister() || (insn as? OneRegisterInstruction)?.registerA != register) continue
+            if (insn.opcode == Opcode.CHECK_CAST) continue
+            if (insn.opcode != Opcode.IGET_OBJECT && insn.opcode != Opcode.IGET_BOOLEAN) {
+                throw PatchException("label editor argument v$register comes from ${insn.opcode}")
+            }
+            return chain(code, i, (insn as TwoRegisterInstruction).registerB, self) + (insn.ref() as FieldReference)
+        }
+        if (register != self) throw PatchException("label editor argument v$register is not read from a field")
+        return emptyList()
+    }
+    fun load(fields: List<FieldReference>) = fields.mapIndexed { i, f ->
+        "${if (f.type == "Z") "iget-boolean" else "iget-object"} v0, ${if (i == 0) "p0" else "v0"}, ${f.definingClass}->${f.name}:${f.type}"
+    }.joinToString("\n")
+
+    for (type in prompts) {
+        val prompt = mutableClassDefBy(type)
+        val open = prompt.methods.singleOrNull { it.name == opener.name && it.parameterTypes.isEmpty() && it.returnType == "V" }
+            ?: throw PatchException("$type does not open the label editor")
+        val code = open.implementation!!.instructions.toList()
+        val at = code.indices.filter { code[it].opcode == Opcode.INVOKE_STATIC }.singleOrNull()
+            ?: throw PatchException("$type opens the label editor other than by one static call")
+        val editor = code[at] as Instruction35c
+        val params = (editor.reference as MethodReference).parameterTypes.map(CharSequence::toString)
+        if (params.size != 3 || params[2] != "Z") throw PatchException("$type's label editor takes $params")
+        if (code.subList(0, at + 1).any { it.location.labels.isNotEmpty() }) throw PatchException("$type's label editor is reached by a branch")
+        val refType = params[1]
+        // The place reference's null-safe getter: static, takes the reference, returns its Serializable.
+        val unwrap = classDefByOrNull(refType)?.methods?.singleOrNull { m ->
+            AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes.map { it.toString() } == listOf(refType) &&
+                m.returnType == "Ljava/io/Serializable;"
+        } ?: throw PatchException("$refType has no single static getter")
+        val self = open.implementation!!.registerCount - 1
+        val place = chain(code, at, editor.registerD, self)
+        val contact = chain(code, at, editor.registerE, self)
+        if (place.lastOrNull()?.type != refType || contact.lastOrNull()?.type != "Z") {
+            throw PatchException("$type's label editor arguments are not fields: $place, $contact")
+        }
+        prompt.methods.add(
+            ImmutableMethod(
+                type, "uaLabel", listOf(ImmutableMethodParameter("Ljava/lang/Object;", null, null)), "Z",
+                AccessFlags.PUBLIC.value, null, null, MutableMethodImplementation(6),
+            ).toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        ${load(contact)}
+                        if-nez v0, :maps
+                        ${load(place)}
+                        invoke-static { v0 }, $refType->${unwrap.name}($refType)Ljava/io/Serializable;
+                        move-result-object v0
+                        instance-of v1, v0, $placeType
+                        if-eqz v1, :maps
+                        check-cast v0, $placeType
+                        invoke-virtual { v0 }, $placeType->${nameGetter.name}()Ljava/lang/String;
+                        move-result-object v1
+                        invoke-virtual { v0 }, $placeType->${featureIdGetter.name}()${featureIdGetter.returnType}
+                        move-result-object v2
+                        invoke-virtual { v0 }, $placeType->${positionGetter.name}()${positionGetter.returnType}
+                        move-result-object v3
+                        invoke-static { p1, v1, v2, v3 }, $SAVED_PLACES->label(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)Z
+                        move-result v0
+                        return v0
+                        :maps
+                        const/4 v0, 0x0
+                        return v0
+                    """,
+                )
+            },
+        )
+    }
+    // The base answers no, so a prompt of any other kind keeps Maps' own.
+    base.methods.add(
+        ImmutableMethod(
+            baseType, "uaLabel", listOf(ImmutableMethodParameter("Ljava/lang/Object;", null, null)), "Z",
+            AccessFlags.PUBLIC.value, null, null, MutableMethodImplementation(3),
+        ).toMutable().apply {
+            addInstructions(0, "const/4 v0, 0x0\nreturn v0")
+        },
+    )
+    if (gate.implementation!!.registerCount - 1 < 1) throw PatchException("label prompt gate has no room for the hook")
+    gate.addInstructionsWithLabels(
+        0,
+        """
+            iget-object v0, p0, $baseType->${activity.name}:${activity.type}
+            invoke-virtual { p0, v0 }, $baseType->uaLabel(Ljava/lang/Object;)Z
+            move-result v0
+            if-eqz v0, :maps_label
+            return-void
+        """,
+        ExternalLabel("maps_label", gate.implementation!!.instructions.first()),
+    )
+}

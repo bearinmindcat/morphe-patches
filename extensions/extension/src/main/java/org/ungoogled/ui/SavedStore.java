@@ -337,6 +337,14 @@ final class SavedStore {
         if (labels.remove(label) != null) save(c);
     }
 
+    /** The place labelled [label] -- Home, Work or one of the user's own -- ignoring case; null if none. */
+    static synchronized Place labelled(String label) {
+        if (label.equalsIgnoreCase("home")) return home;
+        if (label.equalsIgnoreCase("work")) return work;
+        for (Map.Entry<String, Place> e : labels.entrySet()) if (e.getKey().equalsIgnoreCase(label)) return e.getValue();
+        return null;
+    }
+
     /** The user's own labels on [p]. */
     static synchronized List<String> labelsFor(Place p) {
         List<String> out = new ArrayList<>();

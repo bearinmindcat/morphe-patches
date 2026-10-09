@@ -317,12 +317,163 @@ public final class SavedPlaces {
                 .show();
     }
 
+    /** Names [p]; [old] is the label being renamed, or null. "Home" and "Work" set those. */
+    static void labelDialog(Activity a, SavedStore.Place p, String old, NameListener then) {
+        EditText field = new EditText(a);
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        field.setHint("Label, like Gym");
+        if (old != null) field.setText(old);
+        float dp = a.getResources().getDisplayMetrics().density;
+        android.widget.FrameLayout box = new android.widget.FrameLayout(a);
+        box.setPadding(Math.round(20 * dp), Math.round(8 * dp), Math.round(20 * dp), 0);
+        box.addView(field);
+        String name = p.name != null && !p.name.isEmpty() ? p.name : String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng);
+        new AlertDialog.Builder(a, dialogTheme(a))
+                .setTitle(old != null ? "Rename label" : "Label " + name)
+                .setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    String label = field.getText().toString().trim();
+                    if (label.isEmpty()) return;
+                    if (old != null) SavedStore.removeLabel(a, old);
+                    if (label.equalsIgnoreCase("home")) SavedStore.setHome(a, SavedStore.aliasOf(p));
+                    else if (label.equalsIgnoreCase("work")) SavedStore.setWork(a, SavedStore.aliasOf(p));
+                    else SavedStore.setLabel(a, label, p);
+                    then.named(label);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     static int dialogTheme(Context c) {
         boolean night = (c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
                 == android.content.res.Configuration.UI_MODE_NIGHT_YES;
         String darkMode = c.getSharedPreferences("settings_preference", Context.MODE_PRIVATE).getString("dark_mode", "FOLLOW_SYSTEM");
         boolean dark = Shapes.BLACK || "ON".equals(darkMode) || (!"OFF".equals(darkMode) && night);
         return dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert;
+    }
+
+    // ---- Labels without a Google account: Maps' search box and Add label (issue #36) -----------
+
+    /**
+     * From the start of the search box's submit (SearchSuggestFragment.onQueryTextSubmit): a query
+     * naming one of the user's labels in Local saved -- Home, Work or their own, ignoring case --
+     * opens that place, as Maps does for an account's labels, and is not sent to Google. True when
+     * it did; anything else is searched as before (an unset Home or Work then reaches showAliasDialog).
+     */
+    public static boolean searchLabel(String query) {
+        try {
+            if (query == null || query.trim().isEmpty()) return false;
+            Activity a = resumed.get();
+            if (a == null) return false;
+            SavedStore.load(a);
+            String q = query.trim();
+            SavedStore.Place p = SavedStore.labelled(q);
+            if (p == null) return false;
+            // One Enter can submit twice (the key and the editor action): open the place once.
+            long now = android.os.SystemClock.uptimeMillis();
+            boolean again = q.equalsIgnoreCase(lastLabel) && now - lastLabelAt < 1500;
+            lastLabel = q;
+            lastLabelAt = now;
+            if (!again) open(a, p);
+            return true;
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "label search", t);
+            return false;
+        }
+    }
+
+    private static String lastLabel;
+    private static long lastLabelAt;
+
+    private static Object aliasAnswer;
+
+    /** Maps' search answered "Home" or "Work" with its personal-place block: kept for showAliasDialog. */
+    public static void aliasAnswer(Object block) {
+        aliasAnswer = block;
+    }
+
+    /** Rewritten by the patch: the kind of personal place in that block, 0 Home and 1 Work (throws when it has none). */
+    static int aliasKind(Object block) { return -1; }
+
+    /** Rewritten by the patch: the name of the method that shows Maps' dialogs over an Activity. */
+    static String showMethod() { return ""; }
+
+    /**
+     * In place of showing Maps' "Search for Home?" dialog. Maps keeps Home and Work in the Google
+     * account, so signed out, searching "Home" or "Work" only ever asked to sign in, even with Home
+     * set in Local saved. The local Home or Work opens instead, and when that one is not set, Local
+     * saved's Labeled page, where it is set. Any other personal place keeps Maps' dialog.
+     */
+    public static void showAliasDialog(Object dialog, Object activity) {
+        Object block = aliasAnswer;
+        aliasAnswer = null;
+        try {
+            int kind = -1;
+            try {
+                kind = aliasKind(block);
+            } catch (Throwable noPlace) {}
+            if ((kind == 0 || kind == 1) && activity instanceof Activity) {
+                Activity a = (Activity) activity;
+                SavedStore.load(a);
+                SavedStore.Place place = kind == 0 ? SavedStore.home : SavedStore.work;
+                if (place != null) {
+                    open(a, place);
+                } else {
+                    Toast.makeText(a, (kind == 0 ? "Home" : "Work") + " is not set: choose Set as " + (kind == 0 ? "Home" : "Work")
+                            + " in a place's menu", Toast.LENGTH_LONG).show();
+                    a.startActivity(YouActivity.labeledIntent(a));
+                }
+                return;
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "personal place search", t);
+        }
+        try {
+            for (java.lang.reflect.Method m : dialog.getClass().getMethods()) {
+                Class<?>[] params = m.getParameterTypes();
+                if (m.getName().equals(showMethod()) && params.length == 1 && params[0].isInstance(activity)) {
+                    m.invoke(dialog, activity);
+                    return;
+                }
+            }
+            throw new NoSuchMethodException(showMethod());
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            throw SavedPlaces.<RuntimeException>sneaky(e.getCause());
+        } catch (ReflectiveOperationException e) {
+            throw SavedPlaces.<RuntimeException>sneaky(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> T sneaky(Throwable t) throws T {
+        throw (T) t;
+    }
+
+    /**
+     * From the uaLabel() the patch gives Maps' "Add label" prompt (the place sheet's More, and the
+     * older overflow menu): Maps keeps labels in the Google account, so signed out it only asked to
+     * sign in. The place is labelled here instead, in Local saved -- as Home or Work too. [activity]
+     * is the prompt's own; true when it is handled, and Maps' prompt is not shown.
+     */
+    public static boolean label(Object activity, String name, Object ftid, Object latLng) {
+        try {
+            Activity a = activity instanceof Activity ? (Activity) activity : resumed.get();
+            if (a == null) return false;
+            SavedStore.load(a);
+            SavedStore.Place p = place(name, ftid, latLng);
+            if (p == null) return false;
+            HistoryStore.load(a);
+            HistoryStore.Entry seen = HistoryStore.find(p.key());
+            if (seen != null) p.fillFrom(seen.asPlace());
+            List<String> labels = SavedStore.labelsFor(p);
+            labelDialog(a, p, labels.isEmpty() ? null : labels.get(0), label -> Toast.makeText(a,
+                    (label.equalsIgnoreCase("home") ? "Set as Home" : label.equalsIgnoreCase("work") ? "Set as Work"
+                            : "Labeled " + label) + " in Local saved", Toast.LENGTH_SHORT).show());
+            return true;
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "Add label", t);
+            return false;
+        }
     }
 
     // ---- opening saved places ---------------------------------------------------------
