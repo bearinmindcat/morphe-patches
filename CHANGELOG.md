@@ -1,3 +1,9 @@
+## [1.7.11](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.10...v1.7.11) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* choose microg Services or Google Play Services location in both apps ([1e7c8a5](https://github.com/bearinmindcat/morphe-patches/commit/1e7c8a5681249794a21d46f93e76e66a7edb76f0))
+
 ## [1.7.10](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.9...v1.7.10) (2026-10-09)
 
 ### 🐛 Bug Fixes
