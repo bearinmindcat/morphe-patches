@@ -1,3 +1,9 @@
+## [1.7.10](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.9...v1.7.10) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* location sharing settings, notice and my location button in microG Maps; issue [#30](https://github.com/bearinmindcat/morphe-patches/issues/30) ([bd6a34a](https://github.com/bearinmindcat/morphe-patches/commit/bd6a34a25451666d61b121f17c1894a303b18306))
+
 ## [1.7.9](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.8...v1.7.9) (2026-10-09)
 
 ### 🐛 Bug Fixes
