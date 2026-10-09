@@ -1,3 +1,10 @@
+## [1.7.13](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.12...v1.7.13) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* directions to Home, Work and your own labels; issue [#36](https://github.com/bearinmindcat/morphe-patches/issues/36) ([9827770](https://github.com/bearinmindcat/morphe-patches/commit/98277703504fd6bccbc62f91555115407cad2528))
+* show local saved places on the map with a hide switch per list; issue [#36](https://github.com/bearinmindcat/morphe-patches/issues/36) ([7b82e80](https://github.com/bearinmindcat/morphe-patches/commit/7b82e807c3af4bf5aa6be636dd2118427a53efe7))
+
 ## [1.7.12](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.11...v1.7.12) (2026-10-09)
 
 ### 🐛 Bug Fixes
