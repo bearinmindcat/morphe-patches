@@ -119,6 +119,8 @@ final class SavedStore {
     static Place home, work;
     /** The user's own labels ("Gym", "Mum's"), label -> place: Maps' "Labeled" beside Home and Work. */
     static final Map<String, Place> labels = new LinkedHashMap<>();
+    /** Lists whose places are not drawn on the map ("Hide on map"); every other list is. */
+    static final Set<String> hiddenOnMap = new LinkedHashSet<>();
 
     private SavedStore() {}
 
@@ -128,6 +130,7 @@ final class SavedStore {
         lists.clear();
         places.clear();
         labels.clear();
+        hiddenOnMap.clear();
         home = work = null;
         try {
             File f = new File(c.getFilesDir(), FILE);
@@ -175,6 +178,8 @@ final class SavedStore {
             JSONObject at = o.optJSONObject("place");
             if (!label.isEmpty() && at != null && (replace || !labels.containsKey(label))) labels.put(label, Place.fromJson(at));
         }
+        JSONArray hidden = root.optJSONArray("hiddenOnMap");
+        if (hidden != null) for (int i = 0; i < hidden.length(); i++) hiddenOnMap.add(hidden.optString(i));
     }
 
     private static void merge(Place p) {
@@ -191,6 +196,7 @@ final class SavedStore {
             }
             if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
         } catch (Throwable ignored) {}
+        SavedOnMap.refresh();
     }
 
     static synchronized JSONObject toJson() throws Exception {
@@ -210,7 +216,13 @@ final class SavedStore {
             for (Map.Entry<String, Place> e : labels.entrySet()) lb.put(new JSONObject().put("label", e.getKey()).put("place", e.getValue().toJson()));
             root.put("labels", lb);
         }
+        if (!hiddenOnMap.isEmpty()) root.put("hiddenOnMap", new JSONArray(hiddenOnMap));
         return root;
+    }
+
+    /** Draws [listId]'s places on the map, or not ("Hide on map"). */
+    static synchronized void setOnMap(Context c, String listId, boolean shown) {
+        if (shown ? hiddenOnMap.remove(listId) : hiddenOnMap.add(listId)) save(c);
     }
 
     // ---- queries and edits ------------------------------------------------------

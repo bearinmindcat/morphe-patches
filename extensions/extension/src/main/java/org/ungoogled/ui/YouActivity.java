@@ -1253,24 +1253,30 @@ public final class YouActivity extends UiScreen {
     private void listMenu(String id, String name) {
         if (name == null) return;
         List<String> names = new ArrayList<>();
+        List<Runnable> acts = new ArrayList<>();
         names.add("Open");
+        acts.add(() -> { if (!LIST.equals(page)) go(LIST, id); });
         names.add("Rename");
-        if (!SavedStore.isDefault(id)) names.add("Delete list");
+        acts.add(() -> SavedPlaces.newList(this, n -> { SavedStore.renameList(this, id, n); if (LIST.equals(page)) recreate(); else render(); }));
+        // Its places on Maps' map, with the list's icon (SavedOnMap).
+        boolean onMap = !SavedStore.hiddenOnMap.contains(id);
+        names.add(onMap ? "Hide on map" : "Show on map");
+        acts.add(() -> SavedStore.setOnMap(this, id, !onMap));
+        if (!SavedStore.isDefault(id)) {
+            names.add("Delete list");
+            acts.add(() -> new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
+                    .setTitle("Delete " + name + "?")
+                    .setMessage("Its places stay in any other lists they are in.")
+                    .setPositiveButton("Delete", (d2, w) -> {
+                        SavedStore.deleteList(this, id);
+                        if (LIST.equals(page)) finish(); else render();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
+        }
         new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
                 .setTitle(name)
-                .setItems(names.toArray(new String[0]), (d, which) -> {
-                    if (which == 0) { if (!LIST.equals(page)) go(LIST, id); }
-                    else if (which == 1) SavedPlaces.newList(this, n -> { SavedStore.renameList(this, id, n); if (LIST.equals(page)) recreate(); else render(); });
-                    else new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
-                            .setTitle("Delete " + name + "?")
-                            .setMessage("Its places stay in any other lists they are in.")
-                            .setPositiveButton("Delete", (d2, w) -> {
-                                SavedStore.deleteList(this, id);
-                                if (LIST.equals(page)) finish(); else render();
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                })
+                .setItems(names.toArray(new String[0]), (d, which) -> acts.get(which).run())
                 .show();
     }
 

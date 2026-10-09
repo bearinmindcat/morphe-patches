@@ -821,7 +821,249 @@ internal val localSavedPlacesPatch = bytecodePatch(
 
         // ---- 10. Directions to the user's labels: "Home" as a destination (issue #36) --------
         labelWaypoints(featureIdGetter.returnType, positionGetter.returnType)
+
+        // ---- 11. Local saved on the map, with Maps' own icons (issue #36) -------------------
+        savedOnMap(featureIdGetter.returnType, positionGetter.returnType)
     }
+}
+
+/** org.ungoogled.ui.SavedOnMap: Local saved on Maps' own map. */
+private const val SAVED_ON_MAP = "Lorg/ungoogled/ui/SavedOnMap;"
+private const val IMMUTABLE_LIST = "Lcom/google/common/collect/ImmutableList;"
+
+/**
+ * Local saved on Maps' own map (issue #36). Signed in, Maps draws the account's personal places --
+ * Home, Work, labels, each saved place with its list's icon -- through PersonalPlaceLabelGenerator.
+ * Its place setter now goes through SavedOnMap.withLocal, which adds the places kept on the phone,
+ * built as Maps builds its own (the personal place factory and builder, the saved list description);
+ * the generator turning on with the map, and every change to Local saved, draw them again.
+ */
+private fun BytecodePatchContext.savedOnMap(featureType: String, positionType: String) {
+    fun Instruction.ref() = (this as? ReferenceInstruction)?.reference
+    fun params(m: com.android.tools.smali.dexlib2.iface.Method) = m.parameterTypes.map(CharSequence::toString)
+    fun isEnum(type: String) = classDefByOrNull(type)?.superclass == "Ljava/lang/Enum;"
+    fun enumNames(type: String) = classDefByOrNull(type)?.methods?.firstOrNull { it.name == "<clinit>" }?.implementation
+        ?.instructions?.mapNotNull { (it.ref() as? StringReference)?.string }?.toSet().orEmpty()
+    val string = "Ljava/lang/String;"
+
+    // The label generator, its place setter (and the list it keeps), and its on/off switch.
+    val generators = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.methods.any { m -> m.implementation?.instructions?.any { (it.ref() as? StringReference)?.string == "PersonalPlaceLabelGenerator.onUpdateLabels" } == true }) {
+            generators += c.type
+        }
+    }
+    val generatorType = generators.singleOrNull() ?: throw PatchException("expected one personal place label generator, found $generators")
+    val generator = mutableClassDefBy(generatorType)
+    val setter = generator.methods.singleOrNull { it.returnType == "V" && params(it) == listOf(IMMUTABLE_LIST) }
+        ?: throw PatchException("$generatorType has no single place setter")
+    val placesField = setter.implementation!!.instructions.firstNotNullOfOrNull { insn ->
+        (insn.ref() as? FieldReference)?.takeIf { insn.opcode == Opcode.IPUT_OBJECT && it.definingClass == generatorType && it.type == IMMUTABLE_LIST }
+    } ?: throw PatchException("$generatorType's place setter keeps no list")
+    val switch = generator.methods.singleOrNull { it.returnType == "Z" && params(it) == listOf("Z") }
+        ?: throw PatchException("$generatorType has no single on/off switch")
+    // Its "places changed" flag: Maps' own update sets it just before the setter, or the labels already
+    // drawn on each tile stay as they were.
+    val changed = mutableSetOf<String>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            val code = m.implementation?.instructions?.toList() ?: continue
+            for (i in code.indices) {
+                val call = code[i].ref() as? MethodReference ?: continue
+                if (call.definingClass != generatorType || call.name != setter.name || code[i].opcode != Opcode.INVOKE_VIRTUAL) continue
+                (i - 1 downTo maxOf(0, i - 6)).mapNotNull { code[it].ref() as? MethodReference }.firstOrNull {
+                    it.definingClass == generatorType && it.returnType == "V" && it.parameterTypes.map(CharSequence::toString) == listOf("Z")
+                }?.let { changed += it.name }
+            }
+        }
+    }
+    val changedFlag = changed.singleOrNull() ?: throw PatchException("$generatorType's changed flag is not clear: $changed")
+
+    // A personal place: a static factory (feature id, position, title, subtitle) gives its builder.
+    class Factory(val owner: String, val name: String, val builder: String)
+    val factories = mutableListOf<Factory>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            if (!AccessFlags.STATIC.isSet(m.accessFlags) || !AccessFlags.PUBLIC.isSet(m.accessFlags)) continue
+            if (params(m) != listOf(featureType, positionType, string, string)) continue
+            if (classDefByOrNull(m.returnType)?.methods?.any { it.parameterTypes.isEmpty() && it.returnType == c.type } == true) {
+                factories += Factory(c.type, m.name, m.returnType)
+            }
+        }
+    }
+    val factory = factories.singleOrNull() ?: throw PatchException("expected one personal place factory, found ${factories.map { it.owner }}")
+    val itemType = factory.owner
+    val builderType = factory.builder
+    val builderClass = classDefByOrNull(builderType)!!
+    val build = builderClass.methods.single { it.parameterTypes.isEmpty() && it.returnType == itemType }
+    val listSetter = builderClass.methods.singleOrNull { it.returnType == "V" && params(it) == listOf("Ljava/util/Set;") }
+        ?: throw PatchException("$builderType has no single list setter")
+    // The starred flag: the one boolean setter the factory itself calls.
+    val factoryCode = classDefByOrNull(itemType)!!.methods.single {
+        it.name == factory.name && params(it) == listOf(featureType, positionType, string, string)
+    }.implementation!!.instructions
+    val starred = factoryCode.mapNotNull { it.ref() as? MethodReference }
+        .filter { it.definingClass == builderType && it.parameterTypes.map(CharSequence::toString) == listOf("Z") }
+        .map { it.name }.distinct().singleOrNull() ?: throw PatchException("$builderType's starred setter not found")
+    // Home, Work or a label: the place's one enum field, kept by the builder in a plain field.
+    val aliasType = classDefByOrNull(itemType)!!.fields.map { it.type }.filter { isEnum(it) }.distinct().singleOrNull()
+        ?: throw PatchException("$itemType has no single alias enum")
+    if (!enumNames(aliasType).containsAll(listOf("HOME", "WORK", "NICKNAME"))) throw PatchException("$aliasType is not the personal place alias")
+    val buildCode = build.implementation!!.instructions.toList()
+    // What last wrote [register] before [at], through register moves.
+    fun source(at: Int, register: Int): Instruction? {
+        var reg = register
+        for (j in at - 1 downTo 0) {
+            val insn = buildCode[j]
+            if (!insn.opcode.setsRegister() || (insn as? OneRegisterInstruction)?.registerA != reg) continue
+            if (insn.opcode != Opcode.MOVE_OBJECT && insn.opcode != Opcode.MOVE_OBJECT_FROM16 && insn.opcode != Opcode.MOVE_OBJECT_16) return insn
+            reg = (insn as TwoRegisterInstruction).registerB
+        }
+        return null
+    }
+    val aliasField = buildCode.indices.firstNotNullOfOrNull { i ->
+        val cast = buildCode[i]
+        if (cast.opcode != Opcode.CHECK_CAST || (cast.ref() as TypeReference).type != aliasType) return@firstNotNullOfOrNull null
+        source(i, (cast as OneRegisterInstruction).registerA)
+            ?.takeIf { it.opcode == Opcode.IGET_OBJECT }
+            ?.let { (it.ref() as FieldReference).takeIf { f -> f.definingClass == builderType } }
+    } ?: throw PatchException("$builderType's alias field not found")
+
+    // A saved list, as Maps describes it to the generator: (id, kind, 4, name, 4 flags, time, -, 4 strings, flag, list).
+    class ListInfo(val type: String, val kind: String, val descriptor: String)
+    val infos = mutableListOf<ListInfo>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            if (m.name != "<init>" || !AccessFlags.PUBLIC.isSet(m.accessFlags)) continue
+            val p = params(m)
+            if (p.size != 16 || p[0] != string || p[2] != "I" || p[3] != string || p.subList(4, 8).any { it != "Z" } || p[8] != "J") continue
+            if (p.subList(10, 14).any { it != string } || p[14] != "Z" || p[15] != IMMUTABLE_LIST || !isEnum(p[1])) continue
+            infos += ListInfo(c.type, p[1], p.joinToString(""))
+        }
+    }
+    val info = infos.singleOrNull() ?: throw PatchException("expected one saved list description, found ${infos.map { it.type }}")
+    if (!enumNames(info.kind).containsAll(listOf("FAVORITES", "WANT_TO_GO", "TRAVEL_PLANS", "JUST_SAVE", "CUSTOM"))) {
+        throw PatchException("${info.kind} is not the saved list kind")
+    }
+
+    // The generator: its setter adds the phone's places, its switch draws them, uaRefresh redraws.
+    setter.addInstructions(
+        0,
+        """
+            invoke-static { p0, p1 }, $SAVED_ON_MAP->withLocal(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+            move-result-object p1
+            check-cast p1, $IMMUTABLE_LIST
+        """,
+    )
+    switch.addInstructions(0, "invoke-static { p0, p1 }, $SAVED_ON_MAP->shown(Ljava/lang/Object;Z)V")
+    generator.methods.add(
+        ImmutableMethod(generatorType, "uaRefresh", emptyList(), "V", AccessFlags.PUBLIC.value, null, null, MutableMethodImplementation(3))
+            .toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        const/4 v1, 0x1
+                        invoke-virtual { p0, v1 }, $generatorType->$changedFlag(Z)V
+                        iget-object v0, p0, $generatorType->${placesField.name}:$IMMUTABLE_LIST
+                        invoke-virtual { p0, v0 }, $generatorType->${setter.name}($IMMUTABLE_LIST)V
+                        return-void
+                    """,
+                )
+            },
+    )
+
+    // The extension's stubs, written against those classes.
+    val extension = mutableClassDefBy(SAVED_ON_MAP)
+    fun replace(name: String, parameters: List<String>, returnType: String, registers: Int, smali: String) {
+        extension.methods.remove(extension.methods.single { it.name == name })
+        extension.methods.add(
+            ImmutableMethod(
+                SAVED_ON_MAP, name, parameters.map { ImmutableMethodParameter(it, null, null) }, returnType,
+                AccessFlags.STATIC.value, null, null, MutableMethodImplementation(registers),
+            ).toMutable().apply { addInstructions(0, smali) },
+        )
+    }
+    replace(
+        "redraw", listOf("Ljava/lang/Object;"), "V", 1,
+        """
+            check-cast p0, $generatorType
+            invoke-virtual { p0 }, $generatorType->uaRefresh()V
+            return-void
+        """,
+    )
+    replace(
+        "immutable", listOf("Ljava/util/List;"), "Ljava/lang/Object;", 1,
+        """
+            invoke-static { p0 }, $IMMUTABLE_LIST->copyOf(Ljava/util/Collection;)$IMMUTABLE_LIST
+            move-result-object p0
+            return-object p0
+        """,
+    )
+    replace(
+        "listInfo", listOf(string, string, string), "Ljava/lang/Object;", 21,
+        """
+            move-object/from16 v1, p1
+            const-class v2, ${info.kind}
+            invoke-static { v2, v1 }, Ljava/lang/Enum;->valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;
+            move-result-object v2
+            check-cast v2, ${info.kind}
+            new-instance v0, ${info.type}
+            move-object/from16 v1, p0
+            const/4 v3, 0x4
+            move-object/from16 v4, p2
+            const/4 v5, 0x1
+            const/4 v6, 0x0
+            const/4 v7, 0x0
+            const/4 v8, 0x0
+            const-wide/16 v9, 0x0
+            const/4 v11, 0x0
+            const/4 v12, 0x0
+            const/4 v13, 0x0
+            const/4 v14, 0x0
+            const/4 v15, 0x0
+            const/16 v16, 0x0
+            invoke-static { }, $IMMUTABLE_LIST->of()$IMMUTABLE_LIST
+            move-result-object v17
+            invoke-direct/range { v0 .. v17 }, ${info.type}-><init>(${info.descriptor})V
+            return-object v0
+        """,
+    )
+    replace(
+        "item", listOf("J", "J", "D", "D", string, string, "I", "Ljava/lang/Object;", "Z"), "Ljava/lang/Object;", 17,
+        """
+            new-instance v0, $featureType
+            invoke-direct { v0, p0, p1, p2, p3 }, $featureType-><init>(JJ)V
+            new-instance v1, $positionType
+            invoke-direct { v1, p4, p5, p6, p7 }, $positionType-><init>(DD)V
+            invoke-static { v0, v1, p8, p9 }, $itemType->${factory.name}($featureType$positionType$string$string)$builderType
+            move-result-object v2
+            if-eqz p10, :alias_done
+            const-string v3, "NICKNAME"
+            const/4 v1, 0x1
+            if-ne p10, v1, :not_home
+            const-string v3, "HOME"
+            :not_home
+            const/4 v1, 0x2
+            if-ne p10, v1, :not_work
+            const-string v3, "WORK"
+            :not_work
+            const-class v1, $aliasType
+            invoke-static { v1, v3 }, Ljava/lang/Enum;->valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;
+            move-result-object v3
+            iput-object v3, v2, $builderType->${aliasField.name}:${aliasField.type}
+            :alias_done
+            if-eqz p11, :list_done
+            invoke-static { p11 }, Ljava/util/Collections;->singleton(Ljava/lang/Object;)Ljava/util/Set;
+            move-result-object v3
+            invoke-virtual { v2, v3 }, $builderType->${listSetter.name}(Ljava/util/Set;)V
+            :list_done
+            move/from16 v3, p12
+            invoke-virtual { v2, v3 }, $builderType->$starred(Z)V
+            invoke-virtual { v2 }, $builderType->${build.name}()$itemType
+            move-result-object v0
+            return-object v0
+        """,
+    )
 }
 
 private typealias MutableMethodType = app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
