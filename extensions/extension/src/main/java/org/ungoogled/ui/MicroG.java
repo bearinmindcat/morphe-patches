@@ -73,6 +73,20 @@ public final class MicroG {
         return google;
     }
 
+    /**
+     * microG can stand in for Play services' location service: it is installed and answers it under
+     * either name. ReVanced GmsCore has no location service of its own.
+     */
+    static boolean locationService(Context c) {
+        try {
+            if (!installed(c)) return false;
+            PackageManager pm = c.getPackageManager();
+            return answers(pm, GOOGLE_LOCATION_ACTION) || answers(pm, RENAMED_LOCATION_ACTION);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private static boolean answers(PackageManager pm, String action) {
         ResolveInfo r = pm.resolveService(new Intent(action).setPackage(PACKAGE), 0);
         return r != null && r.serviceInfo != null && r.serviceInfo.exported && r.serviceInfo.enabled

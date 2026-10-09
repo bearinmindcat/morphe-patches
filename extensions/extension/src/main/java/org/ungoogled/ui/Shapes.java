@@ -289,28 +289,41 @@ public final class Shapes {
     // connection is pointed at a package that does not exist -- so "Android"
     // means Play services is never asked for a location at all.
     //
-    // It is never true while Play services is missing or disabled. Bypass Play
-    // Services checks makes the availability check succeed regardless, so Maps
-    // would otherwise pick the fused provider with nothing behind it and never
-    // get a fix -- the blue dot greys out and routing from your location hangs.
+    // The fused provider can come from Google's Play services or from microG, in
+    // either app (issue #34): Maps' location service connection is sent to the
+    // chosen one's package, under the name it answers. A source that is missing,
+    // disabled or (ReVanced GmsCore) has no location service is never used. Bypass
+    // Play Services checks makes the availability check succeed regardless, so Maps
+    // would otherwise pick the fused provider with nothing behind it and never get
+    // a fix -- the blue dot greys out and routing from your location hangs.
 
     public static final String KEY_PLAY_LOCATION = "play_location";
+    public static final String KEY_LOCATION_SOURCE = "location_source";
+    public static final String SOURCE_ANDROID = "android", SOURCE_MICROG = "microg", SOURCE_GOOGLE = "google";
     static final String PLAY_SERVICES = "com.google.android.gms";
-    private static volatile int PLAY_LOCATION = -1;   // -1 = not read yet
+    private static final String GOOGLE_LOCATION_SERVICE = "com.google.android.location.internal.GoogleLocationManagerService.START";
+    private static volatile String SOURCE = null;   // the source in use; null = not read yet
 
-    /** The user's choice, whether or not Play services can honour it right now. */
-    public static boolean playLocationEnabled(Context c) {
-        return prefs(c).getBoolean(KEY_PLAY_LOCATION, playLocationByDefault());
+    /** The user's choice, whether or not it can be honoured right now. */
+    public static String locationSource(Context c) {
+        SharedPreferences p = prefs(c);
+        String source = p.getString(KEY_LOCATION_SOURCE, null);
+        if (SOURCE_ANDROID.equals(source) || SOURCE_MICROG.equals(source) || SOURCE_GOOGLE.equals(source)) return source;
+        // Before there were three: on meant the app's own fused provider -- microG's in microG Maps.
+        if (!p.getBoolean(KEY_PLAY_LOCATION, playLocationByDefault())) return SOURCE_ANDROID;
+        return microgPatched() ? SOURCE_MICROG : SOURCE_GOOGLE;
     }
 
-    public static void setPlayLocationEnabled(Context c, boolean on) {
-        prefs(c).edit().putBoolean(KEY_PLAY_LOCATION, on).commit();
+    public static void setLocationSource(Context c, String source) {
+        prefs(c).edit().putString(KEY_LOCATION_SOURCE, source)
+                .putBoolean(KEY_PLAY_LOCATION, !SOURCE_ANDROID.equals(source)).commit();
         refreshPlayLocation(c);
     }
 
-    /** Play services is installed and enabled -- microG, in microG Maps. */
-    public static boolean playServicesUsable(Context c) {
-        if (microgPatched()) return MicroG.installed(c);
+    /** [source] can give Maps a location: Android always; Google's Play services or microG when installed and enabled. */
+    public static boolean locationSourceUsable(Context c, String source) {
+        if (SOURCE_MICROG.equals(source)) return MicroG.locationService(c);
+        if (!SOURCE_GOOGLE.equals(source)) return true;
         try {
             return c.getPackageManager().getApplicationInfo(PLAY_SERVICES, 0).enabled;
         } catch (Throwable t) {
@@ -318,31 +331,51 @@ public final class Shapes {
         }
     }
 
+    /** The source Maps uses: the chosen one, or Android's own while the chosen one cannot answer. */
+    public static String locationSourceInUse(Context c) {
+        String source = locationSource(c);
+        return locationSourceUsable(c, source) ? source : SOURCE_ANDROID;
+    }
+
     static void refreshPlayLocation(Context c) {
         if (!locationSourcePatched()) return;
-        PLAY_LOCATION = playLocationEnabled(c) && playServicesUsable(c) ? 1 : 0;
+        SOURCE = locationSourceInUse(c);
+    }
+
+    private static String sourceInUse() {
+        String v = SOURCE;
+        if (v == null) {
+            Context app = application();
+            if (app == null) return SOURCE_ANDROID;   // not known yet: Android's own providers always work
+            refreshPlayLocation(app);
+            v = SOURCE;
+        }
+        return v == null ? SOURCE_ANDROID : v;
     }
 
     /** Called from the fused-provider availability check, possibly before any Activity exists. */
     public static boolean playLocation() {
-        int v = PLAY_LOCATION;
-        if (v < 0) {
-            Context app = application();
-            if (app == null) return false;   // not known yet: Android's own providers always work
-            refreshPlayLocation(app);
-            v = PLAY_LOCATION;
-        }
-        return v == 1;
+        return !SOURCE_ANDROID.equals(sourceInUse());
+    }
+
+    private static boolean locationService(String action) {
+        return GOOGLE_LOCATION_SERVICE.equals(action) || MicroG.RENAMED_LOCATION_ACTION.equals(action);
     }
 
     /** Called with the package and service action of every Play services connection Maps opens. */
     public static String locationPackage(String pkg, String action) {
         // MicroG-RE answers the location service under its own name (MicroG.locationAction).
-        if (action != null && (action.startsWith("com.google.android.location.")
-                || action.startsWith("app.revanced.android.location.")) && !playLocation()) {
-            return "org.ungoogled.no.play.location";
-        }
-        return pkg;
+        if (action == null || !(action.startsWith("com.google.android.location.")
+                || action.startsWith("app.revanced.android.location."))) return pkg;
+        if (!playLocation()) return "org.ungoogled.no.play.location";
+        if (!locationService(action)) return pkg;
+        return SOURCE_MICROG.equals(sourceInUse()) ? MicroG.PACKAGE : PLAY_SERVICES;
+    }
+
+    /** Called just before locationPackage: the location service's name, as the chosen source answers it. */
+    public static String locationAction(String pkg, String action) {
+        if (!locationService(action) || !playLocation()) return action;
+        return SOURCE_MICROG.equals(sourceInUse()) ? MicroG.locationAction() : GOOGLE_LOCATION_SERVICE;
     }
 
     private static Context application() {

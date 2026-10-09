@@ -208,23 +208,22 @@ public final class CustomizationActivity extends Activity {
         }
 
         if (Shapes.locationSourcePatched()) {
-            // OsmAnd-style single choice. Google Play Services is always listed, but greyed
-            // out and unselectable while Play services is missing or disabled.
-            final boolean playAvailable = Shapes.playServicesUsable(this);
-            final boolean usePlay = playAvailable && Shapes.playLocationEnabled(this);
-            // In microG Maps the second source is microG's, which stands in for Play services.
-            final String playName = Shapes.microgPatched() ? "microG" : "Google Play Services";
-            View locRow = row("Location source", usePlay ? playName : "Android API");
+            // OsmAnd-style single choice. Every source is always listed; microg Services and
+            // Google Play Services are greyed out and unselectable while they cannot answer.
+            final String[] sources = {Shapes.SOURCE_ANDROID, Shapes.SOURCE_MICROG, Shapes.SOURCE_GOOGLE};
+            final String[] options = {"Android API", "microg Services", "Google Play Services"};
+            final boolean[] usable = new boolean[sources.length];
+            for (int i = 0; i < sources.length; i++) usable[i] = Shapes.locationSourceUsable(this, sources[i]);
+            final int inUse = java.util.Arrays.asList(sources).indexOf(Shapes.locationSourceInUse(this));
+            View locRow = row("Location source", options[inUse]);
             locRow.setOnClickListener(v -> {
-                final String[] options = {"Android API", playName};
-                ChoiceAdapter adapter = new ChoiceAdapter(this, options, playAvailable, text(), dark ? 0xFF6B6B6B : 0xFFB0B0B0);
+                ChoiceAdapter adapter = new ChoiceAdapter(this, options, usable, text(), dark ? 0xFF6B6B6B : 0xFFB0B0B0);
                 new AlertDialog.Builder(this, dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
                         .setTitle("Location source")
-                        .setSingleChoiceItems(adapter, usePlay ? 1 : 0, (d, which) -> {
+                        .setSingleChoiceItems(adapter, inUse, (d, which) -> {
                             d.dismiss();
-                            boolean play = which == 1;
-                            if (play == usePlay) return;
-                            Shapes.setPlayLocationEnabled(this, play);
+                            if (which == inUse) return;
+                            Shapes.setLocationSource(this, sources[which]);
                             restartSoon(v);
                         })
                         .setNegativeButton("Cancel", null)
@@ -336,16 +335,19 @@ public final class CustomizationActivity extends Activity {
                 .show();
     }
 
-    /** Single-choice list whose second entry (Google Play Services) is greyed out and unselectable
-     *  while Play services is unavailable. */
+    /** Single-choice list whose unavailable entries (a location source that cannot answer) are
+     *  greyed out and unselectable. */
     private static final class ChoiceAdapter extends android.widget.ArrayAdapter<String> {
-        private final boolean playAvailable; private final int on, off;
-        ChoiceAdapter(android.content.Context c, String[] items, boolean playAvailable, int on, int off) {
+        private final boolean[] available; private final int on, off;
+        ChoiceAdapter(android.content.Context c, String[] items, boolean[] available, int on, int off) {
             super(c, android.R.layout.simple_list_item_single_choice, items);
-            this.playAvailable = playAvailable; this.on = on; this.off = off;
+            this.available = available; this.on = on; this.off = off;
         }
-        @Override public boolean isEnabled(int position) { return position == 0 || playAvailable; }
-        @Override public boolean areAllItemsEnabled() { return playAvailable; }
+        @Override public boolean isEnabled(int position) { return available[position]; }
+        @Override public boolean areAllItemsEnabled() {
+            for (boolean a : available) if (!a) return false;
+            return true;
+        }
         @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
             View row = super.getView(position, convertView, parent);
             boolean enabled = isEnabled(position);
