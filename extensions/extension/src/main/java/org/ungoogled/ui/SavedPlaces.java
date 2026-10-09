@@ -382,7 +382,7 @@ public final class SavedPlaces {
             Context c = v != null ? v.getContext() : resumed.get();
             if (c == null) c = Shapes.appContext();
             if (c == null) return;
-            Intent i = new Intent().setClassName(c.getPackageName(), YouActivity.class.getName());
+            Intent i = Screens.intent(c, YouActivity.class);
             if (!(c instanceof Activity)) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(i);
         }

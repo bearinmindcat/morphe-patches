@@ -18,6 +18,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
+import org.ungoogled.patches.maps.ui.screenHostPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.shared.addInstructionsAtLabel
@@ -72,7 +73,7 @@ val customizationScreenPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, customizationManifestPatch)
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationManifestPatch)
 
     execute {
         // 1. A row builder of our own on the sheet's row holder, built the way Maps builds

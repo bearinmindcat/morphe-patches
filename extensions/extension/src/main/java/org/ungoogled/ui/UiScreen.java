@@ -51,6 +51,11 @@ abstract class UiScreen extends Activity {
         super.attachBaseContext(Shapes.wrap(base));
     }
 
+    @Override protected void onCreate(android.os.Bundle state) {
+        Screens.prepare(this);
+        super.onCreate(state);
+    }
+
     /** Builds the window: title bar with close, and an empty scrolling [body]. */
     void frame(String titleText) {
         frame(titleText, true);

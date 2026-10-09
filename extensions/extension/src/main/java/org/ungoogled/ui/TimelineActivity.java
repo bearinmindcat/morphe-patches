@@ -58,9 +58,13 @@ public final class TimelineActivity extends UiScreen {
         body.addView(hint("A private record of where this phone has been. It stays in this app on this phone: "
                 + "no account, nothing uploaded. Recording shows a notification and uses some battery."));
 
-        LinearLayout record = rowBase("Record my timeline", TimelineService.isRunning() ? "On" : "Off");
+        // A root mount install keeps stock Maps' manifest, so the recorder service does not exist there.
+        boolean recorder = Screens.declared(this, TimelineService.class);
+        LinearLayout record = rowBase("Record my timeline",
+                !recorder ? "Not on a root mount install" : TimelineService.isRunning() ? "On" : "Off");
         Switch sw = new Switch(this);
         sw.setChecked(TimelineService.isRunning());
+        sw.setEnabled(recorder);
         record.setOrientation(LinearLayout.HORIZONTAL);
         // rowBase stacks title over summary; put them in a column so the switch can sit on the right
         LinearLayout col = new LinearLayout(this);
@@ -68,9 +72,13 @@ public final class TimelineActivity extends UiScreen {
         while (record.getChildCount() > 0) { android.view.View c = record.getChildAt(0); record.removeViewAt(0); col.addView(c); }
         record.addView(col, new LinearLayout.LayoutParams(0, -2, 1f));
         record.addView(sw);
-        record.setOnClickListener(v -> sw.toggle());
+        if (recorder) record.setOnClickListener(v -> sw.toggle());
         sw.setOnCheckedChangeListener((b, on) -> { if (on) start(); else stop(); });
         body.addView(record);
+        if (!recorder) {
+            body.addView(hint("Recording runs as a background service, and a root mount install can only use the ones "
+                    + "stock Maps declares. Install the patched app normally to record."));
+        }
 
         List<TimelineService.Db.Point> pts = db.all();
         body.addView(action("Export GPX", pts.size() + " points recorded", v -> {
@@ -88,7 +96,7 @@ public final class TimelineActivity extends UiScreen {
         List<Entry> entries = group(pts, db.sessions(), System.currentTimeMillis(), TimelineService.isRunning());
         if (entries.isEmpty()) {
             body.addView(section("Your days"));
-            body.addView(hint("Nothing recorded yet. Switch on Record my timeline."));
+            body.addView(hint(recorder ? "Nothing recorded yet. Switch on Record my timeline." : "Nothing recorded yet."));
             return;
         }
         String day = null;

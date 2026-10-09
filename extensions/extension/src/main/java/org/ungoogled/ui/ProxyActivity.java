@@ -44,6 +44,7 @@ public final class ProxyActivity extends Activity {
     }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
+        Screens.prepare(this);
         super.onCreate(savedInstanceState);
         initial = Shapes.proxy(this);
         black = Shapes.BLACK;

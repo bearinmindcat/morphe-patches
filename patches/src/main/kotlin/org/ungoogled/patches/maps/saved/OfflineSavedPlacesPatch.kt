@@ -26,6 +26,7 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.customization.customizationScreenPatch
+import org.ungoogled.patches.maps.ui.screenHostPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.shared.addInstructionsAtLabel
@@ -238,7 +239,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
         "import (backup file, KML, Google Takeout's Saved Places.json).",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, customizationScreenPatch, savedManifestPatch)
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationScreenPatch, savedManifestPatch)
 
     execute {
         // microG Maps saves to the Google account, as Maps does: it gets only the Local saved

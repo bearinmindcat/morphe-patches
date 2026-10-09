@@ -8,6 +8,7 @@ import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.applicationStartHookPatch
 import org.ungoogled.patches.maps.ui.customization.customizationScreenPatch
 import org.ungoogled.patches.maps.ui.markPatched
+import org.ungoogled.patches.maps.ui.screenHostPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
@@ -54,7 +55,7 @@ val proxyPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, applicationStartHookPatch, activityContextHookPatch, customizationScreenPatch, proxyManifestPatch)
+    dependsOn(sharedExtensionPatch, applicationStartHookPatch, activityContextHookPatch, screenHostPatch, customizationScreenPatch, proxyManifestPatch)
 
     execute {
         markPatched("proxyPatched")

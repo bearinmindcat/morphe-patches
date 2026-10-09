@@ -48,7 +48,7 @@ public final class TimelineService extends Service implements LocationListener {
     /** Recording was left on but is not running (the phone restarted, or Android stopped it): start it again. */
     static void resumeIfWanted(Activity a) {
         try {
-            if (running || !Shapes.timelinePatched() || !wanted(a)) return;
+            if (running || !Shapes.timelinePatched() || !wanted(a) || !Screens.declared(a, TimelineService.class)) return;
             if (a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
             a.startForegroundService(new Intent(a, TimelineService.class).setAction(ACTION_START));
         } catch (Throwable ignored) {}
@@ -76,7 +76,7 @@ public final class TimelineService extends Service implements LocationListener {
         }
         NotificationManager nm = getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Timeline", NotificationManager.IMPORTANCE_LOW));
-        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, TimelineActivity.class), PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent open = PendingIntent.getActivity(this, 0, Screens.intent(this, TimelineActivity.class), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent stop = PendingIntent.getService(this, 1,
                 new Intent(this, TimelineService.class).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, CHANNEL)

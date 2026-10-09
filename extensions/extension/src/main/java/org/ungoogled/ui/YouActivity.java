@@ -130,16 +130,16 @@ public final class YouActivity extends UiScreen {
 
     /** One of the user's lists' page (after a place is added to it from Maps' "Add a place"). */
     static Intent listIntent(android.content.Context c, String list) {
-        return new Intent(c, YouActivity.class).putExtra(EXTRA_PAGE, LIST).putExtra(EXTRA_LIST, list);
+        return Screens.intent(c, YouActivity.class).putExtra(EXTRA_PAGE, LIST).putExtra(EXTRA_LIST, list);
     }
 
     private void go(String to, String list) {
-        startActivity(new Intent(this, YouActivity.class).putExtra(EXTRA_PAGE, to).putExtra(EXTRA_LIST, list));
+        startActivity(Screens.intent(this, YouActivity.class).putExtra(EXTRA_PAGE, to).putExtra(EXTRA_LIST, list));
     }
 
     /** Your places, filtered: what the You page's search and filter chips open. */
     private void places(int withKind, String withList, String withCategory, boolean withSearch) {
-        startActivity(new Intent(this, YouActivity.class).putExtra(EXTRA_PAGE, PLACES).putExtra(EXTRA_KIND, withKind)
+        startActivity(Screens.intent(this, YouActivity.class).putExtra(EXTRA_PAGE, PLACES).putExtra(EXTRA_KIND, withKind)
                 .putExtra(EXTRA_SAVED_LIST, withList).putExtra(EXTRA_CATEGORY, withCategory).putExtra(EXTRA_SEARCH, withSearch));
     }
 
@@ -179,10 +179,10 @@ public final class YouActivity extends UiScreen {
             TextView explore = label("Explore Timeline", 14, accent(), textMedium);
             explore.setGravity(Gravity.CENTER);
             explore.setPadding(dp(12), dp(14), dp(12), dp(14));
-            explore.setOnClickListener(v -> startActivity(new Intent(this, TimelineActivity.class)));
+            explore.setOnClickListener(v -> startActivity(Screens.intent(this, TimelineActivity.class)));
             body.addView(explore, new LinearLayout.LayoutParams(-1, -2));
             body.addView(shortcut(new PathIcon(PathIcon.TIMELINE, onTonal()), "Timeline",
-                    v -> startActivity(new Intent(this, TimelineActivity.class))));
+                    v -> startActivity(Screens.intent(this, TimelineActivity.class))));
         }
 
         body.addView(bandView());

@@ -55,6 +55,7 @@ public final class CustomizationActivity extends Activity {
     }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
+        Screens.prepare(this);
         super.onCreate(savedInstanceState);
         // Follow Maps' theme, not the system's: Maps decides dark/light from its own
         // settings_preference/dark_mode (ON | OFF | FOLLOW_SYSTEM), see Shapes.enforceDark.
@@ -236,7 +237,7 @@ public final class CustomizationActivity extends Activity {
             // its own screen (Enable / Host / Port), like OsmAnd's
             LinearLayout proxyRow = rowBase("Proxy", proxySummary());
             proxySub = (TextView) ((LinearLayout) proxyRow.getChildAt(0)).getChildAt(1);
-            proxyRow.setOnClickListener(v -> startActivity(new android.content.Intent(this, ProxyActivity.class)));
+            proxyRow.setOnClickListener(v -> startActivity(Screens.intent(this, ProxyActivity.class)));
             body.addView(proxyRow);
         }
     }
@@ -411,8 +412,7 @@ public final class CustomizationActivity extends Activity {
         @Override
         public void onClick(View v) {
             Shapes.SKIP_DISMISS = true;
-            context.startActivity(new android.content.Intent()
-                    .setClassName(context.getPackageName(), CustomizationActivity.class.getName()));
+            context.startActivity(Screens.intent(context, CustomizationActivity.class));
         }
     }
 
@@ -425,9 +425,7 @@ public final class CustomizationActivity extends Activity {
         @Override
         public void onClick(View v) {
             Shapes.SKIP_DISMISS = true;
-            context.startActivity(new android.content.Intent()
-                    .setClassName(context.getPackageName(), CustomizationActivity.class.getName())
-                    .putExtra(EXTRA_PAGE, PAGE_POWER));
+            context.startActivity(Screens.intent(context, CustomizationActivity.class).putExtra(EXTRA_PAGE, PAGE_POWER));
         }
     }
 
