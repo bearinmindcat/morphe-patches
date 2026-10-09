@@ -818,6 +818,9 @@ internal val localSavedPlacesPatch = bytecodePatch(
                 ExternalLabel("maps_search", implementation!!.instructions.first()),
             )
         }
+
+        // ---- 10. Directions to the user's labels: "Home" as a destination (issue #36) --------
+        labelWaypoints(featureIdGetter.returnType, positionGetter.returnType)
     }
 }
 
@@ -955,6 +958,140 @@ private fun BytecodePatchContext.personalPlaceSearch() {
         if (first.opcode != Opcode.CONST_STRING) throw PatchException("SavedPlaces.showMethod() no longer starts with const-string")
         replaceInstruction(0, "const-string v${(first as OneRegisterInstruction).registerA}, \"$showName\"")
     }
+}
+
+/**
+ * The directions waypoint editors -- two, one per directions screen -- build a waypoint from the typed
+ * query alone, so signed out "Home" found nothing ("Something went wrong"): Home and Work live in the
+ * Google account (issue #36). Right after each puts the query on its waypoint builder,
+ * SavedPlaces.labelWaypoint turns a query naming one of the user's labels into that place, built as
+ * Maps builds its own "Home" waypoint: position and feature id, the label as its name, no query.
+ */
+private fun BytecodePatchContext.labelWaypoints(featureType: String, positionType: String) {
+    fun Instruction.ref() = (this as? ReferenceInstruction)?.reference
+    val editors = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+    classDefForEach { c ->
+        if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        for (m in c.methods) {
+            if (m.parameterTypes.firstOrNull()?.toString() != "Ljava/lang/String;") continue
+            if (m.implementation?.instructions?.any { (it.ref() as? StringReference)?.string == "DirectionsWaypointEditorQueryEntered" } == true) {
+                editors += c.type to m
+            }
+        }
+    }
+    if (editors.size != 2) throw PatchException("expected two directions waypoint editors, found ${editors.map { it.first }}")
+    val builders = editors.map { (type, found) ->
+        val method = mutableClassDefBy(type).methods.single {
+            it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == found.returnType
+        }
+        // The query is the first parameter: p1, after this.
+        val query = method.implementation!!.registerCount -
+            method.parameterTypes.map(CharSequence::toString).sumOf { if (it == "J" || it == "D") 2L else 1L }.toInt()
+        val code = method.implementation!!.instructions.toList()
+        val stores = code.indices.filter { i ->
+            code[i].opcode == Opcode.IPUT_OBJECT && (code[i] as TwoRegisterInstruction).registerA == query &&
+                (code[i].ref() as FieldReference).type == "Ljava/lang/String;"
+        }
+        val at = stores.singleOrNull() ?: throw PatchException("$type puts the query on ${stores.size} fields")
+        val builder = (code[at] as TwoRegisterInstruction).registerB
+        if (code[at + 1].location.labels.isNotEmpty()) throw PatchException("$type's query store is followed by a branch target")
+        if (builder > 15 || query > 15) throw PatchException("$type's waypoint registers are out of range")
+        method.addInstructions(
+            at + 1,
+            "invoke-static { v$builder, v$query }, $SAVED_PLACES->labelWaypoint(Ljava/lang/Object;Ljava/lang/String;)V",
+        )
+        (code[at].ref() as FieldReference).let { "${it.definingClass}->${it.name}" }
+    }
+    val queryRef = builders.distinct().singleOrNull() ?: throw PatchException("waypoint editors build different waypoints: $builders")
+    val builder = queryRef.substringBefore("->")
+    val queryField = queryRef.substringAfter("->")
+    val builderClass = classDefByOrNull(builder) ?: throw PatchException("$builder not found")
+    // Its name: the field Maps' own "Home" waypoint puts the literal "Home" in.
+    val named = mutableSetOf<String>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            val code = m.implementation?.instructions?.toList() ?: continue
+            for (i in code.indices) {
+                if (code[i].opcode != Opcode.IPUT_OBJECT) continue
+                val f = code[i].ref() as FieldReference
+                if (f.definingClass != builder || f.type != "Ljava/lang/String;") continue
+                val value = (code[i] as TwoRegisterInstruction).registerA
+                val source = (i - 1 downTo maxOf(0, i - 40)).firstOrNull { j ->
+                    code[j].opcode.setsRegister() && (code[j] as? OneRegisterInstruction)?.registerA == value
+                } ?: continue
+                if ((code[source].ref() as? StringReference)?.string == "Home") named += f.name
+            }
+        }
+    }
+    val nameField = named.singleOrNull() ?: throw PatchException("$builder's name field is not clear: $named")
+    val featureField = builderClass.fields.singleOrNull { it.type == featureType && !AccessFlags.STATIC.isSet(it.accessFlags) }
+        ?: throw PatchException("$builder has no single feature id field")
+    // Its position: of its fields of that type, the one Maps sets when it builds a waypoint for a place.
+    val writes = builderClass.fields.filter { it.type == positionType && !AccessFlags.STATIC.isSet(it.accessFlags) }
+        .associate { it.name to 0 }.toMutableMap()
+    classDefForEach { c ->
+        if (c.type == builder) return@classDefForEach
+        for (m in c.methods) m.implementation?.instructions?.forEach { insn ->
+            if (insn.opcode != Opcode.IPUT_OBJECT) return@forEach
+            val f = insn.ref() as FieldReference
+            if (f.definingClass == builder && f.name in writes) writes[f.name] = writes.getValue(f.name) + 1
+        }
+    }
+    val ranked = writes.entries.sortedByDescending { it.value }
+    if (ranked.isEmpty() || (ranked.size > 1 && ranked[0].value < 2 * ranked[1].value)) {
+        throw PatchException("$builder's position field is not clear: $writes")
+    }
+    val positionField = ranked[0].key
+    fun publicInit(type: String, params: List<String>) = classDefByOrNull(type)?.methods?.any {
+        it.name == "<init>" && it.parameterTypes.map(CharSequence::toString) == params && AccessFlags.PUBLIC.isSet(it.accessFlags)
+    } == true
+    if (!publicInit(featureType, listOf("J", "J"))) throw PatchException("$featureType has no public (long, long) constructor")
+    if (!publicInit(positionType, listOf("D", "D"))) throw PatchException("$positionType has no public (double, double) constructor")
+
+    // The extension's setters: a new value of that type put on the builder's field, and the name.
+    val extension = mutableClassDefBy(SAVED_PLACES)
+    fun setter(name: String, wide: String, type: String, field: String) {
+        extension.methods.remove(extension.methods.single { it.name == name })
+        extension.methods.add(
+            ImmutableMethod(
+                SAVED_PLACES, name,
+                listOf(ImmutableMethodParameter("Ljava/lang/Object;", null, null), ImmutableMethodParameter(wide, null, null), ImmutableMethodParameter(wide, null, null)),
+                "V", AccessFlags.STATIC.value, null, null, MutableMethodImplementation(6),
+            ).toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        check-cast p0, $builder
+                        new-instance v0, $type
+                        invoke-direct { v0, p1, p2, p3, p4 }, $type-><init>($wide$wide)V
+                        iput-object v0, p0, $builder->$field:$type
+                        return-void
+                    """,
+                )
+            },
+        )
+    }
+    setter("setWaypointFeature", "J", featureType, featureField.name)
+    setter("setWaypointPosition", "D", positionType, positionField)
+    extension.methods.remove(extension.methods.single { it.name == "setWaypointName" })
+    extension.methods.add(
+        ImmutableMethod(
+            SAVED_PLACES, "setWaypointName",
+            listOf(ImmutableMethodParameter("Ljava/lang/Object;", null, null), ImmutableMethodParameter("Ljava/lang/String;", null, null)),
+            "V", AccessFlags.STATIC.value, null, null, MutableMethodImplementation(3),
+        ).toMutable().apply {
+            addInstructions(
+                0,
+                """
+                    check-cast p0, $builder
+                    iput-object p1, p0, $builder->$nameField:Ljava/lang/String;
+                    const/4 v0, 0x0
+                    iput-object v0, p0, $builder->$queryField:Ljava/lang/String;
+                    return-void
+                """,
+            )
+        },
+    )
 }
 
 /**

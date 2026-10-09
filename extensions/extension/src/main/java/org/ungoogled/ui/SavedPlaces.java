@@ -385,6 +385,45 @@ public final class SavedPlaces {
     private static String lastLabel;
     private static long lastLabelAt;
 
+    /**
+     * From the directions waypoint editor's submit (DirectionsWaypointEditorQueryEntered), with the
+     * waypoint it is building from the query: signed out, Maps could not route to "Home" at all
+     * ("Something went wrong") -- it asks Google to find the words. A query naming one of the user's
+     * labels in Local saved -- Home, Work or their own -- becomes that place instead, built the way
+     * Maps builds its own "Home" waypoint: the position (and feature id), the label as its name, and
+     * no words to look up.
+     */
+    public static void labelWaypoint(Object waypoint, String query) {
+        try {
+            if (waypoint == null || query == null || query.trim().isEmpty()) return;
+            Context c = Shapes.appContext();
+            if (c == null) return;
+            SavedStore.load(c);
+            String q = query.trim();
+            SavedStore.Place p = SavedStore.labelled(q);
+            if (p == null || (p.lat == 0 && p.lng == 0)) return;
+            // The feature id "0x89b7b7bce3d77213:0xbd541016f552a256": two hex longs.
+            int colon = p.ftid == null ? -1 : p.ftid.indexOf(':');
+            if (colon > 2 && p.ftid.startsWith("0x") && p.ftid.startsWith("0x", colon + 1)) {
+                setWaypointFeature(waypoint, Long.parseUnsignedLong(p.ftid.substring(2, colon), 16),
+                        Long.parseUnsignedLong(p.ftid.substring(colon + 3), 16));
+            }
+            setWaypointPosition(waypoint, p.lat, p.lng);
+            setWaypointName(waypoint, q.equalsIgnoreCase("home") ? "Home" : q.equalsIgnoreCase("work") ? "Work" : q);
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "label waypoint", t);
+        }
+    }
+
+    /** Rewritten by the patch: gives Maps' waypoint the feature id [high]:[low]. */
+    static void setWaypointFeature(Object waypoint, long high, long low) {}
+
+    /** Rewritten by the patch: gives Maps' waypoint the position [lat], [lng]. */
+    static void setWaypointPosition(Object waypoint, double lat, double lng) {}
+
+    /** Rewritten by the patch: names Maps' waypoint [name] and takes its query away. */
+    static void setWaypointName(Object waypoint, String name) {}
+
     private static Object aliasAnswer;
 
     /** Maps' search answered "Home" or "Work" with its personal-place block: kept for showAliasDialog. */
