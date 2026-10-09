@@ -430,6 +430,9 @@ public final class Shapes {
     /** Stores the parts and folds them into the effective setting. */
     public static void setProxyParts(Context c, boolean on, String host, int port) {
         host = host == null ? "" : host.trim();
+        if (on && (host.isEmpty() || port < 1 || port > 65535)) {
+            throw new IllegalArgumentException("Enter a proxy host and a port between 1 and 65535 before enabling it");
+        }
         String effective = on && !host.isEmpty() && port > 0 && port < 65536 ? host + ":" + port : "";
         prefs(c).edit()
                 .putBoolean(KEY_PROXY_ON, on).putString(KEY_PROXY_HOST, host).putInt(KEY_PROXY_PORT, port)
@@ -439,11 +442,17 @@ public final class Shapes {
 
     private static String PROXY_PROBED = "";
     private static volatile String PROXY_EFFECTIVE = "";
+    private static volatile boolean PROXY_REQUIRED;
     private static volatile Context PROXY_CONTEXT;
 
     /** The proxy in force in this process, "host:port" or "" -- read by CronetProxy, which has no Context. */
     public static String proxyEffective() {
         return PROXY_EFFECTIVE;
+    }
+
+    /** Retains the user's intent even when an older saved configuration is invalid. */
+    public static boolean proxyRequired() {
+        return PROXY_REQUIRED;
     }
 
     /**
@@ -452,6 +461,7 @@ public final class Shapes {
      */
     static void applyProxy(Context c) {
         if (!proxyPatched()) return;
+        PROXY_REQUIRED = proxyOn(c);
         String hp = "";
         try { hp = proxy(c); } catch (Throwable ignored) {}
         try {
