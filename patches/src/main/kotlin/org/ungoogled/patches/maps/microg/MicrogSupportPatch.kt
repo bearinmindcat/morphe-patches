@@ -15,6 +15,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
+import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction3rc
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
@@ -216,6 +217,53 @@ val microgSupportPatch = bytecodePatch(
                     """,
                 )
             }
+        }
+
+        // 1c. "Turn on location" (issue #27): with Android's location off, my location has Play
+        //     services resolve its location check, and MicroG-RE's dialog is under Google's action
+        //     in its own package, which it does not answer: the ActivityNotFoundException crashed
+        //     Maps. Every call to Status.startResolutionForResult(Activity, int) goes through
+        //     MicroG.resolve, which opens Android's location settings instead.
+        val status = "Lcom/google/android/gms/common/api/Status;"
+        fun startsResolution(insn: com.android.tools.smali.dexlib2.iface.instruction.Instruction) =
+            ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                r.definingClass == status && r.returnType == "V" &&
+                    r.parameterTypes.map(CharSequence::toString) == listOf("Landroid/app/Activity;", "I")
+            } == true
+        val resolutionCallers = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (m in c.methods) if (m.implementation?.instructions?.any(::startsResolution) == true) resolutionCallers += c.type to m
+        }
+        if (resolutionCallers.isEmpty()) throw PatchException("Status.startResolutionForResult is no longer called")
+        val resolutionNames = mutableSetOf<String>()
+        for ((type, found) in resolutionCallers) {
+            val method = mutableClassDefBy(type).methods.single {
+                it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == found.returnType
+            }
+            val ins = method.implementation!!.instructions.toList()
+            for (i in ins.indices.reversed()) {
+                val insn = ins[i]
+                if (!startsResolution(insn)) continue
+                resolutionNames += ((insn as ReferenceInstruction).reference as MethodReference).name
+                val resolve = "$MICROG_CLASS->resolve(Ljava/lang/Object;Landroid/app/Activity;I)V"
+                when {
+                    insn.opcode == Opcode.INVOKE_VIRTUAL && insn is Instruction35c ->
+                        method.replaceInstruction(i, "invoke-static { v${insn.registerC}, v${insn.registerD}, v${insn.registerE} }, $resolve")
+                    insn.opcode == Opcode.INVOKE_VIRTUAL_RANGE && insn is Instruction3rc ->
+                        method.replaceInstruction(i, "invoke-static/range { v${insn.startRegister} .. v${insn.startRegister + 2} }, $resolve")
+                    else -> throw PatchException("unexpected call to Status.startResolutionForResult in $type: ${insn.opcode}")
+                }
+            }
+        }
+        val resolutionName = resolutionNames.singleOrNull()
+            ?: throw PatchException("Status.startResolutionForResult has more than one name: $resolutionNames")
+        mutableClassDefBy(MICROG_CLASS).methods.single {
+            it.name == "resolveMethod" && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;"
+        }.apply {
+            val first = implementation!!.instructions.first()
+            if (first.opcode != Opcode.CONST_STRING) throw PatchException("MicroG.resolveMethod() no longer starts with const-string")
+            replaceInstruction(0, "const-string v${(first as OneRegisterInstruction).registerA}, \"$resolutionName\"")
         }
 
         // 2. The Play services names in Maps' code: in finalize, below.

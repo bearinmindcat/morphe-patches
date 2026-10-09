@@ -191,6 +191,43 @@ public final class MicroG {
         }
     }
 
+    /** Rewritten by the patch: the name of Play services' Status.startResolutionForResult(Activity, int). */
+    static String resolveMethod() { return ""; }
+
+    /**
+     * In place of Maps' Status.startResolutionForResult -- the "turn on location" request, and Play
+     * services' resolvable errors: MicroG-RE answers the location settings check with a dialog under
+     * Google's action in its own package, which it does not answer, and the ActivityNotFoundException
+     * crashed Maps when my location was tapped with Android's location off (issue #27). Android's own
+     * location settings open instead while location is off; otherwise nothing happens. Every other
+     * failure goes to Maps as before.
+     */
+    public static void resolve(Object status, Activity activity, int requestCode) {
+        try {
+            status.getClass().getMethod(resolveMethod(), Activity.class, int.class).invoke(status, activity, requestCode);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (!(cause instanceof android.content.ActivityNotFoundException)) throw MicroG.<RuntimeException>sneaky(cause);
+            android.util.Log.w("UA", "Play services resolution has no screen", cause);
+            if (!locationOn(activity)) {
+                try {
+                    activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                } catch (Throwable ignored) {}
+            }
+        } catch (ReflectiveOperationException e) {
+            throw MicroG.<RuntimeException>sneaky(e);
+        }
+    }
+
+    private static boolean locationOn(Context c) {
+        try {
+            android.location.LocationManager lm = c.getSystemService(android.location.LocationManager.class);
+            return lm != null && lm.isLocationEnabled();
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
     /** Throws a checked exception (Maps' module exception) from code that does not declare it. */
     @SuppressWarnings("unchecked")
     private static <T extends Throwable> T sneaky(Throwable t) throws T {
