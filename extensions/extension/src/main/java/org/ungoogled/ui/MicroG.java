@@ -79,6 +79,29 @@ public final class MicroG {
                 && PACKAGE.equals(r.serviceInfo.packageName);
     }
 
+    /**
+     * In place of a Play services screen's action, for the screens MicroG-RE opens only under
+     * app.revanced names -- Location sharing's settings, behind the gear on its screen and in
+     * Settings (issue #30): the name the installed microG answers, Google's own first.
+     */
+    public static String activityAction(String google) {
+        Context c = Shapes.appContext();
+        if (c == null || !google.startsWith(PLAY_SERVICES + ".")) return google;
+        try {
+            PackageManager pm = c.getPackageManager();
+            if (opens(pm, google)) return google;
+            String renamed = PACKAGE + google.substring(PLAY_SERVICES.length());
+            if (opens(pm, renamed)) return renamed;
+        } catch (Throwable ignored) {}
+        return google;
+    }
+
+    private static boolean opens(PackageManager pm, String action) {
+        ResolveInfo r = pm.resolveActivity(new Intent(action).setPackage(PACKAGE), PackageManager.MATCH_DEFAULT_ONLY);
+        return r != null && r.activityInfo != null && r.activityInfo.exported && r.activityInfo.enabled
+                && PACKAGE.equals(r.activityInfo.packageName);
+    }
+
     /** Google's own Play services. */
     private static final String PLAY_SERVICES = "com.google.android.gms";
     private static volatile String modules;   // decided at process start
@@ -203,19 +226,83 @@ public final class MicroG {
      * failure goes to Maps as before.
      */
     public static void resolve(Object status, Activity activity, int requestCode) {
+        if (!startResolution(status, activity, requestCode) && !locationOn(activity)) openLocationSettings(activity);
+    }
+
+    /**
+     * As resolve(), for Maps' own location settings check, which my location runs first (issue
+     * #30): MicroG-RE answers it "resolution required" while Android's location is off, and also
+     * while MicroG-RE itself has no location permission, and then its dialog cannot open. Android
+     * answers the failed start as a cancelled dialog, and with location on my location did
+     * nothing. Maps now gets the answer the dialog gives when accepted -- here, before Android's,
+     * which then finds the check already settled -- and carries on with the location it has.
+     */
+    public static void resolveLocation(Object status, Activity activity, int requestCode) {
+        if (startResolution(status, activity, requestCode)) return;
+        if (!locationOn(activity)) {
+            openLocationSettings(activity);
+            return;
+        }
+        try {
+            java.lang.reflect.Method result = Activity.class.getDeclaredMethod("onActivityResult", int.class, int.class, Intent.class);
+            result.setAccessible(true);
+            result.invoke(activity, requestCode, Activity.RESULT_OK, null);
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "location check answer", t);
+        }
+    }
+
+    /** Status.startResolutionForResult(activity, requestCode); false when its screen does not exist. */
+    private static boolean startResolution(Object status, Activity activity, int requestCode) {
         try {
             status.getClass().getMethod(resolveMethod(), Activity.class, int.class).invoke(status, activity, requestCode);
+            return true;
         } catch (java.lang.reflect.InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (!(cause instanceof android.content.ActivityNotFoundException)) throw MicroG.<RuntimeException>sneaky(cause);
             android.util.Log.w("UA", "Play services resolution has no screen", cause);
-            if (!locationOn(activity)) {
-                try {
-                    activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                } catch (Throwable ignored) {}
-            }
+            return false;
         } catch (ReflectiveOperationException e) {
             throw MicroG.<RuntimeException>sneaky(e);
+        }
+    }
+
+    private static void openLocationSettings(Activity activity) {
+        try {
+            activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+        } catch (Throwable ignored) {}
+    }
+
+    private static final String KEY_NOTICE_ACCEPTED = "location_sharing_notice_accepted";
+
+    /**
+     * Maps telling Play services that [account] accepted Location sharing's notice ("Updates to
+     * Google Location Sharing", issue #30). Maps keeps its banner up until Play services reports
+     * the notice acknowledged, and MicroG-RE keeps no record of it, so the banner could never be
+     * dismissed: the acceptance is kept here.
+     */
+    public static void acceptNotice(android.accounts.Account account) {
+        try {
+            Context c = Shapes.appContext();
+            if (c == null || account == null || account.name == null) return;
+            SharedPreferences prefs = c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE);
+            java.util.Set<String> names = new java.util.HashSet<>(prefs.getStringSet(KEY_NOTICE_ACCEPTED, java.util.Collections.emptySet()));
+            if (names.add(account.name)) prefs.edit().putStringSet(KEY_NOTICE_ACCEPTED, names).apply();
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "notice accepted", t);
+        }
+    }
+
+    /** In Maps' "has this account acknowledged the notice" check: yes once it was accepted here. */
+    public static boolean noticeAccepted(Object account) {
+        try {
+            Context c = Shapes.appContext();
+            if (c == null || !(account instanceof android.accounts.Account)) return false;
+            return c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE)
+                    .getStringSet(KEY_NOTICE_ACCEPTED, java.util.Collections.emptySet())
+                    .contains(((android.accounts.Account) account).name);
+        } catch (Throwable t) {
+            return false;
         }
     }
 
