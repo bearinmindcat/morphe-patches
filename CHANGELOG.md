@@ -1,3 +1,9 @@
+## [1.7.8](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.7...v1.7.8) (2026-10-09)
+
+### 🐛 Bug Fixes
+
+* my location no longer crashes microG Maps when location is off; issue [#27](https://github.com/bearinmindcat/morphe-patches/issues/27) ([a1d74bb](https://github.com/bearinmindcat/morphe-patches/commit/a1d74bbd53ad9d4e0d78fdb5768fba9f8c133c38))
+
 ## [1.7.7](https://github.com/bearinmindcat/morphe-patches/compare/v1.7.6...v1.7.7) (2026-10-09)
 
 ### 🐛 Bug Fixes
