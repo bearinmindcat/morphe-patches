@@ -83,6 +83,7 @@ public final class Shapes {
     public static boolean powerSavingPatched() { return false; }
     public static boolean hideDirectoryPatched() { return false; }
     public static boolean hideAiPatched() { return false; }
+    public static boolean hideAskMapsPatched() { return false; }
     public static boolean highRefreshPatched() { return false; }
     public static boolean timelinePatched() { return false; }
     /** Add microG support: microG Maps, which signs in through microG. */
@@ -109,6 +110,7 @@ public final class Shapes {
     public static volatile boolean HIDE_TABS = hideTabsPatched();
     public static volatile boolean HIDE_DIRECTORY = hideDirectoryPatched();
     public static volatile boolean HIDE_AI = hideAiPatched();
+    public static volatile boolean HIDE_ASK_MAPS = hideAskMapsPatched();
     /** Off by default, unlike the others: it costs battery. */
     public static volatile boolean HIGH_REFRESH = false;
     public static volatile boolean BETTER_OFFLINE = betterOfflinePatched();
@@ -248,6 +250,21 @@ public final class Shapes {
     public static void setHideAiEnabled(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_HIDE_AI, on).commit();
         HIDE_AI = on && hideAiPatched();
+    }
+
+    // ---- Hide Ask Maps ---------------------------------------------------------
+    // The "Ask Maps" chip by the search bar and the Ask button on place pages.
+    // Read when the search and place sheets are built, so a change needs no restart.
+
+    public static final String KEY_HIDE_ASK_MAPS = "hide_ask_maps";
+
+    public static boolean hideAskMapsEnabled(Context c) {
+        return hideAskMapsPatched() && prefs(c).getBoolean(KEY_HIDE_ASK_MAPS, true);
+    }
+
+    public static void setHideAskMapsEnabled(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_HIDE_ASK_MAPS, on).commit();
+        HIDE_ASK_MAPS = on && hideAskMapsPatched();
     }
 
     // ---- 120 refresh rate ------------------------------------------------------
@@ -632,6 +649,7 @@ public final class Shapes {
             HIDE_TABS = hideTabsEnabled(base);
             HIDE_DIRECTORY = hideDirectoryEnabled(base);
             HIDE_AI = hideAiEnabled(base);
+            HIDE_ASK_MAPS = hideAskMapsEnabled(base);
             HIGH_REFRESH = highRefreshEnabled(base);
             PowerSaving.refresh(base);
             if (microgPatched()) MicroG.track(base);

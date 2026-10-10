@@ -199,6 +199,14 @@ public final class CustomizationActivity extends Activity {
             ai.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideAiEnabled(this, on));
         }
 
+        if (Shapes.hideAskMapsPatched()) {
+            Switch askmaps = new Switch(this);
+            askmaps.setChecked(Shapes.hideAskMapsEnabled(this));
+            body.addView(toggleRow("Hide Ask Maps", null, askmaps));
+            // read when the search and place sheets are built, so no restart
+            askmaps.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideAskMapsEnabled(this, on));
+        }
+
         if (Shapes.betterOfflinePatched()) {
             Switch offline = new Switch(this);
             offline.setChecked(Shapes.betterOfflineEnabled(this));
