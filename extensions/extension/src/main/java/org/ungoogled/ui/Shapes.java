@@ -387,6 +387,32 @@ public final class Shapes {
         return SOURCE_GOOGLE.equals(sourceInUse());
     }
 
+    /**
+     * Called from Maps' location-settings check, the one a tap on the my-location button waits for (issue #40).
+     * While the source is Android, Play services is never asked -- the check's connection goes to the package
+     * that does not exist -- and after Maps had been in the background that check was never answered, so the
+     * button did nothing until Maps was restarted. Answered here from Android's own location switch instead:
+     * on means OPTIMIZED, off opens Android's location settings. null: ask Play services or microG as usual.
+     * [results] is Maps' enum of answers, looked up by its constants' names.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Object locationSettingsAnswer(Context c, Class<?> results) {
+        if (!locationSourcePatched() || playLocation()) return null;
+        try {
+            android.location.LocationManager lm = (android.location.LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
+            boolean on = lm != null && lm.isLocationEnabled();
+            if (!on) {
+                Intent settings = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                if (!(c instanceof android.app.Activity)) settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(settings);
+            }
+            return Enum.valueOf((Class) results, on ? "OPTIMIZED" : "NOT_OPTIMIZED_OR_DISABLED");
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "location settings answer", t);
+            return null;
+        }
+    }
+
     private static boolean locationService(String action) {
         return GOOGLE_LOCATION_SERVICE.equals(action) || MicroG.RENAMED_LOCATION_ACTION.equals(action);
     }

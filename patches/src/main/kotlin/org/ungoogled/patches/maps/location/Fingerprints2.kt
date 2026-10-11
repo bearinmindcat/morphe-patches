@@ -68,3 +68,16 @@ internal object FusedOrientationCheckFingerprint : Fingerprint(
         classDef.fields.any { it.type == "Lcom/google/android/gms/location/DeviceOrientationListener;" }
     },
 )
+
+/**
+ * Maps' location-settings check (`Lamch;->c(ZZZ Lamck;)V`, issue #40): stores the request's flags, then asks
+ * Play services' SettingsClient whether the location settings are right and waits for the answer -- a tap on
+ * the my-location button only centres the map once it has arrived.
+ */
+internal object LocationSettingsCheckFingerprint : Fingerprint(
+    returnType = "V",
+    filters = listOf(
+        methodCall(definingClass = "Lcom/google/android/gms/location/LocationServices;", name = "getSettingsClient"),
+    ),
+    custom = { method, _ -> method.parameterTypes.size == 4 && method.parameterTypes.take(3).all { it.toString() == "Z" } },
+)
