@@ -1,3 +1,9 @@
+## [2.2.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.2.4...v2.2.5) (2026-10-11)
+
+### 🐛 Bug Fixes
+
+* location button re-centres after switching apps with the Android location source; issue [#40](https://github.com/bearinmindcat/morphe-patches/issues/40) ([e816969](https://github.com/bearinmindcat/morphe-patches/commit/e816969a089a3734fcfa631992f085b011c47872))
+
 ## [2.2.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.2.3...v2.2.4) (2026-10-11)
 
 ### 🐛 Bug Fixes
