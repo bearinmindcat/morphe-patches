@@ -42,8 +42,9 @@ import java.util.concurrent.Executors;
  * a note as a camera comes up ahead, and every camera as a pin on Maps' own map.
  *
  * Off until switched on in Customization, because it goes online: the cameras around you come from
- * an OpenStreetMap server (the Overpass API), one 0.25-degree square -- about 25 km across -- at a
- * time, the square you are in and the eight around it. Each square is kept on the phone for a week,
+ * an OpenStreetMap server (the Overpass API), in 0.25-degree squares -- about 25 km across: the square
+ * you are in and, by the Camera download area setting, the ring of squares around it (none, one -- the
+ * default, about 75 km across -- two or three). Each square is kept on the phone for a week,
  * so the server learns little more than which squares you pass through, and the Proxy setting covers
  * these requests too. The location comes from Android's GPS while Maps is open or navigating.
  *
@@ -56,11 +57,23 @@ public final class SpeedCameras {
 
     public static final String KEY_ON = "speed_cameras";
     public static final String KEY_MAP = "speed_cameras_map";
+    /** Rings of squares around the one you are in: 0 = about 25 km across, 1 = about 75 km (default), 2, 3. */
+    public static final String KEY_AREA = "speed_cameras_area";
+    static final int AREA_DEFAULT = 1, AREA_MAX = 3;
+    /** The Camera download area's choices, in ring order. */
+    static final String[] AREA_LABELS = {
+            "About 25 km (the square you are in)",
+            "About 75 km (and the squares around it)",
+            "About 125 km",
+            "About 175 km",
+    };
 
     static final int SPEED = 0, RED_LIGHT = 1, AVERAGE = 2, STOP = 3;
 
     /** Alerts and downloads; the cameras as pins on the map. */
     static volatile boolean ON, MAP;
+    /** Rings of squares downloaded and drawn around the one you are in. */
+    static volatile int RING = AREA_DEFAULT;
 
     private static final double TILE = 0.25;
     private static final long WEEK = 7L * 24 * 60 * 60 * 1000;
@@ -115,6 +128,19 @@ public final class SpeedCameras {
         return prefs(c).getBoolean(KEY_MAP, true);
     }
 
+    public static int area(Context c) {
+        int ring = prefs(c).getInt(KEY_AREA, AREA_DEFAULT);
+        return Math.max(0, Math.min(AREA_MAX, ring));
+    }
+
+    public static void setArea(Context c, int ring) {
+        prefs(c).edit().putInt(KEY_AREA, Math.max(0, Math.min(AREA_MAX, ring))).commit();
+        refresh(c);
+        Location l = last;
+        if (l != null) MAIN.post(() -> around(l.getLatitude(), l.getLongitude()));
+        SavedOnMap.refresh();
+    }
+
     public static void setEnabled(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_ON, on).commit();
         refresh(c);
@@ -131,6 +157,7 @@ public final class SpeedCameras {
     static void refresh(Context c) {
         ON = enabled(c);
         MAP = ON && onMap(c);
+        RING = area(c);
         Context app = c.getApplicationContext();
         if (!tracking && app instanceof Application) {
             tracking = true;
@@ -223,7 +250,7 @@ public final class SpeedCameras {
         Camera best = null;
         double bestDistance = Double.MAX_VALUE;
         float[] result = new float[2];
-        for (Camera cam : near(l.getLatitude(), l.getLongitude())) {
+        for (Camera cam : near(l.getLatitude(), l.getLongitude(), 1)) {
             Location.distanceBetween(l.getLatitude(), l.getLongitude(), cam.lat, cam.lng, result);
             double d = result[0];
             if (d > reach) continue;
@@ -242,7 +269,7 @@ public final class SpeedCameras {
         if (alerted.size() > 200) alerted.values().removeIf(t -> now - t > 5 * 60 * 1000L);
         // The camera, and any other mapped within 50 m of it: the same camera drawn twice, or a pair
         // at one junction, chime once.
-        for (Camera cam : near(best.lat, best.lng)) {
+        for (Camera cam : near(best.lat, best.lng, 1)) {
             Location.distanceBetween(best.lat, best.lng, cam.lat, cam.lng, result);
             if (result[0] <= 50) alerted.put(cam.id, now);
         }
@@ -279,7 +306,7 @@ public final class SpeedCameras {
         List<Object> out = new ArrayList<>();
         Location l = last;
         if (!MAP || l == null) return out;
-        List<Camera> cams = new ArrayList<>(near(l.getLatitude(), l.getLongitude()));
+        List<Camera> cams = new ArrayList<>(near(l.getLatitude(), l.getLongitude(), RING));
         final double lat = l.getLatitude(), lng = l.getLongitude();
         Collections.sort(cams, (a, b) -> Double.compare(sq(a, lat, lng), sq(b, lat, lng)));
         Map<Integer, Object> lists = new HashMap<>();
@@ -309,12 +336,12 @@ public final class SpeedCameras {
         return ty << 32 | tx;
     }
 
-    /** The cameras of the square at [lat],[lng] and the eight around it, as far as they are loaded. */
-    private static List<Camera> near(double lat, double lng) {
+    /** The cameras of the square at [lat],[lng] and [ring] rings of squares around it, as far as they are loaded. */
+    private static List<Camera> near(double lat, double lng, int ring) {
         List<Camera> out = new ArrayList<>();
         long center = tile(lat, lng), ty = center >>> 32, tx = center & 0xffffffffL;
-        for (long y = ty - 1; y <= ty + 1; y++) {
-            for (long x = tx - 1; x <= tx + 1; x++) {
+        for (long y = ty - ring; y <= ty + ring; y++) {
+            for (long x = tx - ring; x <= tx + ring; x++) {
                 List<Camera> t = tiles.get(y << 32 | x);
                 if (t != null) out.addAll(t);
             }
@@ -323,15 +350,16 @@ public final class SpeedCameras {
     }
 
     /**
-     * Loads, or downloads, the square at [lat],[lng] and the eight around it: those kept on the phone
-     * from the phone, the rest in one request for the rectangle around them -- nine requests at once
-     * got the app rate-limited. After a failed request the next waits 1, 2, 4 ... up to 30 minutes.
+     * Loads, or downloads, the square at [lat],[lng] and the Camera download area's rings around it (at
+     * least one, the squares the alerts look into): those kept on the phone from the phone, the rest in
+     * one request for the rectangle around them -- nine requests at once got the app rate-limited. After a failed request the next waits 1, 2, 4 ... up to 30 minutes.
      */
     private static void around(double lat, double lng) {
         long center = tile(lat, lng), ty = center >>> 32, tx = center & 0xffffffffL;
         List<Long> missing = new ArrayList<>();
-        for (long y = ty - 1; y <= ty + 1; y++) {
-            for (long x = tx - 1; x <= tx + 1; x++) {
+        int ring = Math.max(1, RING);   // the alerts look one square ahead in every direction
+        for (long y = ty - ring; y <= ty + ring; y++) {
+            for (long x = tx - ring; x <= tx + ring; x++) {
                 long key = y << 32 | x;
                 if (!fresh.contains(key)) missing.add(key);
             }
@@ -402,6 +430,7 @@ public final class SpeedCameras {
                     fresh.add(t.getKey());
                 }
                 failures = 0;
+                android.util.Log.i("UA", "speed cameras: " + cams.size() + " in " + saved.size() + " squares from " + server);
                 changed();
                 return;
             } catch (Throwable t) {

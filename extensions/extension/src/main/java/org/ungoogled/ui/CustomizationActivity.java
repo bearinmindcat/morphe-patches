@@ -320,6 +320,14 @@ public final class CustomizationActivity extends Activity {
             camsMap.setChecked(SpeedCameras.onMap(this));
             camsMap.setEnabled(cams.isChecked());
             body.addView(toggleRow("Speed cameras on the map", null, camsMap));
+            // How much of the map around you is downloaded and drawn; read live, so no restart.
+            LinearLayout areaRow = rowBase("Camera download area", SpeedCameras.AREA_LABELS[SpeedCameras.area(this)]);
+            TextView areaSub = (TextView) ((LinearLayout) areaRow.getChildAt(0)).getChildAt(1);
+            areaRow.setOnClickListener(v -> choose("Camera download area", SpeedCameras.AREA_LABELS, SpeedCameras.area(this), which -> {
+                SpeedCameras.setArea(this, which);
+                areaSub.setText(SpeedCameras.AREA_LABELS[which]);
+            }));
+            body.addView(areaRow);
             // both read live, so no restart
             cams.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 SpeedCameras.setEnabled(this, on);
