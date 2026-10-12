@@ -1,3 +1,13 @@
+## [2.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.3.1...v2.4.0) (2026-10-12)
+
+### 🐛 Bug Fixes
+
+* waze installs as De-Waze ([332cd66](https://github.com/bearinmindcat/morphe-patches/commit/332cd668e3b0c81cb1fe5a6f88fa6ff2399b0a3a))
+
+### ✨ New Features
+
+* flock cameras on the map, from openstreetmap (deflock) with a chime for one ahead ([9e5cd2d](https://github.com/bearinmindcat/morphe-patches/commit/9e5cd2d44a535e3939307eb0395a5b24fe8cc09d))
+
 ## [2.3.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.3.0...v2.3.1) (2026-10-12)
 
 ### 🐛 Bug Fixes

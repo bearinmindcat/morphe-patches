@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.3.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.3.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;49 patches total
+> **[v2.4.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.4.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;51 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;26 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;27 patches</summary>
 <br>
 
 <p>
@@ -42,6 +42,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change app name](#change-app-name) | Sets the launcher and in-app app name. | • App name |
 | [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy. | • Package name |
 | [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet, with switches for the patches here that can be turned back off inside the app. |  |
+| [Flock cameras](#flock-cameras) | Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on in Waze Features, a row on the account sheet, because it downloads the ones near you from an OpenStreetMap server, over the same area as the speed cameras. |  |
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG support, microG's C sits in the pin's circle. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG's (microg Services) or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
@@ -80,7 +81,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;•&nbsp;&nbsp;15 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;16 patches</summary>
 <br>
 
 **Supported version(s):** 5.24.5.0
@@ -90,6 +91,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Alert distances](#alert-distances) | How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them. | • Police<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Speed cameras on streets<br>• Speed cameras on highways<br>• Speed cameras on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
 | [All moods](#all-moods) | Every mood can be chosen: the ones Waze keeps for higher ranks and the beta moods it hides. |  |
 | [Bigger speedometer](#bigger-speedometer) | Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be read at a glance. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |
+| [Change app name](#change-app-name) | Sets the name shown under the launcher icon, in the app switcher and on Android Auto. | • App name |
 | [Full black](#full-black) | Waze's dark mode in true black for AMOLED screens: the app's dark backgrounds are black, and with Black night map the night map's background too. Roads, labels, buttons and text keep their colours. | • Black night map |
 | [Hide ads](#hide-ads) | Removes the sponsored pins on the map and on Android Auto, the full-screen ads shown while you are stopped, and the ad statistics Waze sends. |  |
 | [Map skin](#map-skin) | The old Waze mods' map skin, as changes to Waze's own: bigger map labels, a wider navigation arrow head and a warm day background. The night background is Full black's. Skipped by Morphe Manager 1.35 and other patcher 1.15+ builds, which would crash Waze when the map opens; patch with Morphe Desktop to get it. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
