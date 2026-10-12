@@ -320,6 +320,28 @@ public final class CustomizationActivity extends Activity {
             camsMap.setChecked(SpeedCameras.onMap(this));
             camsMap.setEnabled(cams.isChecked());
             body.addView(toggleRow("Speed cameras on the map", null, camsMap));
+            if (Shapes.flockCamerasPatched()) {
+                Switch flock = new Switch(this);
+                flock.setChecked(SpeedCameras.flockEnabled(this));
+                body.addView(toggleRow("Flock cameras", "Flock and other license plate readers, as DeFlock maps them. "
+                        + "Downloads the ones near you from OpenStreetMap", flock));
+                Switch flockMap = new Switch(this);
+                flockMap.setChecked(SpeedCameras.flockOnMap(this));
+                flockMap.setEnabled(flock.isChecked());
+                body.addView(toggleRow("Flock cameras on the map", null, flockMap));
+                Switch flockAlert = new Switch(this);
+                flockAlert.setChecked(SpeedCameras.flockAlert(this));
+                flockAlert.setEnabled(flock.isChecked());
+                body.addView(toggleRow("Chime for a Flock camera ahead", null, flockAlert));
+                // all read live, so no restart
+                flock.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+                    SpeedCameras.setFlockEnabled(this, on);
+                    flockMap.setEnabled(on);
+                    flockAlert.setEnabled(on);
+                });
+                flockMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setFlockOnMap(this, on));
+                flockAlert.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setFlockAlert(this, on));
+            }
             // How much of the map around you is downloaded and drawn; read live, so no restart.
             LinearLayout areaRow = rowBase("Camera download area", SpeedCameras.AREA_LABELS[SpeedCameras.area(this)]);
             TextView areaSub = (TextView) ((LinearLayout) areaRow.getChildAt(0)).getChildAt(1);
