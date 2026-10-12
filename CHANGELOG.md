@@ -1,3 +1,9 @@
+## [2.3.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.3.0...v2.3.1) (2026-10-12)
+
+### 🐛 Bug Fixes
+
+* choose how far around you speed cameras are downloaded (about 25 to 175 km, in waze features) ([4d14f8b](https://github.com/bearinmindcat/morphe-patches/commit/4d14f8ba361c8a6fbde59680f09cc88be4fbb838))
+
 ## [2.3.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.2.5...v2.3.0) (2026-10-12)
 
 ### ✨ New Features

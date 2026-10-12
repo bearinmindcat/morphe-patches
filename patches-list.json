@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -1443,7 +1443,7 @@
     },
     {
       "name": "Speed cameras",
-      "description": "Chimes and shows a note when a speed or red light camera is coming up ahead, and puts the cameras on the map, from OpenStreetMap. Off until turned on in Waze Features, a row on the account sheet, because it downloads the cameras near you from an OpenStreetMap server.",
+      "description": "Chimes and shows a note when a speed or red light camera is coming up ahead, and puts the cameras on the map, from OpenStreetMap. Off until turned on in Waze Features, a row on the account sheet, because it downloads the cameras near you from an OpenStreetMap server -- an area you choose there, about 25 to 175 km across.",
       "default": true,
       "category": null,
       "dependencies": [
