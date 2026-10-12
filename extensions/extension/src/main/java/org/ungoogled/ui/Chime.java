@@ -35,6 +35,11 @@ final class Chime {
         play(new float[]{1568f, 1568f, 2093f}, 110, 50);
     }
 
+    /** A Waze alert ahead: down a note and back up, unlike the other two. */
+    static void alert() {
+        play(new float[]{1319f, 988f, 1319f}, 130, 40);
+    }
+
     /** [notes] in Hz, each [noteMs] long with [gapMs] of silence after it. */
     private static void play(float[] notes, int noteMs, int gapMs) {
         AUDIO.execute(() -> {

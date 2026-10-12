@@ -87,6 +87,7 @@ public final class Shapes {
     public static boolean timelinePatched() { return false; }
     public static boolean speedingChimePatched() { return false; }
     public static boolean speedCamerasPatched() { return false; }
+    public static boolean wazeAlertsPatched() { return false; }
     /** Add microG support: microG Maps, which signs in through microG. */
     public static boolean microgPatched() { return false; }
 
@@ -689,6 +690,7 @@ public final class Shapes {
             HIDE_AI = hideAiEnabled(base);
             SPEEDING_CHIME = speedingChime(base);
             if (speedCamerasPatched()) SpeedCameras.refresh(base);
+            if (wazeAlertsPatched()) WazeAlerts.refresh(base);
             HIGH_REFRESH = highRefreshEnabled(base);
             PowerSaving.refresh(base);
             if (microgPatched()) MicroG.track(base);
@@ -885,6 +887,7 @@ public final class Shapes {
         if (controller == null) return;
         navCamAt = android.os.SystemClock.uptimeMillis();
         if (speedCamerasPatched()) SpeedCameras.navigating(true);
+        if (wazeAlertsPatched()) WazeAlerts.navigating(true);
         if (controller != NAV_CAM) {
             NAV_CAM = controller;
             if (NAV_TRACE) android.util.Log.w("UA", "NAVCAM controller published: " + controller.getClass().getName());
@@ -1036,6 +1039,7 @@ public final class Shapes {
     public static void navEnded() {
         navCamAt = 0L;
         if (speedCamerasPatched()) SpeedCameras.navigating(false);
+        if (wazeAlertsPatched()) WazeAlerts.navigating(false);
         try {
             if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) detachTiles();
             else new android.os.Handler(android.os.Looper.getMainLooper()).post(new Detach());

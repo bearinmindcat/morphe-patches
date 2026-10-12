@@ -33,7 +33,7 @@ private const val MENU = "Lcom/waze/ui/n/ac;"
 private const val SHUT_OFF_LABEL = 0x7f1207cf
 
 /** Waze's Application class (the manifest's android:name), for a Context and the open screen. */
-private object WazeApplicationCreateFingerprint : Fingerprint(
+internal object WazeApplicationCreateFingerprint : Fingerprint(
     definingClass = "Lcom/waze/mobile/WazeMobileApplication;",
     name = "onCreate",
     returnType = "V",

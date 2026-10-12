@@ -50,6 +50,13 @@ public final class SavedOnMap {
                 }
                 out.addAll(cameras);
             }
+            if (Shapes.wazeAlertsPatched()) {
+                List<Object> waze = WazeAlerts.mapItems();
+                synchronized (ours) {
+                    ours.addAll(waze);
+                }
+                out.addAll(waze);
+            }
             return immutable(out);
         } catch (Throwable t) {
             android.util.Log.w("UA", "saved places on the map", t);

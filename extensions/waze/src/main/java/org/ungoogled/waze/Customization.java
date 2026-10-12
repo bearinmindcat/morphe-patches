@@ -72,6 +72,10 @@ public final class Customization {
                 "Android Auto heads-up distances and the traffic bar threshold (the patch's values)"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "The speed limit sign style the patch was set to, whatever the country"});
+        LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
+                "The police, crashes, hazards and other alerts Waze is tracking, for Ungoogled Maps on this phone (Waze alerts in its Waze Features)"});
+        LABELS.put("stayAwake", new String[]{"Stay awake in the background",
+                "Waze keeps running longer without a route, so its alerts keep reaching Maps"});
     }
 
     /** The features the patches applied, as declared by the patch-generated uaDeclared(). */

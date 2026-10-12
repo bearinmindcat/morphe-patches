@@ -299,7 +299,7 @@ public final class CustomizationActivity extends Activity {
         }
     }
 
-    /** Waze Features, opened from its own account sheet row: the speeding chime and speed cameras. */
+    /** Waze Features, opened from its own account sheet row: the speeding chime, speed cameras and Waze's alerts. */
     private void buildWazePage(LinearLayout body) {
         if (Shapes.speedingChimePatched()) {
             LinearLayout chimeRow = rowBase("Speeding chime", CHIME_LABELS[Shapes.speedingChime(this)]);
@@ -326,6 +326,37 @@ public final class CustomizationActivity extends Activity {
                 camsMap.setEnabled(on);
             });
             camsMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setOnMap(this, on));
+        }
+
+        if (Shapes.wazeAlertsPatched()) {
+            Switch waze = new Switch(this);
+            waze.setChecked(WazeAlerts.enabled(this));
+            body.addView(toggleRow("Alerts from Waze", "Police and other reports from Waze on this phone -- patched with "
+                    + "Share alerts with Maps, signed in and open, in the background is enough", waze));
+            LinearLayout kindsRow = rowBase("Waze alert types", WazeAlerts.kindsSummary(this));
+            TextView kindsSub = (TextView) ((LinearLayout) kindsRow.getChildAt(0)).getChildAt(1);
+            kindsRow.setOnClickListener(v -> chooseMany("Waze alert types", WazeAlerts.KIND_LABELS, WazeAlerts.kinds(this), mask -> {
+                // read live, so no restart
+                WazeAlerts.setKinds(this, mask);
+                kindsSub.setText(WazeAlerts.kindsSummary(this));
+            }));
+            body.addView(kindsRow);
+            Switch wazeMap = new Switch(this);
+            wazeMap.setChecked(WazeAlerts.onMap(this));
+            wazeMap.setEnabled(waze.isChecked());
+            body.addView(toggleRow("Waze alerts on the map", null, wazeMap));
+            Switch wazeChime = new Switch(this);
+            wazeChime.setChecked(WazeAlerts.chime(this));
+            wazeChime.setEnabled(waze.isChecked());
+            body.addView(toggleRow("Chime for a Waze alert ahead", null, wazeChime));
+            // all read live, so no restart
+            waze.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+                WazeAlerts.setEnabled(this, on);
+                wazeMap.setEnabled(on);
+                wazeChime.setEnabled(on);
+            });
+            wazeMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setOnMap(this, on));
+            wazeChime.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setChime(this, on));
         }
     }
 
@@ -420,6 +451,24 @@ public final class CustomizationActivity extends Activity {
                 .setSingleChoiceItems(labels, checked, (d, which) -> {
                     d.dismiss();
                     then.chosen(which);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private interface Mask { void chosen(int mask); }
+
+    /** A tick-list dialog in Maps' theme: bit i of [mask] is [labels][i]; OK hands the new mask on. */
+    private void chooseMany(String title, String[] labels, int mask, Mask then) {
+        boolean[] checked = new boolean[labels.length];
+        for (int i = 0; i < labels.length; i++) checked[i] = (mask & (1 << i)) != 0;
+        new AlertDialog.Builder(this, dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
+                .setTitle(title)
+                .setMultiChoiceItems(labels, checked, (d, which, on) -> checked[which] = on)
+                .setPositiveButton("OK", (d, w) -> {
+                    int out = 0;
+                    for (int i = 0; i < checked.length; i++) if (checked[i]) out |= 1 << i;
+                    then.chosen(out);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
