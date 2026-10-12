@@ -51,7 +51,7 @@ APP_RENAMES = {
     ),
     "com.waze": (
         '<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze',
-        '<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze',
+        '<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze',
     ),
     "com.alltrails.alltrails": (
         '<img src="docs/icons/alltrails.png" width="20" height="20" align="top"> AllTrails',
