@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.2.5](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.2.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;46 patches total
+> **[v2.3.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.3.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;49 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;25 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;26 patches</summary>
 <br>
 
 <p>
@@ -55,6 +55,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Speed cameras](#speed-cameras) | Chimes and shows a note when a speed or red light camera is coming up ahead, and puts the cameras on the map, from OpenStreetMap. Off until turned on in Waze Features, a row on the account sheet, because it downloads the cameras near you from an OpenStreetMap server. |  |
 | [Speeding chime](#speeding-chime) | Plays a chime when your speed passes the speed limit during navigation, as Waze does. Maps itself only turns its speedometer red. When it chimes is chosen in Waze Features, a row on the account sheet. |  |
 | [Trim account menu](#trim-account-menu) | Removes Your Timeline, Location sharing, Your data in Maps and Help & feedback from the account sheet. Left out with Add microG support, whose account features need them. |  |
+| [Waze alerts](#waze-alerts) | Shows the alerts a Waze on the same phone is tracking -- police to begin with, and any of crashes, hazards, traffic jams, closures and speed cameras -- as pins on the map, with a chime and a note as one comes up ahead. Off until turned on in Waze Features. Waze has to be patched with Share alerts with Maps, signed in and open; in the background is enough. |  |
 | [Zoom controls in navigation](#zoom-controls-in-navigation) | Adds +, − and reset tiles during turn-by-turn that change the navigation zoom while the camera keeps following the car. |  |
 
 </details>
@@ -79,7 +80,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;•&nbsp;&nbsp;13 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;•&nbsp;&nbsp;15 patches</summary>
 <br>
 
 **Supported version(s):** 5.24.5.0
@@ -96,9 +97,11 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [No AI reporting](#no-ai-reporting) | Turns off conversational reporting, Waze's Gemini voice assistant for reports, together with its activation dialog, tips and onboarding. |  |
 | [No Google Assistant](#no-google-assistant) | Keeps Google Assistant out of Waze: no Assistant button, onboarding or settings entry, whatever Waze's server enables for your region. |  |
 | [Report speed limit](#report-speed-limit) | Turns on Waze's own switch for correcting the speed limit from the speedometer, the old mods' "Report speed limit". Waze's server keeps it off; what it shows is not verified here. |  |
+| [Share alerts with Maps](#share-alerts-with-maps) | Hands the alerts Waze is tracking -- police, crashes, hazards, traffic jams, closures and speed cameras -- to Ungoogled Maps on the same phone, where Waze alerts in Waze Features puts them on the map. Nothing leaves the phone. Waze has to be signed in and open; in the background is enough. |  |
 | [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the speed camera sound for every camera, not only when you are over the speed limit. |  |
 | [Speed cameras everywhere](#speed-cameras-everywhere) | Turns speed camera and police alerts back on in the countries where Waze's server switches them off. Warning of speed cameras is against the law in some of those countries. |  |
 | [Speed limit sign](#speed-limit-sign) | The style of the speed limit sign beside the speedometer, whatever the country. | • Sign style |
+| [Stay awake in the background](#stay-awake-in-the-background) | Lets Waze keep running in the background without a route for the chosen time -- Waze's server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. Costs battery; Waze still closes itself when you close it. | • Minutes in the background |
 
 </details>
 

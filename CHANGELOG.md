@@ -1,3 +1,9 @@
+## [2.3.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.2.5...v2.3.0) (2026-10-12)
+
+### ✨ New Features
+
+* waze police and other alerts on the maps map (share alerts with maps in waze, waze alerts in maps) ([8a80669](https://github.com/bearinmindcat/morphe-patches/commit/8a80669d681bed8a8e1e0e15a5a28e7396d95490))
+
 ## [2.2.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.2.4...v2.2.5) (2026-10-11)
 
 ### 🐛 Bug Fixes
