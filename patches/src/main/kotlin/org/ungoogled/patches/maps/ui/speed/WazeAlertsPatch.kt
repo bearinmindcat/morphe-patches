@@ -12,7 +12,7 @@ val wazeAlertsPatch = bytecodePatch(
     name = "Waze alerts",
     description = "Shows the alerts a Waze on the same phone is tracking -- police to begin with, and any of " +
         "crashes, hazards, traffic jams, closures and speed cameras -- as pins on the map, with a chime and a " +
-        "note as one comes up ahead. Off until turned on in Waze Features. Waze has to be patched with Share " +
+        "note as one comes up ahead. Off until turned on in Waze & external data source. Waze has to be patched with Share " +
         "alerts with Maps, signed in and open; in the background is enough.",
     default = true,
 ) {

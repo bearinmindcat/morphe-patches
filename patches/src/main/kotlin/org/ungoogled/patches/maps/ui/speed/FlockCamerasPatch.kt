@@ -9,7 +9,7 @@ val flockCamerasPatch = bytecodePatch(
     name = "Flock cameras",
     description = "Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras " +
         "DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on " +
-        "in Waze Features, a row on the account sheet, because it downloads the ones near you from an " +
+        "in Waze & external data source, a row on the account sheet, because it downloads the ones near you from an " +
         "OpenStreetMap server, over the same area as the speed cameras.",
     default = true,
 ) {

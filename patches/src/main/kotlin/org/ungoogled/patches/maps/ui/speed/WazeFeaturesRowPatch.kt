@@ -18,18 +18,18 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import org.ungoogled.patches.maps.ui.customization.customizationScreenPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 
-/** The account sheet row's listener: opens Waze Features with the sheet left open behind it. */
+/** The account sheet row's listener: opens Waze & external data source with the sheet left open behind it. */
 private const val OPEN_WAZE = "Lorg/ungoogled/ui/CustomizationActivity\$OpenWaze;"
 /** drawable/gs_directions_car_vd_theme_24 in this build: a car, tinted like the sheet's other icons. */
 private const val CAR_ICON = 0x7f080548
 
 /**
- * A "Waze Features" row on the account sheet -- the speeding chime and speed cameras -- under
+ * A "Waze & external data source" row on the account sheet -- the speeding chime and speed cameras -- under
  * Power Saving Options and above Local saved. It opens a page of the Customization screen.
  * Shared, so either patch brings it.
  */
 internal val wazeFeaturesRowPatch = bytecodePatch(
-    description = "Adds the Waze Features row to the account sheet.",
+    description = "Adds the Waze & external data source row to the account sheet.",
 ) {
     dependsOn(sharedExtensionPatch, customizationScreenPatch)
 
@@ -62,7 +62,7 @@ internal val wazeFeaturesRowPatch = bytecodePatch(
                         move-result v4
                         invoke-virtual { v3, v4 }, Lbrmg;->c(I)V
                         iput-object v1, v3, Lbrmg;->a:Landroid/graphics/drawable/Drawable;
-                        const-string v4, "Waze Features"
+                        const-string v4, "Waze & external data source"
                         invoke-virtual { v3, v4 }, Lbrmg;->d(Ljava/lang/String;)V
                         const v4, 0x161a8
                         invoke-virtual { v3, v4 }, Lbrmg;->f(I)V
@@ -86,7 +86,7 @@ internal val wazeFeaturesRowPatch = bytecodePatch(
 
         // Both sheet builders: after Power Saving Options' row when it is there, else right after
         // Customization's. Power Saving Options always goes right after Customization, so whichever
-        // finalize runs first the order is Customization, Power Saving Options, Waze Features, then
+        // finalize runs first the order is Customization, Power Saving Options, Waze & external data source, then
         // Local saved (added during execute, right after Customization).
         fun addUnderPowerSaving(returnType: String, parameters: List<String>) {
             val found = mutableListOf<Pair<String, String>>()

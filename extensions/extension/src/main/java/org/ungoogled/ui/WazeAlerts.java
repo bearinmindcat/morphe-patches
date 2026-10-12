@@ -161,7 +161,7 @@ public final class WazeAlerts {
         return out.length() == 0 ? "None" : out.toString();
     }
 
-    /** At every Activity attach and after a change in Waze Features: re-reads the settings. */
+    /** At every Activity attach and after a change in Waze & external data source: re-reads the settings. */
     static void refresh(Context c) {
         ON = enabled(c);
         MAP = ON && onMap(c);

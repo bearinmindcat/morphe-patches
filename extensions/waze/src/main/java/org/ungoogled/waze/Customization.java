@@ -73,7 +73,7 @@ public final class Customization {
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "The speed limit sign style the patch was set to, whatever the country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
-                "The police, crashes, hazards and other alerts Waze is tracking, for Ungoogled Maps on this phone (Waze alerts in its Waze Features)"});
+                "The police, crashes, hazards and other alerts Waze is tracking, for Ungoogled Maps on this phone (Waze alerts in its Waze & external data source)"});
         LABELS.put("stayAwake", new String[]{"Stay awake in the background",
                 "Waze keeps running longer without a route, so its alerts keep reaching Maps"});
     }

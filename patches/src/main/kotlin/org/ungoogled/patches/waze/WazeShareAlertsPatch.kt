@@ -26,7 +26,7 @@ private object UpdateAlertersRepositoryFingerprint : Fingerprint(
 val wazeShareAlertsPatch = bytecodePatch(
     name = "Share alerts with Maps",
     description = "Hands the alerts Waze is tracking -- police, crashes, hazards, traffic jams, closures and " +
-        "speed cameras -- to Ungoogled Maps on the same phone, where Waze alerts in Waze Features puts them on " +
+        "speed cameras -- to Ungoogled Maps on the same phone, where Waze alerts in Waze & external data source puts them on " +
         "the map. Nothing leaves the phone. Waze has to be signed in and open; in the background is enough.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)

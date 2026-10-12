@@ -40,7 +40,7 @@ private object SpeedometerSpeedFingerprint : Fingerprint(
 val speedingChimePatch = bytecodePatch(
     name = "Speeding chime",
     description = "Plays a chime when your speed passes the speed limit during navigation, as Waze does. " +
-        "Maps itself only turns its speedometer red. When it chimes is chosen in Waze Features, a row on the " +
+        "Maps itself only turns its speedometer red. When it chimes is chosen in Waze & external data source, a row on the " +
         "account sheet.",
     default = true,
 ) {

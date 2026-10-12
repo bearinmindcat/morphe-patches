@@ -30,14 +30,14 @@ public final class CustomizationActivity extends Activity {
     private static final int BG_D = 0xFF131314, TEXT_D = 0xFFE3E3E3, SUMMARY_D = 0xFFC4C7C5;
     /**
      * Which page of this same screen: the main list; one of its sections (UI, Hide Telemetry,
-     * Misc Features); or a page with its own account sheet row (Power Saving Options, Waze Features).
+     * Misc Features); or a page with its own account sheet row (Power Saving Options, Waze & external data source).
      */
     static final String EXTRA_PAGE = "org.ungoogled.ui.page";
     static final String PAGE_POWER = "power", PAGE_WAZE = "waze", PAGE_UI = "ui", PAGE_HIDE = "hide", PAGE_MISC = "misc";
 
     private static String title(String page) {
         if (PAGE_POWER.equals(page)) return "Power Saving Options";
-        if (PAGE_WAZE.equals(page)) return "Waze Features";
+        if (PAGE_WAZE.equals(page)) return "Waze & external data source";
         if (PAGE_UI.equals(page)) return "UI";
         if (PAGE_HIDE.equals(page)) return "Hide Telemetry";
         if (PAGE_MISC.equals(page)) return "Misc Features";
@@ -299,7 +299,7 @@ public final class CustomizationActivity extends Activity {
         }
     }
 
-    /** Waze Features, opened from its own account sheet row: the speeding chime, speed cameras and Waze's alerts. */
+    /** Waze & external data source, opened from its own account sheet row: the speeding chime, speed cameras and Waze's alerts. */
     private void buildWazePage(LinearLayout body) {
         if (Shapes.speedingChimePatched()) {
             LinearLayout chimeRow = rowBase("Speeding chime", CHIME_LABELS[Shapes.speedingChime(this)]);
@@ -600,7 +600,7 @@ public final class CustomizationActivity extends Activity {
         }
     }
 
-    /** The Waze Features row on the account sheet: this screen's Waze page, the sheet left open behind it. */
+    /** The Waze & external data source row on the account sheet: this screen's Waze page, the sheet left open behind it. */
     public static final class OpenWaze implements View.OnClickListener {
         private final android.content.Context context;
 
