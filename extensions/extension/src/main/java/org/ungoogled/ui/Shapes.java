@@ -88,6 +88,7 @@ public final class Shapes {
     public static boolean speedingChimePatched() { return false; }
     public static boolean speedCamerasPatched() { return false; }
     public static boolean flockCamerasPatched() { return false; }
+    public static boolean flockAvoidPatched() { return false; }
     public static boolean wazeAlertsPatched() { return false; }
     /** Add microG support: microG Maps, which signs in through microG. */
     public static boolean microgPatched() { return false; }

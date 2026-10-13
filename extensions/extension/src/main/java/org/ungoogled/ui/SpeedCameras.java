@@ -64,6 +64,8 @@ public final class SpeedCameras {
     public static final String KEY_FLOCK = "flock_cameras";
     public static final String KEY_FLOCK_MAP = "flock_cameras_map";
     public static final String KEY_FLOCK_ALERT = "flock_cameras_alert";
+    /** Avoid Flock cameras: driving directions steered around them (Steer). */
+    public static final String KEY_FLOCK_AVOID = "flock_cameras_avoid";
     /** Rings of squares around the one you are in: 0 = about 25 km across, 1 = about 75 km (default), 2, 3. */
     public static final String KEY_AREA = "speed_cameras_area";
     static final int AREA_DEFAULT = 1, AREA_MAX = 3;
@@ -80,7 +82,7 @@ public final class SpeedCameras {
     /** Speed cameras: alerts and downloads; their pins on the map. */
     static volatile boolean ON, MAP;
     /** Flock cameras: downloads; their pins; their chime and note. */
-    static volatile boolean FLOCK, FLOCK_MAP, FLOCK_ALERT;
+    static volatile boolean FLOCK, FLOCK_MAP, FLOCK_ALERT, FLOCK_AVOID;
     /** Rings of squares downloaded and drawn around the one you are in. */
     static volatile int RING = AREA_DEFAULT;
 
@@ -174,6 +176,15 @@ public final class SpeedCameras {
         return prefs(c).getBoolean(KEY_FLOCK_ALERT, true);
     }
 
+    public static boolean flockAvoid(Context c) {
+        return Shapes.flockAvoidPatched() && prefs(c).getBoolean(KEY_FLOCK_AVOID, false);
+    }
+
+    public static void setFlockAvoid(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_FLOCK_AVOID, on).commit();
+        changedSettings(c);
+    }
+
     public static int area(Context c) {
         int ring = prefs(c).getInt(KEY_AREA, AREA_DEFAULT);
         return Math.max(0, Math.min(AREA_MAX, ring));
@@ -229,6 +240,7 @@ public final class SpeedCameras {
         FLOCK = flockEnabled(c);
         FLOCK_MAP = FLOCK && flockOnMap(c);
         FLOCK_ALERT = FLOCK && flockAlert(c);
+        FLOCK_AVOID = FLOCK && flockAvoid(c);
         RING = area(c);
         Context app = c.getApplicationContext();
         if (!tracking && app instanceof Application) {
@@ -238,12 +250,23 @@ public final class SpeedCameras {
         MAIN.post(SpeedCameras::listen);
     }
 
+    /** The last GPS fix (for Steer: which pass-through points are still ahead). */
+    static Location lastLocation() {
+        return last;
+    }
+
+    /** Whether guidance is running (for Steer: no second ask for directions while navigating). */
+    static boolean navigatingNow() {
+        return navigating;
+    }
+
     /** From the navigation camera hook: about once a second while guidance runs, false when it ends. */
     static void navigating(boolean on) {
         if (navigating == on) return;
         MAIN.post(() -> {
             navigating = on;
             listen();
+            if (Shapes.flockAvoidPatched()) Steer.navigation(on);
         });
     }
 
@@ -447,6 +470,41 @@ public final class SpeedCameras {
                 List<Camera> t = layer.tiles.get(y << 32 | x);
                 if (t != null) out.addAll(t);
             }
+        }
+        return out;
+    }
+
+    /**
+     * For Steer, on its own thread: the Flock cameras in every square within about 300 m of the route
+     * [latLng] (lat, lng, lat, lng, ...), loading or downloading the squares first -- in blocks of up to
+     * 4 x 4 squares, so a long route is never one huge request. Null when Flock cameras are off.
+     */
+    static List<Camera> flocksAlong(double[] latLng) throws Exception {
+        if (!FLOCK) return null;
+        java.util.Set<Long> keys = new java.util.HashSet<>();
+        for (int i = 0; i + 1 < latLng.length; i += 2) {
+            for (double dy = -0.003; dy <= 0.0031; dy += 0.003) {
+                for (double dx = -0.004; dx <= 0.0041; dx += 0.004) keys.add(tile(latLng[i] + dy, latLng[i + 1] + dx));
+            }
+        }
+        Map<Long, List<Long>> blocks = new HashMap<>();
+        for (long key : keys) {
+            if (FLOCKS.fresh.contains(key)) continue;
+            long block = ((key >>> 32) / 4) << 32 | ((key & 0xffffffffL) / 4);
+            List<Long> b = blocks.get(block);
+            if (b == null) blocks.put(block, b = new ArrayList<>());
+            b.add(key);
+        }
+        for (List<Long> block : blocks.values()) {
+            FLOCKS.net.submit(() -> {
+                fill(FLOCKS, block);
+                return null;
+            }).get(300, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        List<Camera> out = new ArrayList<>();
+        for (long key : keys) {
+            List<Camera> t = FLOCKS.tiles.get(key);
+            if (t != null) out.addAll(t);
         }
         return out;
     }

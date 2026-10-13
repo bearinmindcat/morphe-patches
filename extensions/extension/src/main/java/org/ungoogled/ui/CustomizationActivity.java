@@ -339,6 +339,21 @@ public final class CustomizationActivity extends Activity {
                     flockMap.setEnabled(on);
                     flockAlert.setEnabled(on);
                 });
+                if (Shapes.flockAvoidPatched()) {
+                    Switch avoid = new Switch(this);
+                    avoid.setChecked(SpeedCameras.flockAvoid(this));
+                    avoid.setEnabled(flock.isChecked());
+                    body.addView(toggleRow("Avoid Flock cameras", "Steers driving directions around them. The way around "
+                            + "is worked out with BRouter, which gets your route's start and end", avoid));
+                    flock.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+                        SpeedCameras.setFlockEnabled(this, on);
+                        flockMap.setEnabled(on);
+                        flockAlert.setEnabled(on);
+                        avoid.setEnabled(on);
+                    });
+                    // read live, so no restart
+                    avoid.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setFlockAvoid(this, on));
+                }
                 flockMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setFlockOnMap(this, on));
                 flockAlert.setOnCheckedChangeListener((CompoundButton b, boolean on) -> SpeedCameras.setFlockAlert(this, on));
             }
