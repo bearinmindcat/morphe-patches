@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -415,11 +415,12 @@
     },
     {
       "name": "Bigger speedometer",
-      "description": "Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be read at a glance.",
+      "description": "Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be read at a glance. The sizes can be changed later in Customization, at the bottom of Waze's side menu, where a switch also gives Waze's own sizes back.",
       "default": true,
       "category": null,
       "dependencies": [
-        "ResourcePatch"
+        "ResourcePatch",
+        "BytecodePatch"
       ],
       "compatiblePackages": [
         {

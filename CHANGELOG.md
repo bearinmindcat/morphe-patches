@@ -1,3 +1,9 @@
+## [2.5.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.1...v2.5.2) (2026-10-13)
+
+### 🐛 Bug Fixes
+
+* change the bigger speedometer sizes later in waze customization, with a switch for waze own sizes; issue [#50](https://github.com/bearinmindcat/morphe-patches/issues/50) ([778ef9c](https://github.com/bearinmindcat/morphe-patches/commit/778ef9c923d6f6a32997be87444f2e84ff8cf8b0))
+
 ## [2.5.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.0...v2.5.1) (2026-10-13)
 
 ### 🐛 Bug Fixes
