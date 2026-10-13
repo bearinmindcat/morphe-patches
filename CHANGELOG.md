@@ -1,3 +1,9 @@
+## [2.5.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.0...v2.5.1) (2026-10-13)
+
+### 🐛 Bug Fixes
+
+* change waze patch values later in its customization menu (alert and navigation distances, minutes in the background, sign style); issue [#50](https://github.com/bearinmindcat/morphe-patches/issues/50) ([08b6a3b](https://github.com/bearinmindcat/morphe-patches/commit/08b6a3bd76f53a9bed19c3fc90b1338243b0609f))
+
 ## [2.5.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.4.0...v2.5.0) (2026-10-13)
 
 ### 🐛 Bug Fixes

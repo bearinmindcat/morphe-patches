@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -128,7 +128,7 @@
     },
     {
       "name": "Alert distances",
-      "description": "How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them.",
+      "description": "How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them. They can be changed later in Customization, at the bottom of Waze's side menu.",
       "default": false,
       "category": null,
       "dependencies": [
@@ -1090,7 +1090,7 @@
     },
     {
       "name": "Navigation distances",
-      "description": "How far ahead Android Auto gives its heads-up, and how long a jam must last before the traffic bar shows it. The defaults are the old Waze mods' (Chuppito).",
+      "description": "How far ahead Android Auto gives its heads-up, and how long a jam must last before the traffic bar shows it. The defaults are the old Waze mods' (Chuppito). They can be changed later in Customization, at the bottom of Waze's side menu.",
       "default": false,
       "category": null,
       "dependencies": [
@@ -1600,7 +1600,7 @@
     },
     {
       "name": "Speed limit sign",
-      "description": "The style of the speed limit sign beside the speedometer, whatever the country.",
+      "description": "The style of the speed limit sign beside the speedometer, whatever the country. It can be changed later in Customization, at the bottom of Waze's side menu.",
       "default": false,
       "category": null,
       "dependencies": [
@@ -1673,7 +1673,7 @@
     },
     {
       "name": "Stay awake in the background",
-      "description": "Lets Waze keep running in the background without a route for the chosen time -- Waze's server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. Costs battery; Waze still closes itself when you close it.",
+      "description": "Lets Waze keep running in the background without a route for the chosen time -- Waze's server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. Costs battery; Waze still closes itself when you close it. The time can be changed later in Customization, at the bottom of Waze's side menu.",
       "default": false,
       "category": null,
       "dependencies": [
