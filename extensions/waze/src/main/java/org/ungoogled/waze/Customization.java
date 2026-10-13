@@ -1,6 +1,7 @@
 package org.ungoogled.waze;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Application;
 import android.app.Dialog;
 import android.content.Context;
@@ -10,6 +11,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -17,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -26,6 +29,7 @@ import android.widget.TextView;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -42,6 +46,10 @@ import java.util.Set;
  * keep*() from ConfigManager.uaOverrides. A feature switched off here is left to Waze instead: its
  * values are unlocked and put back to Waze's own default, and the server's value returns at the next
  * sync. Switching takes effect at once, on Waze's native thread, as Waze's own settings do.
+ *
+ * The numbers and choices those features keep (alert distances, navigation distances, minutes in the
+ * background, the sign style) are listed under their switch and can be changed here: a changed one is
+ * kept instead of the patch's, and Reset puts the patch's back -- no patching again (issue #50).
  */
 public final class Customization {
     private Customization() {}
@@ -77,6 +85,57 @@ public final class Customization {
         LABELS.put("stayAwake", new String[]{"Stay awake in the background",
                 "Waze keeps running longer without a route, so its alerts keep reaching Maps"});
     }
+
+    /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */
+    private static final class Label {
+        final String title, unit;
+        final int scale, max;
+        final String[] choices, choiceNames;
+
+        Label(String title, String unit, int scale, int max) {
+            this.title = title; this.unit = unit; this.scale = scale; this.max = max;
+            this.choices = null; this.choiceNames = null;
+        }
+
+        Label(String title, String[] choices, String[] choiceNames) {
+            this.title = title; this.unit = ""; this.scale = 1; this.max = 0;
+            this.choices = choices; this.choiceNames = choiceNames;
+        }
+    }
+
+    /** ConfigValues name -> how it is shown. Only these are offered for changing. */
+    private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
+
+    static {
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_POLICE_ALERT_DISTANCE_METERS", new Label("Police", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_HAZARD_ALERT_DISTANCE_METERS", new Label("Hazards", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ACCIDENT_ALERT_DISTANCE_METERS", new Label("Crashes", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_HEAVY_TRAFFIC_ALERT_DISTANCE_METERS", new Label("Traffic jams", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_STREETS", new Label("Speed cameras on streets", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_HIGHWAY", new Label("Speed cameras on highways", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", new Label("Speed cameras on freeways", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_BLOCKED_LANE_ALERT_DISTANCE", new Label("Blocked lanes", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_DISTANCE_BETWEEN_ALERTS", new Label("Least distance between two alerts", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_NORMAL", new Label("Android Auto heads-up, normal roads", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_FREEWAY", new Label("Android Auto heads-up, freeways", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_TRAFFIC_BAR_MIN_TIME_IN_TRAFFIC_SECONDS", new Label("Traffic bar: time in traffic", "s", 1, 3600));
+        VALUE_LABELS.put("CONFIG_VALUE_POWER_BACKGROUND_TIMEOUT_MS", new Label("Minutes in the background", "min", 60_000, 1440));
+        VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
+                new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
+    }
+
+    /** A value the patches keep: its feature, its name and the value the patch was given. */
+    private static final class Value {
+        final String feature, name;
+        final Object patched;   // Integer or String
+
+        Value(String feature, String name, Object patched) {
+            this.feature = feature; this.name = name; this.patched = patched;
+        }
+    }
+
+    /** The values the patches keep, as declared by uaDeclared(), in the patches' order. */
+    private static final Map<String, Value> values = new LinkedHashMap<>();
 
     /** The features the patches applied, as declared by the patch-generated uaDeclared(). */
     private static final Set<String> declared = new LinkedHashSet<>();
@@ -135,6 +194,30 @@ public final class Customization {
         }
     }
 
+    /** Called by uaDeclared() for each number a patch keeps. */
+    public static void valueInt(String feature, String name, int patched) {
+        synchronized (declared) {
+            values.put(name, new Value(feature, name, patched));
+        }
+    }
+
+    /** Called by uaDeclared() for each string a patch keeps. */
+    public static void valueString(String feature, String name, String patched) {
+        synchronized (declared) {
+            values.put(name, new Value(feature, name, patched));
+        }
+    }
+
+    /** The adjustable values of [feature], in the patches' order. */
+    private static List<Value> valuesOf(String feature) {
+        features();
+        List<Value> out = new ArrayList<>();
+        synchronized (declared) {
+            for (Value v : values.values()) if (v.feature.equals(feature) && VALUE_LABELS.containsKey(v.name)) out.add(v);
+        }
+        return out;
+    }
+
     private static List<String> features() {
         synchronized (declared) {
             if (!declaredLoaded) {
@@ -170,12 +253,48 @@ public final class Customization {
     private static void set(String feature, boolean on) {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putBoolean(feature, on).commit();
-        // Every kept value again, each by its feature's switch: ConfigManager.uaOverrides, the patch's
-        // method, on Waze's native thread -- where Waze's own settings run their native half too.
+        reapply(feature + (on ? " on" : " off"));
+    }
+
+    /** The key a changed value is kept under. */
+    private static String valueKey(String name) {
+        return "value:" + name;
+    }
+
+    /** The value kept for [name] now: the one changed here, else the patch's [patched]. */
+    private static Object current(String name, Object patched) {
+        SharedPreferences p = prefs();
+        if (p == null || !p.contains(valueKey(name))) return patched;
+        try {
+            if (patched instanceof Integer) return p.getInt(valueKey(name), (Integer) patched);
+            if (patched instanceof String) return p.getString(valueKey(name), (String) patched);
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: " + name, t);
+        }
+        return patched;
+    }
+
+    /** Keeps [value] for [name] instead of the patch's; null puts the patch's back. */
+    private static void change(String name, Object value) {
+        SharedPreferences p = prefs();
+        if (p == null) return;
+        SharedPreferences.Editor e = p.edit();
+        if (value == null) e.remove(valueKey(name));
+        else if (value instanceof Integer) e.putInt(valueKey(name), (Integer) value);
+        else e.putString(valueKey(name), String.valueOf(value));
+        e.commit();
+        reapply(name + " = " + (value == null ? "the patch's" : value));
+    }
+
+    /**
+     * Every kept value again, each by its feature's switch: ConfigManager.uaOverrides, the patch's
+     * method, on Waze's native thread -- where Waze's own settings run their native half too.
+     */
+    private static void reapply(String why) {
         Runnable apply = () -> {
             try {
                 Class.forName("com.waze.ConfigManager").getMethod("uaOverrides").invoke(null);
-                Log.i("UA", "Waze customization: " + feature + (on ? " on" : " off"));
+                Log.i("UA", "Waze customization: " + why);
             } catch (Throwable t) {
                 Log.w("UA", "Waze customization: uaOverrides", t);
             }
@@ -197,7 +316,7 @@ public final class Customization {
 
     private static void keep(String feature, String name, int id, Object value) {
         try {
-            apply(feature, new Kept(name, id, value));
+            apply(feature, new Kept(name, id, current(name, value)));
         } catch (Throwable t) {
             Log.w("UA", "Waze customization: " + name, t);
         }
@@ -365,11 +484,12 @@ public final class Customization {
             s.setChecked(on(key));
             s.setOnCheckedChangeListener((CompoundButton b, boolean isOn) -> set(key, isOn));
             body.addView(row(a, label != null ? label[0] : key, label != null ? label[1] : null, s, text, sub));
+            for (Value v : valuesOf(key)) body.addView(valueRow(a, v, night, text, sub));
         }
         TextView note = new TextView(a);
-        note.setText("Switches take effect right away. A screen that still shows the old behaviour picks it up "
-                + "after Shut off and reopening Waze. Map skin, Full black and Bigger speedometer are set when "
-                + "patching and have no switch.");
+        note.setText("Switches and values take effect right away. A screen that still shows the old behaviour "
+                + "picks it up after Shut off and reopening Waze. Tap a value to change it; Reset puts the "
+                + "patch's value back. Map skin and Full black are set when patching.");
         note.setTextColor(sub);
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         note.setPadding(dp(a, 20), dp(a, 16), dp(a, 20), dp(a, 24));
@@ -391,6 +511,100 @@ public final class Customization {
             }
         }
         d.show();
+    }
+
+    /** "1,000 m", "180 min", "US (white rectangle)": [value] as shown for [label]. */
+    private static String shown(Label label, Object value) {
+        if (value == null) return "?";
+        if (label.choices != null) {
+            for (int i = 0; i < label.choices.length; i++) if (label.choices[i].equalsIgnoreCase(String.valueOf(value))) return label.choiceNames[i];
+            return String.valueOf(value);
+        }
+        if (value instanceof Number) {
+            long n = ((Number) value).longValue() / label.scale;
+            return NumberFormat.getIntegerInstance().format(n) + " " + label.unit;
+        }
+        return String.valueOf(value);
+    }
+
+    /** A value under its feature's switch: its title and what it is now; a tap changes it. */
+    private static View valueRow(Activity a, Value v, boolean night, int text, int sub) {
+        Label label = VALUE_LABELS.get(v.name);
+        View r = row(a, label.title, null, null, text, sub);
+        r.setPadding(dp(a, 44), dp(a, 4), dp(a, 20), dp(a, 4));
+        r.setMinimumHeight(dp(a, 52));
+        LinearLayout col = (LinearLayout) ((LinearLayout) r).getChildAt(0);
+        TextView title = (TextView) col.getChildAt(0);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        TextView now = new TextView(a);
+        now.setTextColor(sub);
+        now.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        col.addView(now);
+        Runnable refresh = () -> {
+            Object value = current(v.name, v.patched);
+            boolean changed = !value.equals(v.patched);
+            now.setText(shown(label, value) + (changed ? "  (patched: " + shown(label, v.patched) + ")" : ""));
+        };
+        refresh.run();
+        r.setOnClickListener(x -> edit(a, v, label, night, refresh));
+        return r;
+    }
+
+    /** The change dialog: a number (or a choice), with the patch's value and Waze's own shown, and Reset. */
+    private static void edit(Activity a, Value v, Label label, boolean night, Runnable refresh) {
+        int theme = night ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert;
+        Object stock = wazeDefault(v.name);
+        String info = "Patched: " + shown(label, v.patched) + (stock != null ? "\nWaze: " + shown(label, stock) : "");
+        Object value = current(v.name, v.patched);
+        AlertDialog.Builder b = new AlertDialog.Builder(a, theme).setTitle(label.title);
+        if (label.choices != null) {
+            int at = 0;
+            for (int i = 0; i < label.choices.length; i++) if (label.choices[i].equalsIgnoreCase(String.valueOf(value))) at = i;
+            b.setSingleChoiceItems(label.choiceNames, at, (d, which) -> {
+                change(v.name, label.choices[which].equals(v.patched) ? null : label.choices[which]);
+                refresh.run();
+                d.dismiss();
+            });
+        } else {
+            EditText input = new EditText(a);
+            input.setInputType(InputType.TYPE_CLASS_NUMBER);
+            input.setText(String.valueOf(((Number) value).longValue() / label.scale));
+            input.setSelectAllOnFocus(true);
+            LinearLayout box = new LinearLayout(a);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setPadding(dp(a, 24), dp(a, 8), dp(a, 24), 0);
+            TextView unit = new TextView(a);
+            unit.setTextColor(night ? 0xFF9AA0A6 : 0xFF5F6368);
+            unit.setText(info + "\nIn " + label.unit + ", 0 to " + label.max + ".");
+            box.addView(input);
+            box.addView(unit);
+            b.setView(box);
+            b.setPositiveButton("Save", (d, w) -> {
+                try {
+                    long n = Long.parseLong(input.getText().toString().trim());
+                    if (n < 0 || n > label.max) throw new NumberFormatException();
+                    int kept = (int) (n * label.scale);
+                    change(v.name, v.patched instanceof Integer && kept == (Integer) v.patched ? null : kept);
+                    refresh.run();
+                } catch (NumberFormatException e) {
+                    android.widget.Toast.makeText(a, "Enter a number from 0 to " + label.max, android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
+            b.setNegativeButton("Cancel", null);
+        }
+        if (label.choices != null) b.setMessage(null);
+        b.setNeutralButton("Reset", (d, w) -> {
+            change(v.name, null);
+            refresh.run();
+        });
+        AlertDialog dialog = b.create();
+        dialog.show();
+        // Waze's theme leaves dialog buttons white on white: Google's blue, as Waze's own dialogs use.
+        int accent = night ? 0xFF8AB4F8 : 0xFF1A73E8;
+        for (int which : new int[]{AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL}) {
+            android.widget.Button button = dialog.getButton(which);
+            if (button != null) button.setTextColor(accent);
+        }
     }
 
     private static View row(Context c, String title, String summary, Switch s, int text, int sub) {

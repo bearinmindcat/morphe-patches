@@ -62,7 +62,7 @@ internal val wazeCustomizationPatch = bytecodePatch(
         customization.methods.add(
             ImmutableMethod(
                 WAZE_CUSTOMIZATION, "uaDeclared", emptyList(), "V",
-                AccessFlags.PRIVATE.value or AccessFlags.STATIC.value, null, null, MutableMethodImplementation(1),
+                AccessFlags.PRIVATE.value or AccessFlags.STATIC.value, null, null, MutableMethodImplementation(3),
             ).toMutable().apply { addInstructions(0, "return-void") },
         )
 

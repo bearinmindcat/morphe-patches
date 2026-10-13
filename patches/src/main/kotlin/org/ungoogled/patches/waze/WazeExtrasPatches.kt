@@ -192,7 +192,8 @@ val wazeCameraSoundAnySpeedPatch = bytecodePatch(
 val wazeAlertDistancesPatch = bytecodePatch(
     name = "Alert distances",
     description = "How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed " +
-        "cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them.",
+        "cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them." +
+        " They can be changed later in Customization, at the bottom of Waze's side menu.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -224,7 +225,8 @@ val wazeAlertDistancesPatch = bytecodePatch(
 @Suppress("unused")
 val wazeSpeedLimitSignPatch = bytecodePatch(
     name = "Speed limit sign",
-    description = "The style of the speed limit sign beside the speedometer, whatever the country.",
+    description = "The style of the speed limit sign beside the speedometer, whatever the country. It can be " +
+        "changed later in Customization, at the bottom of Waze's side menu.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -248,7 +250,8 @@ val wazeSpeedLimitSignPatch = bytecodePatch(
 val wazeNavigationDistancesPatch = bytecodePatch(
     name = "Navigation distances",
     description = "How far ahead Android Auto gives its heads-up, and how long a jam must last before the " +
-        "traffic bar shows it. The defaults are the old Waze mods' (Chuppito).",
+        "traffic bar shows it. The defaults are the old Waze mods' (Chuppito)." +
+        " They can be changed later in Customization, at the bottom of Waze's side menu.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)

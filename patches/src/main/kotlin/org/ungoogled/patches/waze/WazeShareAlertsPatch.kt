@@ -52,7 +52,8 @@ val wazeStayAwakePatch = bytecodePatch(
     name = "Stay awake in the background",
     description = "Lets Waze keep running in the background without a route for the chosen time -- Waze's " +
         "server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. " +
-        "Costs battery; Waze still closes itself when you close it.",
+        "Costs battery; Waze still closes itself when you close it. The time can be changed later in " +
+        "Customization, at the bottom of Waze's side menu.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
