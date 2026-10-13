@@ -1,6 +1,7 @@
 package org.ungoogled.patches.waze
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatch
 import app.morphe.patcher.patch.PatchException
@@ -59,10 +60,12 @@ private val speedometerLayoutPatch: ResourcePatch = resourcePatch {
 val wazeBiggerSpeedometerPatch: BytecodePatch = bytecodePatch(
     name = "Bigger speedometer",
     description = "Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be " +
-        "read at a glance.",
+        "read at a glance. The sizes can be changed later in Customization, at the bottom of Waze's side menu, " +
+        "where a switch also gives Waze's own sizes back.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
-    dependsOn(speedometerLayoutPatch)
+    // The sizes are listed, and can be changed, on the Customization screen.
+    dependsOn(speedometerLayoutPatch, wazeCustomizationPatch)
 
     val speed by intOption(
         key = "speed",
@@ -108,8 +111,27 @@ val wazeBiggerSpeedometerPatch: BytecodePatch = bytecodePatch(
         } ?: throw PatchException("the speed limit sign size $value not found before the int-to-float")
         val twoDigits = constant(20)
         val threeDigits = constant(13)
-        // A replace keeps the labels on these locations (the branch into the 13 case lands on it).
+        // A replace keeps the labels on these locations (the branch into the 13 case lands on it); each
+        // size then goes through Customization, which gives the one chosen there (issue #50).
         bind.replaceInstruction(twoDigits, "const/16 v$register, ${limit!!}")
         bind.replaceInstruction(threeDigits, "const/16 v$register, ${limitThreeDigits!!}")
+        for ((at, method) in listOf(twoDigits to "limitSize", threeDigits to "limitThreeSize").sortedByDescending { it.first }) {
+            bind.addInstructions(
+                at + 1,
+                """
+                    invoke-static/range { v$register .. v$register }, $WAZE_CUSTOMIZATION->$method(I)I
+                    move-result v$register
+                """,
+            )
+        }
+        // The speed and its unit: sized from Customization as the speedometer (this) is bound.
+        val self = bind.implementation!!.registerCount - bind.parameterTypes.sumOf { if (it.toString() == "J" || it.toString() == "D") 2 else 1 as Int } - 1
+        bind.addInstructions(0, "invoke-static/range { v$self .. v$self }, $WAZE_CUSTOMIZATION->speedometer(Ljava/lang/Object;)V")
+
+        declareWazeToggle("biggerSpeedometer")
+        declareWazeValue("biggerSpeedometer", "SPEEDOMETER_SPEED", speed!!)
+        declareWazeValue("biggerSpeedometer", "SPEEDOMETER_UNITS", units!!)
+        declareWazeValue("biggerSpeedometer", "SPEEDOMETER_LIMIT", limit!!)
+        declareWazeValue("biggerSpeedometer", "SPEEDOMETER_LIMIT_THREE", limitThreeDigits!!)
     }
 }

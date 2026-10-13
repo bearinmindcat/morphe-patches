@@ -164,7 +164,14 @@ internal fun BytecodePatchContext.keepWazeConfig(feature: String, name: String, 
         """,
     )
     declareWazeToggle(feature)
-    // Numbers and strings are also listed, with the patch's value, so they can be changed in Waze (issue #50).
+    declareWazeValue(feature, name, value)
+}
+
+/**
+ * Lists [name] under [feature] on the Customization screen with the patch's [value] (a number or a
+ * string; flags are the switch itself), so it can be changed in Waze (issue #50).
+ */
+internal fun BytecodePatchContext.declareWazeValue(feature: String, name: String, value: Any) {
     val declare = when (value) {
         is Int -> "const v2, $value" to "valueInt(Ljava/lang/String;Ljava/lang/String;I)V"
         is String -> "const-string v2, \"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\"" to

@@ -78,6 +78,8 @@ public final class Customization {
                 "How far ahead police, hazards, crashes, jams and cameras are announced (the patch's values)"});
         LABELS.put("navigationDistances", new String[]{"Navigation distances",
                 "Android Auto heads-up distances and the traffic bar threshold (the patch's values)"});
+        LABELS.put("biggerSpeedometer", new String[]{"Bigger speedometer",
+                "Bigger digits on the speedometer and its speed limit sign; off is Waze's own sizes"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "The speed limit sign style the patch was set to, whatever the country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
@@ -91,17 +93,27 @@ public final class Customization {
         final String title, unit;
         final int scale, max;
         final String[] choices, choiceNames;
+        /** Waze's own value, for values that are not Waze configuration (the speedometer's sizes). */
+        final Integer stock;
 
         Label(String title, String unit, int scale, int max) {
-            this.title = title; this.unit = unit; this.scale = scale; this.max = max;
+            this(title, unit, scale, max, null);
+        }
+
+        Label(String title, String unit, int scale, int max, Integer stock) {
+            this.title = title; this.unit = unit; this.scale = scale; this.max = max; this.stock = stock;
             this.choices = null; this.choiceNames = null;
         }
 
         Label(String title, String[] choices, String[] choiceNames) {
-            this.title = title; this.unit = ""; this.scale = 1; this.max = 0;
+            this.title = title; this.unit = ""; this.scale = 1; this.max = 0; this.stock = null;
             this.choices = choices; this.choiceNames = choiceNames;
         }
     }
+
+    /** Bigger speedometer's sizes: not Waze configuration, read by the speedometer as it draws. */
+    private static final String SPEED = "SPEEDOMETER_SPEED", UNITS = "SPEEDOMETER_UNITS",
+            LIMIT = "SPEEDOMETER_LIMIT", LIMIT_THREE = "SPEEDOMETER_LIMIT_THREE";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -120,6 +132,10 @@ public final class Customization {
         VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_FREEWAY", new Label("Android Auto heads-up, freeways", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_TRAFFIC_BAR_MIN_TIME_IN_TRAFFIC_SECONDS", new Label("Traffic bar: time in traffic", "s", 1, 3600));
         VALUE_LABELS.put("CONFIG_VALUE_POWER_BACKGROUND_TIMEOUT_MS", new Label("Minutes in the background", "min", 60_000, 1440));
+        VALUE_LABELS.put(SPEED, new Label("Speed digits", "dp", 1, 80, 26));
+        VALUE_LABELS.put(UNITS, new Label("Unit label", "dp", 1, 40, 12));
+        VALUE_LABELS.put(LIMIT, new Label("Speed limit sign digits", "sp", 1, 60, 20));
+        VALUE_LABELS.put(LIMIT_THREE, new Label("Speed limit sign digits, 100 and over", "sp", 1, 60, 13));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -404,6 +420,70 @@ public final class Customization {
         return on("hideAds") ? "" : url;
     }
 
+    // ---- Bigger speedometer, read as the speedometer draws ------------------------------------
+
+    private static int speedTextId, speedUnitsId;
+
+    /** A speedometer size now: the one changed here, else the patch's; Waze's own while switched off. */
+    private static int size(String name, int patched) {
+        Label label = VALUE_LABELS.get(name);
+        if (!on("biggerSpeedometer")) return label.stock;
+        Object v = current(name, patched);
+        return v instanceof Integer ? (Integer) v : patched;
+    }
+
+    /** The patch's value for [name], as declared by uaDeclared(); [fallback] when not declared. */
+    private static int patched(String name, int fallback) {
+        features();
+        synchronized (declared) {
+            Value v = values.get(name);
+            return v != null && v.patched instanceof Integer ? (Integer) v.patched : fallback;
+        }
+    }
+
+    /** The speed limit sign's digits under 100: the patch passes its own size, [patched]. */
+    public static int limitSize(int patched) {
+        try {
+            return size(LIMIT, patched);
+        } catch (Throwable t) {
+            return patched;
+        }
+    }
+
+    /** The speed limit sign's digits from 100. */
+    public static int limitThreeSize(int patched) {
+        try {
+            return size(LIMIT_THREE, patched);
+        } catch (Throwable t) {
+            return patched;
+        }
+    }
+
+    /**
+     * From the start of the speedometer's bind, [view] being the speedometer: the speed and its unit at
+     * the sizes chosen here. The layout holds the patch's sizes; TextView ignores a size it already has.
+     */
+    public static void speedometer(Object view) {
+        try {
+            if (!(view instanceof View)) return;
+            View v = (View) view;
+            if (speedTextId == 0) {
+                speedTextId = v.getResources().getIdentifier("speedText", "id", v.getContext().getPackageName());
+                speedUnitsId = v.getResources().getIdentifier("speedUnits", "id", v.getContext().getPackageName());
+            }
+            if (Log.isLoggable("UA", Log.DEBUG)) {
+                Log.d("UA", "Waze customization: speedometer " + v.getClass().getName() + " ids " + speedTextId + "/" + speedUnitsId
+                        + " sizes " + size(SPEED, patched(SPEED, 26)) + "/" + size(UNITS, patched(UNITS, 12)));
+            }
+            View speed = speedTextId != 0 ? v.findViewById(speedTextId) : null;
+            if (speed instanceof TextView) ((TextView) speed).setTextSize(TypedValue.COMPLEX_UNIT_DIP, size(SPEED, patched(SPEED, 26)));
+            View units = speedUnitsId != 0 ? v.findViewById(speedUnitsId) : null;
+            if (units instanceof TextView) ((TextView) units).setTextSize(TypedValue.COMPLEX_UNIT_DIP, size(UNITS, patched(UNITS, 12)));
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: speedometer", t);
+        }
+    }
+
     // ---- the menu row and the screen ----------------------------------------------------------
 
     /** The row's icon: Waze's pencil, else Android's. */
@@ -489,7 +569,8 @@ public final class Customization {
         TextView note = new TextView(a);
         note.setText("Switches and values take effect right away. A screen that still shows the old behaviour "
                 + "picks it up after Shut off and reopening Waze. Tap a value to change it; Reset puts the "
-                + "patch's value back. Map skin and Full black are set when patching.");
+                + "patch's value back. The speedometer changes as it next shows a speed. Map skin and Full "
+                + "black are set when patching.");
         note.setTextColor(sub);
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         note.setPadding(dp(a, 20), dp(a, 16), dp(a, 20), dp(a, 24));
@@ -553,7 +634,7 @@ public final class Customization {
     /** The change dialog: a number (or a choice), with the patch's value and Waze's own shown, and Reset. */
     private static void edit(Activity a, Value v, Label label, boolean night, Runnable refresh) {
         int theme = night ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert;
-        Object stock = wazeDefault(v.name);
+        Object stock = label.stock != null ? label.stock : wazeDefault(v.name);
         String info = "Patched: " + shown(label, v.patched) + (stock != null ? "\nWaze: " + shown(label, stock) : "");
         Object value = current(v.name, v.patched);
         AlertDialog.Builder b = new AlertDialog.Builder(a, theme).setTitle(label.title);
