@@ -1,3 +1,13 @@
+## [2.5.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.4.0...v2.5.0) (2026-10-13)
+
+### 🐛 Bug Fixes
+
+* waze features is now waze & external data source ([dbf86e3](https://github.com/bearinmindcat/morphe-patches/commit/dbf86e34fbfb7a3623241636cc531d0107bec752))
+
+### ✨ New Features
+
+* avoid flock cameras (steers google maps driving directions around them, routed with brouter) ([c59cbfe](https://github.com/bearinmindcat/morphe-patches/commit/c59cbfe74c3bb6cb32f5c8f4acee9ee14666d5ee))
+
 ## [2.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.3.1...v2.4.0) (2026-10-12)
 
 ### 🐛 Bug Fixes

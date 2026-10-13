@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-10-12T15:24:37",
-  "description": "## [2.4.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.3.1...v2.4.0) (2026-10-12)\n\n### 🐛 Bug Fixes\n\n* waze installs as De-Waze ([332cd66](https://github.com/bearinmindcat/morphe-patches/commit/332cd668e3b0c81cb1fe5a6f88fa6ff2399b0a3a))\n\n### ✨ New Features\n\n* flock cameras on the map, from openstreetmap (deflock) with a chime for one ahead ([9e5cd2d](https://github.com/bearinmindcat/morphe-patches/commit/9e5cd2d44a535e3939307eb0395a5b24fe8cc09d))",
-  "download_url": "https://github.com/bearinmindcat/morphe-patches/releases/download/v2.4.0/patches-2.4.0.mpp",
+  "created_at": "2026-10-13T18:27:09",
+  "description": "## [2.5.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.4.0...v2.5.0) (2026-10-13)\n\n### 🐛 Bug Fixes\n\n* waze features is now waze & external data source ([dbf86e3](https://github.com/bearinmindcat/morphe-patches/commit/dbf86e34fbfb7a3623241636cc531d0107bec752))\n\n### ✨ New Features\n\n* avoid flock cameras (steers google maps driving directions around them, routed with brouter) ([c59cbfe](https://github.com/bearinmindcat/morphe-patches/commit/c59cbfe74c3bb6cb32f5c8f4acee9ee14666d5ee))",
+  "download_url": "https://github.com/bearinmindcat/morphe-patches/releases/download/v2.5.0/patches-2.5.0.mpp",
   "signature_download_url": "",
-  "version": "2.4.0"
+  "version": "2.5.0"
 }
