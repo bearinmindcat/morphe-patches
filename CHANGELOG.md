@@ -1,3 +1,9 @@
+## [2.5.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.4...v2.5.5) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+* navigation in landscape no longer keeps the portrait layout after turning the phone; issue [#48](https://github.com/bearinmindcat/morphe-patches/issues/48) ([0e27aca](https://github.com/bearinmindcat/morphe-patches/commit/0e27acae74dbd2349005bd8ee76adf9d88b280a3))
+
 ## [2.5.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.3...v2.5.4) (2026-10-14)
 
 ### 🐛 Bug Fixes
