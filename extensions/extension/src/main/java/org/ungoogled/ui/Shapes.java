@@ -679,9 +679,14 @@ public final class Shapes {
 
     /**
      * Called from the Activity base class right before its super.attachBaseContext
-     * (after the app's own locale wrapping). createConfigurationContext does NOT
-     * merge nested overrides, so the full current configuration is copied and
-     * only mcc/mnc are changed -- the app's locale override survives.
+     * (after the app's own locale wrapping). The override holds only what is ours --
+     * mnc/mcc and Maps' own day/night -- plus the app's locale, which has to be carried
+     * over because createConfigurationContext does NOT merge nested overrides. It used to
+     * be a full copy of the configuration, which froze the orientation and screen size
+     * at the moment the screen opened: Maps' main screen handles rotation itself
+     * (configChanges) instead of being recreated, so a navigation started in portrait
+     * and turned to landscape kept the portrait layout stretched across the screen
+     * (issue #48).
      */
     public static Context wrap(Context base) {
         try {
@@ -706,7 +711,9 @@ public final class Shapes {
             if (lastBottom <= 0) loadPlacement(base);
             startPopupTicker();
             if (!RECT && !BLACK) return base;
-            Configuration c = new Configuration(base.getResources().getConfiguration());
+            Configuration current = base.getResources().getConfiguration();
+            Configuration c = new Configuration();   // all undefined: the rest follows the screen
+            c.setLocales(current.getLocales());
             if (RECT) c.mnc = MNC_RECT;
             if (BLACK) {
                 c.mcc = MCC_BLACK;   // night itself comes from Maps' own dark_mode setting, see setBlackEnabled
@@ -718,7 +725,7 @@ public final class Shapes {
             // system's day/night, so with Maps dark on a light system they drew dark labels on a
             // dark page (Settings -> Navigation). Carry Maps' own choice over instead.
             int night = mapsNightMode(base);
-            if (night != 0) c.uiMode = (c.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | night;
+            if (night != 0) c.uiMode = (current.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | night;
             return base.createConfigurationContext(c);
         } catch (Throwable t) {
             return base;
@@ -1638,10 +1645,10 @@ public final class Shapes {
         } catch (Throwable t) { }
     }
     // Landscape is decided from the DECOR's own width/height, never from
-    // Configuration.orientation: --rect-shapes gives every Activity an override
-    // Configuration (Lef;/applyOverrideConfiguration), so that field is ours and
-    // is not a trustworthy report of the screen. Measured: after a real rotation
-    // the orientation field compared EQUAL and the re-attach never fired.
+    // Configuration.orientation: wrap() used to give every Activity a full copy of
+    // the configuration as its override, which froze that field (issue #48, fixed
+    // there). Measured then: after a real rotation the orientation field compared
+    // EQUAL and the re-attach never fired. The decor is the screen either way.
     private static boolean navLandscape;
 
     static void attachTiles(android.view.ViewGroup decor) {
