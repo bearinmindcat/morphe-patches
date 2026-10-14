@@ -1,3 +1,11 @@
+## [2.5.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.3...v2.5.4) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+* cameras show sooner (network location until gps has a fix, servers that answer, retries on their own) with a cameras now line ([9934912](https://github.com/bearinmindcat/morphe-patches/commit/99349121937eda0669f0c9ec2237448680360a79))
+* maps asks waze for its alerts when it opens or comes back, instead of waiting up to a minute ([170d30a](https://github.com/bearinmindcat/morphe-patches/commit/170d30abada6a82335368718ad731be6b57cad4f))
+* waze alerts, speed camera and flock camera pins show in microG Maps; issue [#55](https://github.com/bearinmindcat/morphe-patches/issues/55) ([127f00b](https://github.com/bearinmindcat/morphe-patches/commit/127f00b66e8f9823f96446a5ee336bf1ba36ccf8))
+
 ## [2.5.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.2...v2.5.3) (2026-10-14)
 
 ### 🐛 Bug Fixes
