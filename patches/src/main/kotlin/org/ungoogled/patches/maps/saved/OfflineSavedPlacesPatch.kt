@@ -15,6 +15,7 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
@@ -29,6 +30,7 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.customization.customizationScreenPatch
+import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.screenHostPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
@@ -238,6 +240,41 @@ private fun BytecodePatchContext.addLocalSavedRow() {
     addAfterCustomization("Lbrfb;", listOf("Z"))
 }
 
+/** Maps' place object, read off the Save button's state class [stateClass]: its position and feature id getters. */
+private fun BytecodePatchContext.placeGetters(stateClass: ClassDef): Pair<MethodReference, MethodReference> {
+    val ctor = stateClass.methods.singleOrNull { it.name == "<init>" }
+        ?: throw PatchException("Save button state class has more than one constructor")
+    val placeType = ctor.parameterTypes.last().toString()
+    val placeCalls = ctor.implementation!!.instructions
+        .mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+        .filter { it.definingClass == placeType && it.parameterTypes.isEmpty() }
+    // Two getters: the feature id and the position. The position type is the one whose
+    // toString starts "lat/lng: (".
+    fun printsLatLng(type: String) = classDefByOrNull(type)?.methods?.any { m ->
+        m.implementation?.instructions?.any { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "lat/lng: (" } == true
+    } == true
+    val positionGetter = placeCalls.singleOrNull { printsLatLng(it.returnType) }
+        ?: throw PatchException("place position getter not found")
+    val featureIdGetter = placeCalls.singleOrNull { it != positionGetter && it.returnType.startsWith("L") && !it.returnType.startsWith("Ljava/") }
+        ?: throw PatchException("place feature id getter not found")
+    return positionGetter to featureIdGetter
+}
+
+/**
+ * Extra pins on Maps' own map, drawn as its personal places (SavedOnMap): Local saved's places, and the
+ * speed cameras', Flock cameras' and Waze alerts' pins -- in microG Maps as well, which used to go
+ * without them because only Local saved set this up and microG Maps leaves most of Local saved out
+ * (issue #55).
+ */
+internal val mapMarkersPatch = bytecodePatch(description = "Draws extra pins on Maps' own map, as its personal places.") {
+    dependsOn(sharedExtensionPatch)
+
+    execute {
+        val (positionGetter, featureIdGetter) = placeGetters(mutableClassDefBy(SaveButtonIconFingerprint.method.definingClass))
+        savedOnMap(featureIdGetter.returnType, positionGetter.returnType)
+    }
+}
+
 internal val localSavedPlacesPatch = bytecodePatch(
     description = "Save places without a Google account, kept only on the phone: Save opens Maps' own \"Place " +
         "saved\" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a " +
@@ -246,7 +283,10 @@ internal val localSavedPlacesPatch = bytecodePatch(
         "import (backup file, KML, Google Takeout's Saved Places.json).",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationScreenPatch, savedManifestPatch)
+    dependsOn(
+        sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationScreenPatch, savedManifestPatch,
+        mapMarkersPatch,
+    )
 
     execute {
         // microG Maps saves to the Google account, as Maps does: it gets only the Local saved
@@ -257,18 +297,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
         val ctor = stateClass.methods.singleOrNull { it.name == "<init>" }
             ?: throw PatchException("Save button state class has more than one constructor")
         val placeType = ctor.parameterTypes.last().toString()
-        val placeCalls = ctor.implementation!!.instructions
-            .mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
-            .filter { it.definingClass == placeType && it.parameterTypes.isEmpty() }
-        // Two getters: the feature id and the position. The position type is the one whose
-        // toString starts "lat/lng: (".
-        fun printsLatLng(type: String) = classDefByOrNull(type)?.methods?.any { m ->
-            m.implementation?.instructions?.any { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "lat/lng: (" } == true
-        } == true
-        val positionGetter = placeCalls.singleOrNull { printsLatLng(it.returnType) }
-            ?: throw PatchException("place position getter not found")
-        val featureIdGetter = placeCalls.singleOrNull { it != positionGetter && it.returnType.startsWith("L") && !it.returnType.startsWith("Ljava/") }
-            ?: throw PatchException("place feature id getter not found")
+        val (positionGetter, featureIdGetter) = placeGetters(stateClass)
         val nameGetter = stateClass.methods.flatMap { m ->
             m.implementation?.instructions?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }.orEmpty()
         }.filter { it.definingClass == placeType && it.returnType == "Ljava/lang/String;" && it.parameterTypes.isEmpty() }
@@ -308,6 +337,8 @@ internal val localSavedPlacesPatch = bytecodePatch(
             )
             return@execute
         }
+        // SavedOnMap adds the phone's places to the map's (mapMarkersPatch).
+        markPatched("localSavedPatched")
 
         // ---- 1. Save: a single place goes to the extension's list picker -----------------
         val controller = mutableClassDefBy(SaveControllerFingerprint.method.definingClass)
@@ -822,8 +853,7 @@ internal val localSavedPlacesPatch = bytecodePatch(
         // ---- 10. Directions to the user's labels: "Home" as a destination (issue #36) --------
         labelWaypoints(featureIdGetter.returnType, positionGetter.returnType)
 
-        // ---- 11. Local saved on the map, with Maps' own icons (issue #36) -------------------
-        savedOnMap(featureIdGetter.returnType, positionGetter.returnType)
+        // ---- 11. Local saved on the map, with Maps' own icons (issue #36): mapMarkersPatch ----
     }
 }
 

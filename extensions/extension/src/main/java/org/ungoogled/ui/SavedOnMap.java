@@ -20,6 +20,10 @@ import java.util.Set;
  * star for Starred places, a pin for any other list. The patch routes that generator's place list
  * through withLocal(), so Local saved is drawn the same way, among the map's own labels, and asks
  * it to draw again whenever Local saved changes. A list set to "Hide on map" is left out.
+ *
+ * The speed cameras', Flock cameras' and Waze alerts' pins go the same way, in microG Maps too
+ * (issue #55) -- where the account's own places are Maps' to draw, so Local saved's copies of them
+ * are not added there.
  */
 public final class SavedOnMap {
     private SavedOnMap() {}
@@ -35,7 +39,7 @@ public final class SavedOnMap {
     public static Object withLocal(Object labels, Object places) {
         try {
             generator = new WeakReference<>(labels);
-            List<Object> mine = localPlaces();
+            List<Object> mine = Shapes.localSavedPatched() ? localPlaces() : new ArrayList<>();
             List<Object> out = new ArrayList<>();
             synchronized (ours) {
                 if (places instanceof Iterable) for (Object o : (Iterable<?>) places) if (!ours.contains(o)) out.add(o);

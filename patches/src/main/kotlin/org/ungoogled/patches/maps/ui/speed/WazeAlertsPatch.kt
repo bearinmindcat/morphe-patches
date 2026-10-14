@@ -1,6 +1,7 @@
 package org.ungoogled.patches.maps.ui.speed
 
 import app.morphe.patcher.patch.bytecodePatch
+import org.ungoogled.patches.maps.saved.mapMarkersPatch
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.navzoom.navigationCameraHookPatch
@@ -18,8 +19,9 @@ val wazeAlertsPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // The settings are read at every Activity (Shapes.wrap), which also registers the receiver; guidance
-    // start and end come from the navigation camera hook. The pins go through Local saved's map markers.
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, wazeFeaturesRowPatch)
+    // start and end come from the navigation camera hook. The pins are drawn as Maps' personal places
+    // (mapMarkersPatch).
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, wazeFeaturesRowPatch, mapMarkersPatch)
 
     execute {
         markPatched("wazeAlertsPatched")
