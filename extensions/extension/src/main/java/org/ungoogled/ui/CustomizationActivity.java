@@ -367,6 +367,15 @@ public final class CustomizationActivity extends Activity {
                 areaSub.setText(SpeedCameras.AREA_LABELS[which]);
             }));
             body.addView(areaRow);
+            // What the downloads are doing now -- how many cameras, or what they wait for; tap to try again.
+            LinearLayout camsNow = rowBase("Cameras now", cameraStatus());
+            TextView camsNowSub = (TextView) ((LinearLayout) camsNow.getChildAt(0)).getChildAt(1);
+            camsNow.setOnClickListener(v -> {
+                SpeedCameras.retryNow();
+                camsNowSub.setText(cameraStatus());
+            });
+            body.addView(camsNow);
+            live(() -> camsNowSub.setText(cameraStatus()));
             // both read live, so no restart
             cams.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 SpeedCameras.setEnabled(this, on);
@@ -411,6 +420,13 @@ public final class CustomizationActivity extends Activity {
             body.addView(wazeNow);
             live(() -> wazeNowSub.setText(WazeAlerts.status()));
         }
+    }
+
+    /** "Speed cameras: 42 cameras around you", and Flock cameras' line below it when that patch is in. */
+    private String cameraStatus() {
+        String out = "Speed cameras: " + SpeedCameras.status(false);
+        if (Shapes.flockCamerasPatched()) out += "\nFlock cameras: " + SpeedCameras.status(true);
+        return out;
     }
 
     /** Runs [update] every second while this screen is open. */

@@ -49,7 +49,11 @@ import java.util.concurrent.Executors;
  * -- the default, about 75 km across -- two or three). Speed cameras and plate readers are separate
  * requests, kept apart on the phone. Each square is kept for a week, so the server learns little more
  * than which squares you pass through, and the Proxy setting covers these requests too. The location
- * comes from Android's GPS while Maps is open or navigating.
+ * comes from Android's GPS while Maps is open or navigating; until GPS has a fix (indoors, just
+ * opened), a fix another app asked for -- Maps' own, too -- or the phone's network location (only when
+ * Maps' Location source is Android's, so no other location service is asked) decides where to
+ * download and draw -- the alerts wait for GPS. A server that fails or hangs is passed over for a while, and a
+ * failed download is tried again by itself: after 30 seconds, then 1, 2, 4 ... up to 30 minutes.
  *
  * A camera is "ahead" when it lies on the line you are driving along: within 60 m of it, in front,
  * and close enough for the speed -- 20 seconds away, at least 250 m and at most 1 km. Each camera
@@ -91,11 +95,27 @@ public final class SpeedCameras {
 
     private static final double TILE = 0.25;
     private static final long WEEK = 7L * 24 * 60 * 60 * 1000;
+    /**
+     * Public Overpass servers, tried in this order (passing over any that failed lately): the main
+     * one, then its two machines by name -- the main name sends a request to either, and one of them
+     * is often too busy (504) while the other answers -- then VK's and private.coffee's (which
+     * overpass.kumi.systems also points at).
+     */
     private static final String[] SERVERS = {
             "https://overpass-api.de/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter",
+            "https://lz4.overpass-api.de/api/interpreter",
+            "https://z.overpass-api.de/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
             "https://overpass.private.coffee/api/interpreter",
     };
+    /** Per server: until when it is passed over, after a failure (System.currentTimeMillis()). */
+    private static final long[] SERVER_RESTING = new long[SERVERS.length];
+    /** Per server: its last failure was a wait that ran out -- connected, then nothing. */
+    private static final boolean[] SERVER_HUNG = new boolean[SERVERS.length];
+    /** A server that failed rests this long; one that answered nothing at all, longer. */
+    private static final long REST_MS = 10 * 60 * 1000L, REST_HUNG_MS = 30 * 60 * 1000L;
+    /** Rough fixes (network, other apps') are used while GPS has had nothing this long. */
+    private static final long GPS_FRESH_NS = 60_000_000_000L;
     private static final String AGENT = "Ungoogled-Maps-speed-cameras/1.0";
 
     static final class Camera {
@@ -123,8 +143,15 @@ public final class SpeedCameras {
         final Set<Long> fresh = Collections.newSetFromMap(new ConcurrentHashMap<>());
         volatile boolean busy;
         volatile long retryAt;
+        /** The server being asked now, for the status line; null when none. */
+        volatile String asking;
         int failures;
         final ExecutorService net;
+        /** Tries again when [retryAt] comes, location or not. */
+        final Runnable retry = () -> {
+            Location l = last;
+            if (l != null && on()) around(this, l.getLatitude(), l.getLongitude());
+        };
 
         Layer(String name, String dir, boolean plates) {
             this.name = name; this.dir = dir; this.plates = plates;
@@ -279,7 +306,15 @@ public final class SpeedCameras {
         @Override public void onProviderDisabled(String p) {}
     };
 
-    /** GPS on while switched on and Maps is open or navigating; off otherwise. Main thread. */
+    /** The phone's network location, and fixes other apps (Maps itself, too) asked for: where, roughly. */
+    private static final LocationListener ROUGH = new LocationListener() {
+        @Override public void onLocationChanged(Location l) { roughly(l); }
+        @Override public void onStatusChanged(String p, int s, Bundle b) {}
+        @Override public void onProviderEnabled(String p) {}
+        @Override public void onProviderDisabled(String p) {}
+    };
+
+    /** GPS (and the rough sources) on while switched on and Maps is open or navigating; off otherwise. Main thread. */
     private static void listen() {
         Context c = Shapes.appContext();
         if (c == null) return;
@@ -291,10 +326,33 @@ public final class SpeedCameras {
             if (want) {
                 if (c.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
                 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, GPS, Looper.getMainLooper());
-                Location known = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                if (known != null) located(known);
+                List<String> providers = lm.getAllProviders();
+                // Android's network location only when Maps itself asks it (Location source: Android):
+                // with Google's or microG's chosen, it may be served by the other one.
+                List<String> rough = new ArrayList<>();
+                rough.add(LocationManager.PASSIVE_PROVIDER);
+                if (!Shapes.playLocation()) rough.add(LocationManager.NETWORK_PROVIDER);
+                for (String p : rough) {
+                    if (!providers.contains(p)) continue;
+                    try {
+                        lm.requestLocationUpdates(p, 10_000L, 100f, ROUGH, Looper.getMainLooper());
+                    } catch (Throwable t) {
+                        android.util.Log.w("UA", "speed cameras: " + p + " location", t);
+                    }
+                }
+                // To begin with, the newest fix any source still has.
+                Location known = null;
+                for (String p : providers) {
+                    Location k = lm.getLastKnownLocation(p);
+                    if (k != null && (known == null || k.getElapsedRealtimeNanos() > known.getElapsedRealtimeNanos())) known = k;
+                }
+                if (known != null) {
+                    if (LocationManager.GPS_PROVIDER.equals(known.getProvider())) located(known);
+                    else roughly(known);
+                }
             } else {
                 lm.removeUpdates(GPS);
+                lm.removeUpdates(ROUGH);
                 previous = null;
             }
             listening = want;
@@ -304,16 +362,31 @@ public final class SpeedCameras {
     }
 
     private static void located(Location l) {
+        moved(l);
+        try {
+            alert(l);
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "speed cameras: alert", t);
+        }
+    }
+
+    /** A fix from a rough source: used for where to download and draw while GPS has none. No alerts. */
+    private static void roughly(Location l) {
+        if (l == null || LocationManager.GPS_PROVIDER.equals(l.getProvider())) return;   // GPS's own come to GPS
+        Location g = last;
+        if (g != null && LocationManager.GPS_PROVIDER.equals(g.getProvider())
+                && android.os.SystemClock.elapsedRealtimeNanos() - g.getElapsedRealtimeNanos() < GPS_FRESH_NS) return;
+        if (g == null) android.util.Log.i("UA", "speed cameras: location from " + l.getProvider() + " until GPS has one");
+        moved(l);
+    }
+
+    /** [l] is where we are now: download around it, and redraw once in a new square. */
+    private static void moved(Location l) {
         Location before = last;
         last = l;
         around(l.getLatitude(), l.getLongitude());
         if (before == null || tile(before.getLatitude(), before.getLongitude()) != tile(l.getLatitude(), l.getLongitude())) {
             if (MAP || FLOCK_MAP) SavedOnMap.refresh();
-        }
-        try {
-            alert(l);
-        } catch (Throwable t) {
-            android.util.Log.w("UA", "speed cameras: alert", t);
         }
     }
 
@@ -518,7 +591,7 @@ public final class SpeedCameras {
      * Loads, or downloads, [layer]'s square at [lat],[lng] and the Camera download area's rings around it
      * (at least one, the squares the alerts look into): those kept on the phone from the phone, the rest in
      * one request for the rectangle around them -- nine requests at once got the app rate-limited. After a
-     * failed request the next waits 1, 2, 4 ... up to 30 minutes.
+     * failed request the next waits 30 seconds, then 1, 2, 4 ... up to 30 minutes (see fill).
      */
     private static void around(Layer layer, double lat, double lng) {
         long center = tile(lat, lng), ty = center >>> 32, tx = center & 0xffffffffL;
@@ -571,7 +644,9 @@ public final class SpeedCameras {
             x0 = Math.min(x0, key & 0xffffffffL); x1 = Math.max(x1, key & 0xffffffffL);
         }
         double s = y0 * TILE - 90, n = (y1 + 1) * TILE - 90, w = x0 * TILE - 180, e = (x1 + 1) * TILE - 180;
-        for (String server : SERVERS) {
+        for (int k : serverOrder()) {
+            String server = SERVERS[k];
+            layer.asking = host(server);
             try {
                 JSONObject root = new JSONObject(layer.plates
                         ? post(server, plateQuery(s, w, n, e), 240000)
@@ -603,17 +678,104 @@ public final class SpeedCameras {
                     layer.fresh.add(t.getKey());
                 }
                 layer.failures = 0;
+                layer.retryAt = 0;
+                layer.asking = null;
+                synchronized (SERVER_RESTING) {
+                    SERVER_RESTING[k] = 0;
+                    SERVER_HUNG[k] = false;
+                }
                 android.util.Log.i("UA", layer.name + ": " + cams.size() + " in " + saved.size() + " squares from " + server);
                 changed();
                 return;
             } catch (Throwable t) {
+                // Passed over for a while: 30 minutes when it took the whole wait and said nothing.
+                boolean hung = t instanceof java.net.SocketTimeoutException;
+                synchronized (SERVER_RESTING) {
+                    SERVER_RESTING[k] = System.currentTimeMillis() + (hung ? REST_HUNG_MS : REST_MS);
+                    SERVER_HUNG[k] = hung;
+                }
                 android.util.Log.w("UA", layer.name + ": " + server + " " + t);
             }
         }
-        layer.failures = Math.min(layer.failures + 1, 6);
-        layer.retryAt = System.currentTimeMillis() + Math.min(30L, 1L << (layer.failures - 1)) * 60 * 1000L;
+        layer.asking = null;
+        layer.failures = Math.min(layer.failures + 1, 7);
+        // 30 s, 1, 2, 4, 8, 16, then 30 minutes; tried by itself then, not only at the next fix.
+        long wait = Math.min(30 * 60 * 1000L, 30_000L << (layer.failures - 1));
+        layer.retryAt = System.currentTimeMillis() + wait;
+        MAIN.removeCallbacks(layer.retry);
+        MAIN.postDelayed(layer.retry, wait + 1000L);
         for (long key : remaining) if (!layer.tiles.containsKey(key) && file(c, layer, key).isFile()) keep(layer, key, file(c, layer, key));
         changed();
+    }
+
+    /**
+     * The servers to ask, in order: those not resting. If every one is, those that answered with an
+     * error (busy servers often answer the next time), the soonest back first; one that answered
+     * nothing at all only when every server did -- each costs the whole wait again.
+     */
+    private static List<Integer> serverOrder() {
+        long now = System.currentTimeMillis();
+        List<Integer> out = new ArrayList<>();
+        synchronized (SERVER_RESTING) {
+            for (int k = 0; k < SERVERS.length; k++) if (SERVER_RESTING[k] <= now) out.add(k);
+            if (out.isEmpty()) {
+                for (int k = 0; k < SERVERS.length; k++) if (!SERVER_HUNG[k]) out.add(k);
+                if (out.isEmpty()) for (int k = 0; k < SERVERS.length; k++) out.add(k);
+                Collections.sort(out, (a, b) -> Long.compare(SERVER_RESTING[a], SERVER_RESTING[b]));
+            }
+        }
+        return out;
+    }
+
+    private static String host(String url) {
+        try {
+            return new URL(url).getHost();
+        } catch (Throwable t) {
+            return url;
+        }
+    }
+
+    // ---- what is going on, for Customization -----------------------------------------------
+
+    /** One line on speed cameras ([plates] false) or Flock cameras: how many, or what they wait for. */
+    static String status(boolean plates) {
+        Layer layer = plates ? FLOCKS : CAMERAS;
+        if (!layer.on()) return "Off";
+        Location l = last;
+        if (l == null) return "Waiting for your location";
+        long center = tile(l.getLatitude(), l.getLongitude()), ty = center >>> 32, tx = center & 0xffffffffL;
+        int ring = RING, missing = 0;
+        for (long y = ty - ring; y <= ty + ring; y++) {
+            for (long x = tx - ring; x <= tx + ring; x++) if (!layer.fresh.contains(y << 32 | x)) missing++;
+        }
+        int n = near(layer, l.getLatitude(), l.getLongitude(), ring).size();
+        String count = n == 1 ? "1 camera" : n + " cameras";
+        String asking = layer.asking;
+        if (asking != null) return count + " so far, downloading from " + asking;
+        if (missing == 0) return count + " around you";
+        long wait = layer.retryAt - System.currentTimeMillis();
+        if (wait > 0) {
+            long s = (wait + 999) / 1000;
+            String in = s < 60 ? s + " seconds" : (s + 59) / 60 + " minutes";
+            return count + " so far. The server did not answer; trying again in " + in + ", or tap to try now";
+        }
+        return count + " so far, downloading";
+    }
+
+    /**
+     * Tapped in Customization: every switched-on layer downloads now, from every server that answered
+     * last time, even with an error; one that answered nothing still rests (each costs the whole wait).
+     */
+    static void retryNow() {
+        synchronized (SERVER_RESTING) {
+            for (int k = 0; k < SERVERS.length; k++) if (!SERVER_HUNG[k]) SERVER_RESTING[k] = 0;
+        }
+        for (Layer layer : LAYERS) {
+            if (!layer.on() || layer.busy) continue;
+            layer.retryAt = 0;
+            MAIN.removeCallbacks(layer.retry);
+            MAIN.post(layer.retry);
+        }
     }
 
     /** Puts [layer]'s square saved in [f] in memory; false when it cannot be read. */
