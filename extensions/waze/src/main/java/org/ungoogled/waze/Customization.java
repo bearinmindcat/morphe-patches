@@ -26,16 +26,25 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The Customization row at the bottom of Waze's side menu, under Shut off, and the screen it opens:
@@ -80,6 +89,10 @@ public final class Customization {
                 "Android Auto heads-up distances and the traffic bar threshold (the patch's values)"});
         LABELS.put("biggerSpeedometer", new String[]{"Bigger speedometer",
                 "Bigger digits on the speedometer and its speed limit sign; off is Waze's own sizes"});
+        LABELS.put("mapSkin", new String[]{"Map skin",
+                "Bigger map labels, a wider navigation arrow head and a warm day background; from Waze's next start"});
+        LABELS.put("blackNightMap", new String[]{"Black night map",
+                "The night map's background black (Full black); from Waze's next start"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "The speed limit sign style the patch was set to, whatever the country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
@@ -93,14 +106,18 @@ public final class Customization {
         final String title, unit;
         final int scale, max;
         final String[] choices, choiceNames;
-        /** Waze's own value, for values that are not Waze configuration (the speedometer's sizes). */
-        final Integer stock;
+        /** Waze's own value, for values that are not Waze configuration (speedometer, map skin). */
+        final Object stock;
+        /** A number kept in tenths and shown with one decimal (the arrow head). */
+        boolean tenths;
+        /** Six hex digits, a colour (the day background). */
+        boolean hex;
 
         Label(String title, String unit, int scale, int max) {
             this(title, unit, scale, max, null);
         }
 
-        Label(String title, String unit, int scale, int max, Integer stock) {
+        Label(String title, String unit, int scale, int max, Object stock) {
             this.title = title; this.unit = unit; this.scale = scale; this.max = max; this.stock = stock;
             this.choices = null; this.choiceNames = null;
         }
@@ -109,11 +126,26 @@ public final class Customization {
             this.title = title; this.unit = ""; this.scale = 1; this.max = 0; this.stock = null;
             this.choices = choices; this.choiceNames = choiceNames;
         }
+
+        static Label tenths(String title, String unit, int maxTenths, int stockTenths) {
+            Label l = new Label(title, unit, 1, maxTenths, stockTenths);
+            l.tenths = true;
+            return l;
+        }
+
+        static Label hex(String title, String stock) {
+            Label l = new Label(title, "", 1, 0, stock);
+            l.hex = true;
+            return l;
+        }
     }
 
     /** Bigger speedometer's sizes: not Waze configuration, read by the speedometer as it draws. */
     private static final String SPEED = "SPEEDOMETER_SPEED", UNITS = "SPEEDOMETER_UNITS",
             LIMIT = "SPEEDOMETER_LIMIT", LIMIT_THREE = "SPEEDOMETER_LIMIT_THREE";
+    /** Map skin's values: label sizes, the arrow head in tenths, the day background as six hex digits. */
+    private static final String FONT_HUGE = "SKIN_FONT_HUGE", FONT_BIG = "SKIN_FONT_BIG", FONT_MEDIUM = "SKIN_FONT_MEDIUM",
+            FONT_SMALL = "SKIN_FONT_SMALL", ARROW_HEAD = "SKIN_ARROW_HEAD", DAY_BACKGROUND = "SKIN_DAY_BACKGROUND";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -136,6 +168,12 @@ public final class Customization {
         VALUE_LABELS.put(UNITS, new Label("Unit label", "dp", 1, 40, 12));
         VALUE_LABELS.put(LIMIT, new Label("Speed limit sign digits", "sp", 1, 60, 20));
         VALUE_LABELS.put(LIMIT_THREE, new Label("Speed limit sign digits, 100 and over", "sp", 1, 60, 13));
+        VALUE_LABELS.put(FONT_HUGE, new Label("Map labels: huge", "", 1, 60, 14));
+        VALUE_LABELS.put(FONT_BIG, new Label("Map labels: big", "", 1, 60, 12));
+        VALUE_LABELS.put(FONT_MEDIUM, new Label("Map labels: medium", "", 1, 60, 10));
+        VALUE_LABELS.put(FONT_SMALL, new Label("Map labels: small", "", 1, 60, 8));
+        VALUE_LABELS.put(ARROW_HEAD, Label.tenths("Navigation arrow head width", "x the tail", 300, 30));
+        VALUE_LABELS.put(DAY_BACKGROUND, Label.hex("Day map background", "FAFCFA"));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -176,6 +214,8 @@ public final class Customization {
     /** From WazeMobileApplication.onCreate. */
     public static void init(Application a) {
         app = a;
+        // Before Waze's map engine reads its skin copy, which it does after this.
+        applySkin();
         try {
             a.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
                 @Override public void onActivityResumed(Activity x) { resumed = new WeakReference<>(x); }
@@ -269,6 +309,7 @@ public final class Customization {
     private static void set(String feature, boolean on) {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putBoolean(feature, on).commit();
+        if (feature.equals("mapSkin") || feature.equals("blackNightMap")) applySkin();
         reapply(feature + (on ? " on" : " off"));
     }
 
@@ -299,6 +340,7 @@ public final class Customization {
         else if (value instanceof Integer) e.putInt(valueKey(name), (Integer) value);
         else e.putString(valueKey(name), String.valueOf(value));
         e.commit();
+        if (name.startsWith("SKIN_")) applySkin();
         reapply(name + " = " + (value == null ? "the patch's" : value));
     }
 
@@ -420,6 +462,156 @@ public final class Customization {
         return on("hideAds") ? "" : url;
     }
 
+    // ---- Map skin and Black night map: Waze's own copy of its skin ------------------------------
+
+    /*
+     * Waze copies res/skins/default/ out of its APK into <data>/waze/skins/default/ on its first start and
+     * its map engine reads that copy from then on; it does not copy again. So these features rewrite the
+     * copy, from the APK's untouched originals, as Waze starts and whenever they change here -- the APK's
+     * assets are never edited (Morphe Manager 1.35 crashes Waze when they are). Off writes the originals.
+     */
+    private static final String SKIN_ASSETS = "res/skins/default/";
+    private static final String[] SKIN_STRUCTURES = {"skin_structure.main.lua", "experiment/skin_structure.main.lua"};
+    private static final String[] SKIN_DAY = {"skin_values.day.lua", "skin_values.editor.day.lua",
+            "experiment/skin_values.day.lua", "experiment/skin_values.editor.day.lua"};
+    private static final String[] SKIN_NIGHT = {"skin_values.night.lua", "skin_values.editor.night.lua",
+            "experiment/skin_values.night.lua", "experiment/skin_values.editor.night.lua"};
+    private static boolean waitingForSkins;
+
+    /** Rewrites Waze's skin copy for Map skin and Black night map as they are set now. */
+    static synchronized void applySkin() {
+        try {
+            Context c = context();
+            if (c == null) return;
+            List<String> list = features();
+            boolean skinPatched = list.contains("mapSkin"), nightPatched = list.contains("blackNightMap");
+            if (!skinPatched && !nightPatched) return;
+            File dir = new File(c.getApplicationInfo().dataDir, "waze/skins/default");
+            if (!new File(dir, SKIN_STRUCTURES[0]).isFile()) {
+                waitForSkins();   // Waze's first start: its copy is made after this
+                return;
+            }
+            boolean skin = skinPatched && on("mapSkin"), night = nightPatched && on("blackNightMap");
+            int written = 0;
+            if (skinPatched) {
+                for (String f : SKIN_STRUCTURES) written += rewrite(c, dir, f, skin ? 1 : 0);
+                for (String f : SKIN_DAY) written += rewrite(c, dir, f, skin ? 2 : 0);
+            }
+            if (nightPatched) for (String f : SKIN_NIGHT) written += rewrite(c, dir, f, night ? 3 : 0);
+            Log.i("UA", "Waze customization: map skin " + (skinPatched ? (skin ? "on" : "off") : "-") + ", black night map "
+                    + (nightPatched ? (night ? "on" : "off") : "-") + ", " + written + " skin files written");
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: map skin", t);
+        }
+    }
+
+    /** First start: once Waze has copied its skin, rewrite it, for the start after this one. */
+    private static void waitForSkins() {
+        if (waitingForSkins) return;
+        waitingForSkins = true;
+        Thread t = new Thread(() -> {
+            Context c = context();
+            File first = c == null ? null : new File(c.getApplicationInfo().dataDir, "waze/skins/default/" + SKIN_STRUCTURES[0]);
+            for (int i = 0; i < 90 && first != null; i++) {
+                if (first.isFile()) {
+                    try {
+                        Thread.sleep(5000);   // let the whole copy finish
+                    } catch (InterruptedException ignored) {
+                    }
+                    applySkin();
+                    return;
+                }
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        }, "ua-skin");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /**
+     * [file] of the copy rewritten from the APK's original: [how] 0 = as it is, 1 = Map skin's label sizes
+     * and arrow head, 2 = Map skin's day background, 3 = a black night background. 1 when it was written.
+     */
+    private static int rewrite(Context c, File dir, String file, int how) {
+        try {
+            String original;
+            try (InputStream in = c.getAssets().open(SKIN_ASSETS + file)) {
+                original = text(in);
+            }
+            String text = original;
+            if (how == 1) text = structure(original);
+            else if (how == 2) text = background(original, skinString(DAY_BACKGROUND, "EBE7DD"));
+            else if (how == 3) text = background(original, "000000");
+            File out = new File(dir, file);
+            if (out.isFile()) {
+                try (InputStream in = new FileInputStream(out)) {
+                    if (text.equals(text(in))) return 0;
+                }
+            }
+            File tmp = new File(dir, file + ".ua-tmp");
+            try (FileOutputStream o = new FileOutputStream(tmp)) {
+                o.write(text.getBytes(StandardCharsets.UTF_8));
+            }
+            if (!tmp.renameTo(out)) {
+                tmp.delete();
+                return 0;
+            }
+            return 1;
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: skin " + file, t);
+            return 0;
+        }
+    }
+
+    /** The label sizes in FontSizes (the same names in ShieldScaleFactors stay) and the arrow head factor. */
+    private static String structure(String lua) {
+        Matcher table = Pattern.compile("FontSizes\\s*=\\s*\\{[^}]*\\}").matcher(lua);
+        if (!table.find()) return lua;
+        String sizes = table.group();
+        String[][] fonts = {{"huge", FONT_HUGE, "18"}, {"big", FONT_BIG, "14"}, {"medium", FONT_MEDIUM, "12"}, {"small", FONT_SMALL, "10"}};
+        for (String[] f : fonts) {
+            int size = skinInt(f[1], Integer.parseInt(f[2]));
+            sizes = sizes.replaceAll("\\b" + f[0] + "\\s*=\\s*\\d+", f[0] + " = " + size);
+        }
+        String out = lua.substring(0, table.start()) + sizes + lua.substring(table.end());
+        String head = String.format(Locale.ROOT, "%.1f", skinInt(ARROW_HEAD, 100) / 10.0);
+        return out.replaceAll("(\\bnav_arrow_head_width_factor\\s*=\\s*)[0-9.]+", "$1" + head);
+    }
+
+    /** The map background and the not-yet-loaded areas in [hex]. */
+    private static String background(String lua, String hex) {
+        return lua.replaceAll("(\\bmap_background\\s*=\\s*rgb\\()0x[0-9a-fA-F]{6}", "$10x" + hex)
+                .replaceAll("(\\bmap_missing\\s*=\\s*rgb\\()0x[0-9a-fA-F]{6}", "$10x" + hex);
+    }
+
+    private static int skinInt(String name, int fallback) {
+        Object v = current(name, patched(name, fallback));
+        return v instanceof Integer ? (Integer) v : fallback;
+    }
+
+    private static String skinString(String name, String fallback) {
+        features();
+        Object patched;
+        synchronized (declared) {
+            Value v = values.get(name);
+            patched = v != null ? v.patched : fallback;
+        }
+        Object v = current(name, patched);
+        return String.valueOf(v).toUpperCase(Locale.ROOT);
+    }
+
+    private static String text(InputStream in) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[16384];
+        int n;
+        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        return out.toString("UTF-8");
+    }
+
     // ---- Bigger speedometer, read as the speedometer draws ------------------------------------
 
     private static int speedTextId, speedUnitsId;
@@ -427,7 +619,7 @@ public final class Customization {
     /** A speedometer size now: the one changed here, else the patch's; Waze's own while switched off. */
     private static int size(String name, int patched) {
         Label label = VALUE_LABELS.get(name);
-        if (!on("biggerSpeedometer")) return label.stock;
+        if (!on("biggerSpeedometer")) return (Integer) label.stock;
         Object v = current(name, patched);
         return v instanceof Integer ? (Integer) v : patched;
     }
@@ -569,8 +761,8 @@ public final class Customization {
         TextView note = new TextView(a);
         note.setText("Switches and values take effect right away. A screen that still shows the old behaviour "
                 + "picks it up after Shut off and reopening Waze. Tap a value to change it; Reset puts the "
-                + "patch's value back. The speedometer changes as it next shows a speed. Map skin and Full "
-                + "black are set when patching.");
+                + "patch's value back. The speedometer changes as it next shows a speed; Map skin and Black "
+                + "night map from Waze's next start (Shut off, then open Waze).");
         note.setTextColor(sub);
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         note.setPadding(dp(a, 20), dp(a, 16), dp(a, 20), dp(a, 24));
@@ -601,9 +793,13 @@ public final class Customization {
             for (int i = 0; i < label.choices.length; i++) if (label.choices[i].equalsIgnoreCase(String.valueOf(value))) return label.choiceNames[i];
             return String.valueOf(value);
         }
+        if (label.hex) return "#" + String.valueOf(value).toUpperCase(Locale.ROOT);
+        if (label.tenths && value instanceof Number) {
+            return String.format(Locale.getDefault(), "%.1f", ((Number) value).intValue() / 10.0) + (label.unit.isEmpty() ? "" : " " + label.unit);
+        }
         if (value instanceof Number) {
             long n = ((Number) value).longValue() / label.scale;
-            return NumberFormat.getIntegerInstance().format(n) + " " + label.unit;
+            return NumberFormat.getIntegerInstance().format(n) + (label.unit.isEmpty() ? "" : " " + label.unit);
         }
         return String.valueOf(value);
     }
@@ -648,27 +844,51 @@ public final class Customization {
             });
         } else {
             EditText input = new EditText(a);
-            input.setInputType(InputType.TYPE_CLASS_NUMBER);
-            input.setText(String.valueOf(((Number) value).longValue() / label.scale));
+            if (label.hex) {
+                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+                input.setText(String.valueOf(value).toUpperCase(Locale.ROOT));
+            } else if (label.tenths) {
+                input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                input.setText(String.format(Locale.ROOT, "%.1f", ((Number) value).intValue() / 10.0));
+            } else {
+                input.setInputType(InputType.TYPE_CLASS_NUMBER);
+                input.setText(String.valueOf(((Number) value).longValue() / label.scale));
+            }
             input.setSelectAllOnFocus(true);
             LinearLayout box = new LinearLayout(a);
             box.setOrientation(LinearLayout.VERTICAL);
             box.setPadding(dp(a, 24), dp(a, 8), dp(a, 24), 0);
             TextView unit = new TextView(a);
             unit.setTextColor(night ? 0xFF9AA0A6 : 0xFF5F6368);
-            unit.setText(info + "\nIn " + label.unit + ", 0 to " + label.max + ".");
+            String range = label.hex ? "Six hex digits, like EBE7DD."
+                    : label.tenths ? String.format(Locale.ROOT, "0 to %.1f.", label.max / 10.0)
+                    : (label.unit.isEmpty() ? "" : "In " + label.unit + ", ") + "0 to " + label.max + ".";
+            unit.setText(info + "\n" + range + (v.name.startsWith("SKIN_") ? "\nFrom Waze's next start." : ""));
             box.addView(input);
             box.addView(unit);
             b.setView(box);
             b.setPositiveButton("Save", (d, w) -> {
+                String typed = input.getText().toString().trim();
                 try {
-                    long n = Long.parseLong(input.getText().toString().trim());
-                    if (n < 0 || n > label.max) throw new NumberFormatException();
-                    int kept = (int) (n * label.scale);
-                    change(v.name, v.patched instanceof Integer && kept == (Integer) v.patched ? null : kept);
+                    if (label.hex) {
+                        String hex = typed.replaceFirst("^(#|0[xX])", "").toUpperCase(Locale.ROOT);
+                        if (!hex.matches("[0-9A-F]{6}")) throw new NumberFormatException();
+                        change(v.name, hex.equalsIgnoreCase(String.valueOf(v.patched)) ? null : hex);
+                    } else if (label.tenths) {
+                        int kept = Math.round(Float.parseFloat(typed.replace(',', '.')) * 10);
+                        if (kept < 0 || kept > label.max) throw new NumberFormatException();
+                        change(v.name, v.patched instanceof Integer && kept == (Integer) v.patched ? null : kept);
+                    } else {
+                        long n = Long.parseLong(typed);
+                        if (n < 0 || n > label.max) throw new NumberFormatException();
+                        int kept = (int) (n * label.scale);
+                        change(v.name, v.patched instanceof Integer && kept == (Integer) v.patched ? null : kept);
+                    }
                     refresh.run();
                 } catch (NumberFormatException e) {
-                    android.widget.Toast.makeText(a, "Enter a number from 0 to " + label.max, android.widget.Toast.LENGTH_LONG).show();
+                    android.widget.Toast.makeText(a, label.hex ? "Enter six hex digits, like EBE7DD"
+                            : label.tenths ? String.format(Locale.ROOT, "Enter a number from 0 to %.1f", label.max / 10.0)
+                            : "Enter a number from 0 to " + label.max, android.widget.Toast.LENGTH_LONG).show();
                 }
             });
             b.setNegativeButton("Cancel", null);

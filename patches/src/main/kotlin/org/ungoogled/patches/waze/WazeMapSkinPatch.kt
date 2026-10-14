@@ -1,26 +1,13 @@
 package org.ungoogled.patches.waze
 
+import app.morphe.patcher.patch.BytecodePatch
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.floatOption
 import app.morphe.patcher.patch.intOption
-import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 import java.util.Locale
-
-/** The map's structure: label sizes, line widths, the navigation arrow. */
-private val SKIN_STRUCTURES = listOf(
-    "assets/res/skins/default/skin_structure.main.lua",
-    "assets/res/skins/default/experiment/skin_structure.main.lua",
-)
-
-/** The day map's colour tables. */
-private val DAY_SKINS = listOf(
-    "assets/res/skins/default/skin_values.day.lua",
-    "assets/res/skins/default/skin_values.editor.day.lua",
-    "assets/res/skins/default/experiment/skin_values.day.lua",
-    "assets/res/skins/default/experiment/skin_values.editor.day.lua",
-)
 
 /** A colour option as six hex digits, whatever the user typed ("#ebe7dd", "0xEBE7DD", "ebe7dd"). */
 private fun hexColour(value: String?, what: String): String {
@@ -30,55 +17,22 @@ private fun hexColour(value: String?, what: String): String {
 }
 
 /**
- * Why Map skin, and Full black's black night map, are off by default and skipped by newer patchers:
- * they change files under `assets/res/`, and Morphe Manager 1.35 (patcher 1.15) then also writes
- * empty folder entries into the APK for every parent folder of a changed asset. Waze 5.24's native
- * map engine treats the `assets/res/` folder entry as a file and crashes about a second after the
- * map appears, on every launch. Morphe Desktop (patcher 1.14) writes no folder entries, so its
- * builds run.
+ * The old Waze mods' map skin, applied while Waze runs. Waze copies `res/skins/default/` out of its APK
+ * into its data folder on its first start, and its map engine reads that copy; the extension rewrites the
+ * copy from the APK's originals as Waze starts (Customization.applySkin). Nothing in the APK's assets is
+ * edited: Morphe Manager 1.35 (patcher 1.15) writes folder entries for edited assets that crash Waze's map
+ * engine, which is why this used to be off by default and skipped there.
  */
-internal const val MANAGER_ASSET_WARNING =
-    "Skipped by Morphe Manager 1.35 and other patcher 1.15+ builds, which would crash Waze when the map " +
-        "opens; patch with Morphe Desktop to get it."
-
-/** The version of the patcher running these patches ("1.15.1"), from its own version.properties; null if unreadable. */
-private fun runningPatcherVersion(): String? = try {
-    // The patcher's classes come from the app running the patches (Morphe Manager or Desktop), not from
-    // this bundle, so this is that app's patcher.
-    PatchException::class.java.getResourceAsStream("/app/morphe/patcher/version.properties")?.use { stream ->
-        java.util.Properties().apply { load(stream) }.getProperty("version")?.trim()
-    }
-} catch (_: Throwable) {
-    null
-}
-
-/**
- * Whether Waze's assets can be changed without crashing Waze: only under a patcher from before 1.15,
- * which writes no folder entries. Logs why when not, naming [what] was skipped.
- */
-internal fun wazeAssetEditsSafe(what: String): Boolean {
-    val version = runningPatcherVersion()
-    val parts = version?.split('.', '-')?.mapNotNull { it.toIntOrNull() }.orEmpty()
-    val safe = parts.size >= 2 && (parts[0] < 1 || (parts[0] == 1 && parts[1] < 15))
-    if (!safe) {
-        // The patcher's own logger, which Morphe Desktop prints and Morphe Manager shows in its patch log.
-        java.util.logging.Logger.getLogger("app.morphe.patcher.Patcher").warning(
-            "$what skipped: patcher ${version ?: "(unknown version)"} adds folder entries to the APK that crash " +
-                "Waze when the map opens. Patch with Morphe Desktop to get it.",
-        )
-    }
-    return safe
-}
-
 @Suppress("unused")
-val wazeMapSkinPatch = resourcePatch(
+val wazeMapSkinPatch: BytecodePatch = bytecodePatch(
     name = "Map skin",
     description = "The old Waze mods' map skin, as changes to Waze's own: bigger map labels, a wider " +
-        "navigation arrow head and a warm day background. The night background is Full black's. " +
-        MANAGER_ASSET_WARNING,
-    default = false,
+        "navigation arrow head and a warm day background. It is applied as Waze starts, and can be switched " +
+        "off or changed later in Customization, at the bottom of Waze's side menu; changes show from Waze's " +
+        "next start.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
+    dependsOn(wazeCustomizationPatch)
 
     val fontHuge by intOption(key = "fontHuge", default = 18, title = "Map labels: huge", description = "Waze: 14.", required = true)
     val fontBig by intOption(key = "fontBig", default = 14, title = "Map labels: big", description = "Waze: 12.", required = true)
@@ -100,37 +54,15 @@ val wazeMapSkinPatch = resourcePatch(
     )
 
     execute {
-        if (!wazeAssetEditsSafe("Map skin")) return@execute
-        val fonts = mapOf("huge" to fontHuge!!, "big" to fontBig!!, "medium" to fontMedium!!, "small" to fontSmall!!)
-        val head = String.format(Locale.ROOT, "%.1f", arrowHead!!)
-        for (path in SKIN_STRUCTURES) {
-            val skin = get(path)
-            if (!skin.isFile) throw PatchException("$path not found")
-            val before = skin.readText()
-            // The label sizes live in one table; the same names in ShieldScaleFactors must stay.
-            val table = Regex("FontSizes\\s*=\\s*\\{[^}]*\\}").find(before) ?: throw PatchException("$path has no FontSizes")
-            var sizes = table.value
-            for ((name, size) in fonts) {
-                val sized = sizes.replace(Regex("\\b$name\\s*=\\s*\\d+"), "$name = $size")
-                if (sized == sizes) throw PatchException("$path: FontSizes has no $name")
-                sizes = sized
-            }
-            val after = before.replace(table.value, sizes)
-                .replace(Regex("(\\bnav_arrow_head_width_factor\\s*=\\s*)[0-9.]+"), "$1$head")
-            if (!after.contains("nav_arrow_head_width_factor = $head")) throw PatchException("$path has no nav_arrow_head_width_factor")
-            skin.writeText(after)
-        }
-
         val day = hexColour(dayBackground, "the day background")
-        for (path in DAY_SKINS) {
-            val skin = get(path)
-            if (!skin.isFile) throw PatchException("$path not found")
-            val before = skin.readText()
-            val after = before
-                .replace(Regex("(\\bmap_background\\s*=\\s*rgb\\()0x[0-9a-fA-F]{6}"), "$10x$day")
-                .replace(Regex("(\\bmap_missing\\s*=\\s*rgb\\()0x[0-9a-fA-F]{6}"), "$10x$day")
-            if (after == before) throw PatchException("$path has no map background")
-            skin.writeText(after)
-        }
+        val head = Math.round(arrowHead!! * 10)
+        if (head !in 0..300) throw PatchException("the arrow head width must be 0 to 30")
+        declareWazeToggle("mapSkin")
+        declareWazeValue("mapSkin", "SKIN_FONT_HUGE", fontHuge!!)
+        declareWazeValue("mapSkin", "SKIN_FONT_BIG", fontBig!!)
+        declareWazeValue("mapSkin", "SKIN_FONT_MEDIUM", fontMedium!!)
+        declareWazeValue("mapSkin", "SKIN_FONT_SMALL", fontSmall!!)
+        declareWazeValue("mapSkin", "SKIN_ARROW_HEAD", head)
+        declareWazeValue("mapSkin", "SKIN_DAY_BACKGROUND", day)
     }
 }
