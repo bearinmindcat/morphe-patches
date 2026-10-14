@@ -30,7 +30,9 @@ import java.util.Map;
  *
  * Waze keeps a list of the alerts it is about to warn about, around the car and along its route.
  * Patched with Share alerts with Maps it broadcasts that list on the phone (org.ungoogled.waze.ALERTS)
- * each time it changes and once a minute besides; this receives it. Off until switched on in Waze
+ * each time it changes and once a minute besides; this receives it, and asks for it
+ * (org.ungoogled.waze.ALERTS_REQUEST) when switched on, as Maps starts and as it comes back on screen,
+ * so the pins need not wait for Waze's next minute. Off until switched on in Waze
  * Features. Waze has to be signed in and open -- in the background is enough -- with a GPS fix of its
  * own. Which kinds show is chosen in Waze alert types, police alone to begin with; the list is dropped
  * three minutes after the last word from Waze. An alert is "ahead" by the speed cameras' test: on the
@@ -41,6 +43,10 @@ public final class WazeAlerts {
 
     /** The broadcast Waze's bridge sends; its extras are described in the Waze extension (Bridge). */
     public static final String ACTION = "org.ungoogled.waze.ALERTS";
+    /** To Waze's bridge: send the list now. */
+    static final String ACTION_REQUEST = "org.ungoogled.waze.ALERTS_REQUEST";
+    /** Back on screen with nothing from Waze for this long: ask again. */
+    private static final long ASK_AFTER_MS = 30_000L;
     public static final String KEY_ON = "waze_alerts";
     public static final String KEY_MAP = "waze_alerts_map";
     public static final String KEY_CHIME = "waze_alerts_chime";
@@ -82,6 +88,7 @@ public final class WazeAlerts {
 
     private static volatile List<Alert> alerts = Collections.emptyList();
     private static volatile long receivedAt;
+    private static volatile int receivedCount;
     private static final Map<String, Long> alerted = new HashMap<>();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
@@ -198,9 +205,12 @@ public final class WazeAlerts {
                 if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(RECEIVER, f, Context.RECEIVER_EXPORTED);
                 else app.registerReceiver(RECEIVER, f);
                 host = app;
+                registered = true;
+                ask();
             } else {
                 if (host != null) host.unregisterReceiver(RECEIVER);
                 host = null;
+                receivedAt = 0;
                 clear("switched off");
             }
             registered = ON;
@@ -236,6 +246,7 @@ public final class WazeAlerts {
         }
         alerts = Collections.unmodifiableList(out);
         receivedAt = SystemClock.elapsedRealtime();
+        receivedCount = out.size();
         android.util.Log.i("UA", "waze alerts: " + out.size() + " from " + in.getStringExtra("from"));
         MAIN.removeCallbacks(EXPIRE);
         if (!out.isEmpty()) MAIN.postDelayed(EXPIRE, STALE_MS + 1000L);
@@ -243,6 +254,40 @@ public final class WazeAlerts {
         Location l = last;
         // With a fresh fix, one of the new alerts may already be right ahead.
         if (l != null && SystemClock.elapsedRealtimeNanos() - l.getElapsedRealtimeNanos() < 15_000_000_000L) alert(l);
+    }
+
+    /** Asks Waze's bridge for its list now; it answers only while Waze runs. Main thread. */
+    static void ask() {
+        Context c = host;
+        if (c == null || !ON) return;
+        try {
+            c.sendBroadcast(new Intent(ACTION_REQUEST)
+                    .putExtra("from", c.getPackageName())
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND | Intent.FLAG_INCLUDE_STOPPED_PACKAGES));
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "waze alerts: ask", t);
+        }
+    }
+
+    /** For Waze & external data source: the last word from Waze, in a line. */
+    static String status() {
+        if (!ON) return "Off";
+        long at = receivedAt;
+        if (at == 0) return "Nothing from Waze yet. Waze sends its alerts while it is open; tap to ask again";
+        int n = receivedCount, shown = 0;
+        for (Alert a : alerts) if ((KINDS & (1 << a.kind)) != 0) shown++;
+        String count = n == 1 ? "1 alert" : n + " alerts";
+        if (n > 0 && shown != n) count += ", " + shown + " of the types chosen";
+        return count + " from Waze, " + ago(SystemClock.elapsedRealtime() - at);
+    }
+
+    /** "just now", "40 seconds ago", "3 minutes ago". */
+    static String ago(long ms) {
+        long s = ms / 1000;
+        if (s < 5) return "just now";
+        if (s < 60) return s + " seconds ago";
+        long m = s / 60;
+        return m == 1 ? "a minute ago" : m + " minutes ago";
     }
 
     private static String at(String[] a, int i, String fallback) {
@@ -383,7 +428,12 @@ public final class WazeAlerts {
     // ---- Maps open or not --------------------------------------------------------------
 
     private static final class Lifecycle implements Application.ActivityLifecycleCallbacks {
-        @Override public void onActivityResumed(Activity a) { resumed++; listen(); }
+        @Override public void onActivityResumed(Activity a) {
+            resumed++;
+            listen();
+            // Back on screen with nothing recent from Waze: ask, rather than wait for its next minute.
+            if (registered && SystemClock.elapsedRealtime() - receivedAt > ASK_AFTER_MS) ask();
+        }
         @Override public void onActivityPaused(Activity a) { resumed = Math.max(0, resumed - 1); listen(); }
         @Override public void onActivityCreated(Activity a, Bundle b) {}
         @Override public void onActivityStarted(Activity a) {}

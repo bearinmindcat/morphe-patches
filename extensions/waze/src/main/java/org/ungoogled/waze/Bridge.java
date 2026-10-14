@@ -27,7 +27,9 @@ import java.util.Map;
  * trigger distance and broadcasts them on the phone (org.ungoogled.waze.ALERTS, plain intent extras)
  * to whichever app is listening -- Ungoogled Maps with Waze alerts turned on draws them on its map.
  * Nothing leaves the phone. While there are alerts the same list goes out again every minute, so
- * Maps knows Waze is still running; once Waze is gone, Maps drops them a few minutes later.
+ * Maps knows Waze is still running; once Waze is gone, Maps drops them a few minutes later. A Maps
+ * that has just started, or just had the alerts switched on, asks for the list
+ * (org.ungoogled.waze.ALERTS_REQUEST) and gets it at once rather than at the next minute.
  *
  * The JNI proto classes keep their names from one Waze build to the next (the native side looks
  * them up by name), so their getters are called by name here rather than compiled against.
@@ -42,6 +44,8 @@ public final class Bridge {
      * description, icon; plus long at (the time) and String from (Waze's package name).
      */
     public static final String ACTION = "org.ungoogled.waze.ALERTS";
+    /** From Maps: send the list now. Answered with the last list (an empty one before any), at most every 2 s. */
+    static final String ACTION_REQUEST = "org.ungoogled.waze.ALERTS_REQUEST";
     /**
      * Only after `adb shell setprop log.tag.UA DEBUG` and a restart of Waze: a broadcast of this
      * action with double lat, lng (and int type, count, String title, boolean real) fakes a list of
@@ -51,6 +55,7 @@ public final class Bridge {
     static final String ACTION_TEST = "org.ungoogled.waze.SELF_TEST";
     private static final long HEARTBEAT_MS = 60_000L;
     private static final long SAME_AGAIN_MS = 20_000L;
+    private static final long ASKED_AGAIN_MS = 2_000L;
 
     private static volatile Context app;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -58,13 +63,16 @@ public final class Bridge {
 
     private static Intent last;
     private static String lastKey = "";
-    private static long lastSentAt;
+    private static long lastSentAt, lastAskedAt;
     private static boolean beating;
 
     /** From WazeMobileApplication.onCreate. */
     public static void init(Application a) {
         try {
             app = a;
+            IntentFilter asked = new IntentFilter(ACTION_REQUEST);
+            if (Build.VERSION.SDK_INT >= 33) a.registerReceiver(new Asked(), asked, Context.RECEIVER_EXPORTED);
+            else a.registerReceiver(new Asked(), asked);
             Log.i("UA", "Waze alerts bridge ready");
             if (Log.isLoggable("UA", Log.DEBUG)) {
                 IntentFilter f = new IntentFilter(ACTION_TEST);
@@ -171,6 +179,43 @@ public final class Bridge {
             broadcast(again, count);
         }
     };
+
+    /** Maps asking for the list: the last one goes out again now, or an empty one if Waze has had none yet. */
+    private static final class Asked extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context c, Intent in) {
+            try {
+                if (!Customization.on("shareAlerts")) return;
+                Intent again;
+                int count;
+                synchronized (Bridge.class) {
+                    long now = SystemClock.elapsedRealtime();
+                    if (now - lastAskedAt < ASKED_AGAIN_MS) return;
+                    lastAskedAt = now;
+                    if (last == null) {
+                        again = new Intent(ACTION)
+                                .putExtra("type", new int[0]).putExtra("subType", new int[0])
+                                .putExtra("lat", new int[0]).putExtra("lng", new int[0])
+                                .putExtra("trigger", new int[0]).putExtra("thumbs", new int[0])
+                                .putExtra("report", new int[0]).putExtra("id", new String[0])
+                                .putExtra("title", new String[0]).putExtra("description", new String[0])
+                                .putExtra("icon", new String[0])
+                                .putExtra("from", c.getPackageName())
+                                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND | Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
+                    } else {
+                        again = new Intent(last);
+                    }
+                    again.putExtra("at", System.currentTimeMillis());
+                    int[] type = again.getIntArrayExtra("type");
+                    count = type == null ? 0 : type.length;
+                }
+                Log.i("UA", "Waze alerts bridge: asked by " + in.getStringExtra("from"));
+                broadcast(again, count);
+            } catch (Throwable t) {
+                Log.w("UA", "Waze alerts bridge", t);
+            }
+        }
+    }
 
     private static void broadcast(Intent i, int count) {
         Context c = context();
