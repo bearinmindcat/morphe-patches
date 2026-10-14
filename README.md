@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.5.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.5.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;52 patches total
+> **[v2.5.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.5.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;52 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;28 patches</summary>
 <br>
@@ -95,7 +95,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change app name](#change-app-name) | Sets the name shown under the launcher icon, in the app switcher and on Android Auto. | • App name |
 | [Full black](#full-black) | Waze's dark mode in true black for AMOLED screens: the app's dark backgrounds are black, and with Black night map the night map's background too. Roads, labels, buttons and text keep their colours. | • Black night map |
 | [Hide ads](#hide-ads) | Removes the sponsored pins on the map and on Android Auto, the full-screen ads shown while you are stopped, and the ad statistics Waze sends. |  |
-| [Map skin](#map-skin) | The old Waze mods' map skin, as changes to Waze's own: bigger map labels, a wider navigation arrow head and a warm day background. The night background is Full black's. Skipped by Morphe Manager 1.35 and other patcher 1.15+ builds, which would crash Waze when the map opens; patch with Morphe Desktop to get it. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
+| [Map skin](#map-skin) | The old Waze mods' map skin, as changes to Waze's own: bigger map labels, a wider navigation arrow head and a warm day background. It is applied as Waze starts, and can be switched off or changed later in Customization, at the bottom of Waze's side menu; changes show from Waze's next start. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
 | [Navigation distances](#navigation-distances) | How far ahead Android Auto gives its heads-up, and how long a jam must last before the traffic bar shows it. The defaults are the old Waze mods' (Chuppito). They can be changed later in Customization, at the bottom of Waze's side menu. | • Android Auto heads-up, normal roads (m)<br>• Android Auto heads-up, freeways (m)<br>• Traffic bar: time in traffic (s) |
 | [No AI reporting](#no-ai-reporting) | Turns off conversational reporting, Waze's Gemini voice assistant for reports, together with its activation dialog, tips and onboarding. |  |
 | [No Google Assistant](#no-google-assistant) | Keeps Google Assistant out of Waze: no Assistant button, onboarding or settings entry, whatever Waze's server enables for your region. |  |

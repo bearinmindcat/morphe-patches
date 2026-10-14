@@ -1,3 +1,9 @@
+## [2.5.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.2...v2.5.3) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+* map skin and black night map applied while waze runs (they work with morphe manager and can be changed in waze customization); issue [#50](https://github.com/bearinmindcat/morphe-patches/issues/50) ([73934c8](https://github.com/bearinmindcat/morphe-patches/commit/73934c80d5a76650836ec3c7ad29daff54e0a592))
+
 ## [2.5.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.1...v2.5.2) (2026-10-13)
 
 ### 🐛 Bug Fixes
