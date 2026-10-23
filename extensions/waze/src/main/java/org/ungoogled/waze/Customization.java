@@ -99,6 +99,8 @@ public final class Customization {
                 "The police, crashes, hazards and other alerts Waze is tracking, for Ungoogled Maps on this phone (Waze alerts in its Waze & external data source)"});
         LABELS.put("stayAwake", new String[]{"Stay awake in the background",
                 "Waze keeps running longer without a route, so its alerts keep reaching Maps"});
+        LABELS.put("noLocationGate", new String[]{"Open without device location",
+                "Waze opens with the phone's location off, and uses it once it is switched on"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */

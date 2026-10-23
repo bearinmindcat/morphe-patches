@@ -267,3 +267,50 @@ val wazeNavigationDistancesPatch = bytecodePatch(
         trafficBar?.let { keepWazeConfig("navigationDistances", "CONFIG_VALUE_TRAFFIC_BAR_MIN_TIME_IN_TRAFFIC_SECONDS", it) }
     }
 }
+
+/**
+ * LocationSensorListener.canUseLocation(Context): the location permission AND the phone's location switch. Waze
+ * asks it as it starts, when the map is up and after its location screen, and stops at "To use Waze, turn on
+ * device location" while it says no. A JNI class, so the names survive.
+ */
+private object CanUseLocationFingerprint : Fingerprint(
+    definingClass = "Lcom/waze/location/LocationSensorListener;",
+    name = "canUseLocation",
+    returnType = "Z",
+    parameters = listOf("Landroid/content/Context;"),
+)
+
+@Suppress("unused")
+val wazeNoLocationGatePatch = bytecodePatch(
+    name = "Open without device location",
+    description = "Waze opens with the phone's location switched off -- the map, search and planning work, " +
+        "and it picks up your position as soon as location is switched on -- instead of stopping at \"To use " +
+        "Waze, turn on device location\". Waze still needs the location permission. Can be switched off later " +
+        "in Customization, at the bottom of Waze's side menu.",
+    default = false,
+) {
+    compatibleWith(COMPATIBILITY_WAZE)
+    dependsOn(wazeCustomizationPatch)
+
+    execute {
+        declareWazeToggle("noLocationGate")
+        // While switched on, only the permission counts; Waze's own check otherwise.
+        CanUseLocationFingerprint.method.apply {
+            if (implementation!!.registerCount - 1 < 1) throw PatchException("canUseLocation has no free register")
+            addInstructionsWithLabels(
+                0,
+                """
+                    const-string v0, "noLocationGate"
+                    invoke-static { v0 }, $WAZE_CUSTOMIZATION->on(Ljava/lang/String;)Z
+                    move-result v0
+                    if-eqz v0, :waze_check
+                    invoke-static { p0 }, Lcom/waze/location/LocationSensorListener;->permissionsMissing(Landroid/content/Context;)Z
+                    move-result v0
+                    xor-int/lit8 v0, v0, 0x1
+                    return v0
+                """,
+                ExternalLabel("waze_check", implementation!!.instructions.first()),
+            )
+        }
+    }
+}
