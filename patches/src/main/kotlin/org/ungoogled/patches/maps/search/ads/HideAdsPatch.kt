@@ -5,8 +5,13 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLa
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.string
 import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction21t
+import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
@@ -20,8 +25,17 @@ private object PromotedPinAdsRequestFingerprint : Fingerprint(
     parameters = listOf("Lcdsx;", "Lcjlj;", "Z"),
 )
 
+/**
+ * Navigation's promoted-pin label controller: draws the promoted pins Maps gets with the route while
+ * navigating. The class is the only one with this trace label.
+ */
+private object NavigationAdsLabelControllerFingerprint : Fingerprint(
+    filters = listOf(string("NavigationAdsLabelController.onNavigationUiStateChanged")),
+)
+
 internal val hideAdsPatch = bytecodePatch(
-    description = "Hides promoted map pins and \"Sponsored\" search result rows.",
+    description = "Hides promoted map pins -- on the map and along a route, in directions and navigation -- " +
+        "and \"Sponsored\" search result rows.",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // Every edit below reads Shapes.HIDE_ADS, so the Customization screen's
@@ -49,6 +63,45 @@ internal val hideAdsPatch = bytecodePatch(
         // (www.google.com/adview) are fired by the native engine when a pin is
         // drawn, so not requesting the pins also stops those.
         PromotedPinAdsRequestFingerprint.method.leaveEarlyWhenHidingAds("return-void")
+
+        // Promoted pins along a route (issue #64). Every directions request asks for them (its
+        // promotedPinAdsRequestOptions), and the answer's promoted-pin list goes, apart from the map's own
+        // request above, to two label drawers: the directions screen's and navigation's. Each takes that
+        // list alone and hands it to the same label factory (which builds the promoted labels from it);
+        // they return at once when hiding ads, as each already does for an empty list. The factory is
+        // read off navigation's drawer, the one with a trace label; the directions one is the other
+        // method of the same shape that calls it.
+        run {
+            val navigation = mutableClassDefBy(NavigationAdsLabelControllerFingerprint.method.definingClass)
+            fun factoryCall(m: Method) = m.implementation?.instructions
+                ?.filter { it.opcode == Opcode.INVOKE_STATIC }
+                ?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+                ?.firstOrNull { r ->
+                    m.parameterTypes.size == 1 && r.parameterTypes.size == 5 &&
+                        r.parameterTypes[0].toString() == m.parameterTypes[0].toString() &&
+                        r.parameterTypes[1].toString() == "I" && r.parameterTypes[2].toString() == "Z"
+                }
+            val navDrawer = navigation.methods.singleOrNull { it.returnType == "V" && factoryCall(it) != null }
+                ?: throw PatchException("navigation's promoted-pin drawer not found")
+            val factory = factoryCall(navDrawer)!!
+            val listType = navDrawer.parameterTypes[0].toString()
+            val drawers = mutableListOf<Pair<String, String>>()
+            classDefForEach { c ->
+                for (m in c.methods) {
+                    if (m.returnType != "V" || m.parameterTypes.map { it.toString() } != listOf(listType)) continue
+                    val call = factoryCall(m) ?: continue
+                    if (call.definingClass == factory.definingClass && call.name == factory.name) drawers += c.type to m.name
+                }
+            }
+            if (drawers.size != 2) throw PatchException("expected the directions and navigation promoted-pin drawers, found $drawers")
+            for ((owner, name) in drawers) {
+                val drawer = mutableClassDefBy(owner).methods.single {
+                    it.name == name && it.returnType == "V" && it.parameterTypes.map { t -> t.toString() } == listOf(listType)
+                }
+                if (drawer.implementation!!.registerCount - 2 < 1) throw PatchException("$owner.$name has no free register")
+                drawer.leaveEarlyWhenHidingAds("return-void")
+            }
+        }
 
         // Sponsored-pin placemark objects: the factory returns null instead of
         // building one. Both existing callers already skip a null result.
