@@ -1,3 +1,9 @@
+## [2.5.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.5...v2.5.6) (2026-10-23)
+
+### 🐛 Bug Fixes
+
+* sponsored pins along a route in directions and navigation are hidden too; issue [#64](https://github.com/bearinmindcat/morphe-patches/issues/64) ([83ddd7e](https://github.com/bearinmindcat/morphe-patches/commit/83ddd7e92a18add110cd3830bf59698fcbcbcfe1))
+
 ## [2.5.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.4...v2.5.5) (2026-10-14)
 
 ### 🐛 Bug Fixes
