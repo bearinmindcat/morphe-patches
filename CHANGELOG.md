@@ -1,3 +1,9 @@
+## [2.5.7](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.6...v2.5.7) (2026-10-24)
+
+### 🐛 Bug Fixes
+
+* waze opens without device location (open without device location, off by default); issue [#56](https://github.com/bearinmindcat/morphe-patches/issues/56) ([e589863](https://github.com/bearinmindcat/morphe-patches/commit/e5898630aeab1278706528dafb1aaaad473ce5a5))
+
 ## [2.5.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.5...v2.5.6) (2026-10-23)
 
 ### 🐛 Bug Fixes
