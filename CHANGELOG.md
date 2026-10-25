@@ -1,3 +1,9 @@
+## [2.6.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.7...v2.6.0) (2026-10-25)
+
+### ✨ New Features
+
+* bigger alert pins, alert distances on by default and shorter waze texts; issue [#59](https://github.com/bearinmindcat/morphe-patches/issues/59) ([cd6c399](https://github.com/bearinmindcat/morphe-patches/commit/cd6c399f64ede634d26b39f5f5400c87506ab29c))
+
 ## [2.5.7](https://github.com/bearinmindcat/morphe-patches/compare/v2.5.6...v2.5.7) (2026-10-24)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.5.7](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.5.7)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;53 patches total
+> **[v2.6.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.6.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;54 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;28 patches</summary>
 <br>
@@ -82,30 +82,31 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;17 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;18 patches</summary>
 <br>
 
 **Supported version(s):** 5.24.5.0
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Alert distances](#alert-distances) | How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them. They can be changed later in Customization, at the bottom of Waze's side menu. | • Police<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Speed cameras on streets<br>• Speed cameras on highways<br>• Speed cameras on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
-| [All moods](#all-moods) | Every mood can be chosen: the ones Waze keeps for higher ranks and the beta moods it hides. |  |
-| [Bigger speedometer](#bigger-speedometer) | Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be read at a glance. The sizes can be changed later in Customization, at the bottom of Waze's side menu, where a switch also gives Waze's own sizes back. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |
-| [Change app name](#change-app-name) | Sets the name shown under the launcher icon, in the app switcher and on Android Auto. | • App name |
-| [Full black](#full-black) | Waze's dark mode in true black for AMOLED screens: the app's dark backgrounds are black, and with Black night map the night map's background too. Roads, labels, buttons and text keep their colours. | • Black night map |
-| [Hide ads](#hide-ads) | Removes the sponsored pins on the map and on Android Auto, the full-screen ads shown while you are stopped, and the ad statistics Waze sends. |  |
-| [Map skin](#map-skin) | The old Waze mods' map skin, as changes to Waze's own: bigger map labels, a wider navigation arrow head and a warm day background. It is applied as Waze starts, and can be switched off or changed later in Customization, at the bottom of Waze's side menu; changes show from Waze's next start. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
-| [Navigation distances](#navigation-distances) | How far ahead Android Auto gives its heads-up, and how long a jam must last before the traffic bar shows it. The defaults are the old Waze mods' (Chuppito). They can be changed later in Customization, at the bottom of Waze's side menu. | • Android Auto heads-up, normal roads (m)<br>• Android Auto heads-up, freeways (m)<br>• Traffic bar: time in traffic (s) |
-| [No AI reporting](#no-ai-reporting) | Turns off conversational reporting, Waze's Gemini voice assistant for reports, together with its activation dialog, tips and onboarding. |  |
-| [No Google Assistant](#no-google-assistant) | Keeps Google Assistant out of Waze: no Assistant button, onboarding or settings entry, whatever Waze's server enables for your region. |  |
-| [Open without device location](#open-without-device-location) | Waze opens with the phone's location switched off -- the map, search and planning work, and it picks up your position as soon as location is switched on -- instead of stopping at "To use Waze, turn on device location". Waze still needs the location permission. Can be switched off later in Customization, at the bottom of Waze's side menu. |  |
-| [Report speed limit](#report-speed-limit) | Turns on Waze's own switch for correcting the speed limit from the speedometer, the old mods' "Report speed limit". Waze's server keeps it off; what it shows is not verified here. |  |
-| [Share alerts with Maps](#share-alerts-with-maps) | Hands the alerts Waze is tracking -- police, crashes, hazards, traffic jams, closures and speed cameras -- to Ungoogled Maps on the same phone, where Waze alerts in Waze & external data source puts them on the map. Nothing leaves the phone. Waze has to be signed in and open; in the background is enough. |  |
-| [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the speed camera sound for every camera, not only when you are over the speed limit. |  |
-| [Speed cameras everywhere](#speed-cameras-everywhere) | Turns speed camera and police alerts back on in the countries where Waze's server switches them off. Warning of speed cameras is against the law in some of those countries. |  |
-| [Speed limit sign](#speed-limit-sign) | The style of the speed limit sign beside the speedometer, whatever the country. It can be changed later in Customization, at the bottom of Waze's side menu. | • Sign style |
-| [Stay awake in the background](#stay-awake-in-the-background) | Lets Waze keep running in the background without a route for the chosen time -- Waze's server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. Costs battery; Waze still closes itself when you close it. The time can be changed later in Customization, at the bottom of Waze's side menu. | • Minutes in the background |
+| [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Speed cameras on streets<br>• Speed cameras on highways<br>• Speed cameras on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
+| [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
+| [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
+| [Bigger speedometer](#bigger-speedometer) | Bigger speedometer and speed limit digits. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |
+| [Change app name](#change-app-name) | Renames Waze. | • App name |
+| [Full black](#full-black) | True black dark mode for AMOLED screens. | • Black night map |
+| [Hide ads](#hide-ads) | Removes sponsored pins, stop ads and ad tracking. |  |
+| [Map skin](#map-skin) | Bigger map labels, a wider arrow and a warm day background. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
+| [Navigation distances](#navigation-distances) | Android Auto heads-up distances and the traffic bar threshold. | • Android Auto heads-up, normal roads (m)<br>• Android Auto heads-up, freeways (m)<br>• Traffic bar: time in traffic (s) |
+| [No AI reporting](#no-ai-reporting) | Turns off Gemini voice reporting. |  |
+| [No Google Assistant](#no-google-assistant) | Removes Google Assistant from Waze. |  |
+| [Open without device location](#open-without-device-location) | Opens Waze with location off and uses it once it is on. Still needs the location permission. |  |
+| [Report speed limit](#report-speed-limit) | Lets you correct speed limits from the speedometer (unverified). |  |
+| [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone. Waze must be signed in and open. |  |
+| [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the camera sound even when you are not speeding. |  |
+| [Speed cameras everywhere](#speed-cameras-everywhere) | Camera and police alerts in every country. Camera warnings are illegal in some. |  |
+| [Speed limit sign](#speed-limit-sign) | One speed limit sign style in every country. | • Sign style |
+| [Stay awake in the background](#stay-awake-in-the-background) | Keeps Waze running without a route so its alerts keep reaching Maps. Uses more battery. | • Minutes in the background |
 
 </details>
 
