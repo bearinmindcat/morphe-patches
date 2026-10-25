@@ -25,9 +25,7 @@ private object UpdateAlertersRepositoryFingerprint : Fingerprint(
 @Suppress("unused")
 val wazeShareAlertsPatch = bytecodePatch(
     name = "Share alerts with Maps",
-    description = "Hands the alerts Waze is tracking -- police, crashes, hazards, traffic jams, closures and " +
-        "speed cameras -- to Ungoogled Maps on the same phone, where Waze alerts in Waze & external data source puts them on " +
-        "the map. Nothing leaves the phone. Waze has to be signed in and open; in the background is enough.",
+    description = "Shows Waze alerts in Ungoogled Maps on this phone. Waze must be signed in and open.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     // The extension, the Application hook and a switch on Waze's Customization screen.
@@ -50,10 +48,7 @@ val wazeShareAlertsPatch = bytecodePatch(
 @Suppress("unused")
 val wazeStayAwakePatch = bytecodePatch(
     name = "Stay awake in the background",
-    description = "Lets Waze keep running in the background without a route for the chosen time -- Waze's " +
-        "server allows 10 minutes -- so that its alerts keep reaching Maps while you navigate there. " +
-        "Costs battery; Waze still closes itself when you close it. The time can be changed later in " +
-        "Customization, at the bottom of Waze's side menu.",
+    description = "Keeps Waze running without a route so its alerts keep reaching Maps. Uses more battery.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -63,7 +58,7 @@ val wazeStayAwakePatch = bytecodePatch(
         key = "minutes",
         default = 180,
         title = "Minutes in the background",
-        description = "How long Waze may run in the background without a route. Waze: 10.",
+        description = "Waze: 10.",
         required = true,
     )
 

@@ -31,8 +31,7 @@ private fun darkNeutral(argb: Long): Boolean {
 @Suppress("unused")
 val wazeFullBlackPatch: ResourcePatch = resourcePatch(
     name = "Full black",
-    description = "Waze's dark mode in true black for AMOLED screens: the app's dark backgrounds are black, and " +
-        "with Black night map the night map's background too. Roads, labels, buttons and text keep their colours.",
+    description = "True black dark mode for AMOLED screens.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeBlackNightMapPatch)
@@ -42,8 +41,7 @@ val wazeFullBlackPatch: ResourcePatch = resourcePatch(
         key = "blackMap",
         default = true,
         title = "Black night map",
-        description = "The night map's background black as well, from Waze's next start. It can be switched " +
-            "later in Customization, at the bottom of Waze's side menu.",
+        description = "The night map in black too.",
     )
 
     execute {

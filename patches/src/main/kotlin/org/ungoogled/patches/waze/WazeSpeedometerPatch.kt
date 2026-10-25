@@ -59,9 +59,7 @@ private val speedometerLayoutPatch: ResourcePatch = resourcePatch {
 @Suppress("unused")
 val wazeBiggerSpeedometerPatch: BytecodePatch = bytecodePatch(
     name = "Bigger speedometer",
-    description = "Bigger digits on the speedometer, and on the speed limit sign beside it, so they can be " +
-        "read at a glance. The sizes can be changed later in Customization, at the bottom of Waze's side menu, " +
-        "where a switch also gives Waze's own sizes back.",
+    description = "Bigger speedometer and speed limit digits.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     // The sizes are listed, and can be changed, on the Customization screen.
@@ -78,7 +76,7 @@ val wazeBiggerSpeedometerPatch: BytecodePatch = bytecodePatch(
         key = "units",
         default = 14,
         title = "Unit label (dp)",
-        description = "The \"mph\" or \"km/h\" under the speed. Waze: 12.",
+        description = "The mph or km/h label. Waze: 12.",
         required = true,
     )
     val limit by intOption(

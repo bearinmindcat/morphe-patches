@@ -70,37 +70,39 @@ public final class Customization {
 
     static {
         LABELS.put("hideAds", new String[]{"Hide ads",
-                "Sponsored pins on the map and on Android Auto, ads while you are stopped, and ad statistics"});
+                "No sponsored pins, stop ads or ad tracking"});
         LABELS.put("noAssistant", new String[]{"No Google Assistant",
-                "No Assistant button, onboarding or settings entry"});
+                "Removes the Assistant button and prompts"});
         LABELS.put("noAiReporting", new String[]{"No AI reporting",
-                "Conversational reporting (Gemini) off, with its dialogs, tips and onboarding"});
+                "Turns off Gemini voice reports"});
         LABELS.put("allMoods", new String[]{"All moods",
-                "Every mood can be chosen, including the beta ones"});
+                "Unlocks every mood, beta ones too"});
         LABELS.put("reportSpeedLimit", new String[]{"Report speed limit",
-                "Waze's switch for correcting the speed limit from the speedometer"});
+                "Fix speed limits from the speedometer"});
         LABELS.put("camerasEverywhere", new String[]{"Speed cameras everywhere",
-                "Speed camera and police alerts where Waze's server turns them off"});
+                "Camera and police alerts in every country"});
         LABELS.put("cameraSoundAnySpeed", new String[]{"Speed camera sound at any speed",
-                "The camera sound for every camera, not only when you are speeding"});
+                "Camera sound even when not speeding"});
         LABELS.put("alertDistances", new String[]{"Alert distances",
-                "How far ahead police, hazards, crashes, jams and cameras are announced (the patch's values)"});
+                "How early each alert is announced"});
         LABELS.put("navigationDistances", new String[]{"Navigation distances",
-                "Android Auto heads-up distances and the traffic bar threshold (the patch's values)"});
+                "Android Auto heads-up and traffic bar"});
         LABELS.put("biggerSpeedometer", new String[]{"Bigger speedometer",
-                "Bigger digits on the speedometer and its speed limit sign; off is Waze's own sizes"});
+                "Larger speed and limit digits"});
         LABELS.put("mapSkin", new String[]{"Map skin",
-                "Bigger map labels, a wider navigation arrow head and a warm day background; from Waze's next start"});
+                "Bigger labels, wider arrow, warm day map"});
         LABELS.put("blackNightMap", new String[]{"Black night map",
-                "The night map's background black (Full black); from Waze's next start"});
+                "Pure black night map"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
-                "The speed limit sign style the patch was set to, whatever the country"});
+                "One sign style in every country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
-                "The police, crashes, hazards and other alerts Waze is tracking, for Ungoogled Maps on this phone (Waze alerts in its Waze & external data source)"});
+                "Shows Waze alerts in Ungoogled Maps"});
         LABELS.put("stayAwake", new String[]{"Stay awake in the background",
-                "Waze keeps running longer without a route, so its alerts keep reaching Maps"});
+                "Keeps Waze running for Maps"});
+        LABELS.put("biggerPins", new String[]{"Bigger alert pins",
+                "Larger alert pins on the map"});
         LABELS.put("noLocationGate", new String[]{"Open without device location",
-                "Waze opens with the phone's location off, and uses it once it is switched on"});
+                "Opens with location off"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */
@@ -148,6 +150,7 @@ public final class Customization {
     /** Map skin's values: label sizes, the arrow head in tenths, the day background as six hex digits. */
     private static final String FONT_HUGE = "SKIN_FONT_HUGE", FONT_BIG = "SKIN_FONT_BIG", FONT_MEDIUM = "SKIN_FONT_MEDIUM",
             FONT_SMALL = "SKIN_FONT_SMALL", ARROW_HEAD = "SKIN_ARROW_HEAD", DAY_BACKGROUND = "SKIN_DAY_BACKGROUND";
+    private static final String PIN_SIZE = "PIN_SIZE";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -176,6 +179,7 @@ public final class Customization {
         VALUE_LABELS.put(FONT_SMALL, new Label("Map labels: small", "", 1, 60, 8));
         VALUE_LABELS.put(ARROW_HEAD, Label.tenths("Navigation arrow head width", "x the tail", 300, 30));
         VALUE_LABELS.put(DAY_BACKGROUND, Label.hex("Day map background", "FAFCFA"));
+        VALUE_LABELS.put(PIN_SIZE, new Label("Alert pin size", "%", 1, 300, 100));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -218,6 +222,7 @@ public final class Customization {
         app = a;
         // Before Waze's map engine reads its skin copy, which it does after this.
         applySkin();
+        applyPins();
         try {
             a.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
                 @Override public void onActivityResumed(Activity x) { resumed = new WeakReference<>(x); }
@@ -312,6 +317,7 @@ public final class Customization {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putBoolean(feature, on).commit();
         if (feature.equals("mapSkin") || feature.equals("blackNightMap")) applySkin();
+        if (feature.equals("biggerPins")) applyPins();
         reapply(feature + (on ? " on" : " off"));
     }
 
@@ -343,6 +349,7 @@ public final class Customization {
         else e.putString(valueKey(name), String.valueOf(value));
         e.commit();
         if (name.startsWith("SKIN_")) applySkin();
+        if (name.equals(PIN_SIZE)) applyPins();
         reapply(name + " = " + (value == null ? "the patch's" : value));
     }
 
@@ -505,6 +512,112 @@ public final class Customization {
         } catch (Throwable t) {
             Log.w("UA", "Waze customization: map skin", t);
         }
+    }
+
+    // ---- Bigger alert pins ----------------------------------------------------------------------
+
+    /**
+     * Waze draws its realtime alert pins with Godot's 2D renderer, from three scenes in
+     * res/godot/waze_map_scenes.pck (GodotPins.SCENES), which it copies once to <data>/waze/godot/ and loads from
+     * there. Waze sets only each scene root's scale as the map zooms; the pin's own size is the scale its
+     * AnimationPlayer gives the root's children, and those keys are multiplied in place in the copy, from the
+     * APK's original values -- 1 writes them back as they were. The same bytes stay the same length, so nothing
+     * else in the pack moves. All alert kinds share the scenes, so all of them grow.
+     */
+    private static final String PCK_ASSET = "res/godot/waze_map_scenes.pck";
+    private static boolean waitingForPins;
+
+    /** Rewrites the alert pin sizes in Waze's copy of its Godot pack for Bigger alert pins as it is set now. */
+    static synchronized void applyPins() {
+        try {
+            Context c = context();
+            if (c == null || !features().contains("biggerPins")) return;
+            File copy = new File(c.getApplicationInfo().dataDir, "waze/godot/waze_map_scenes.pck");
+            if (!copy.isFile()) {
+                waitForPins(copy);
+                return;
+            }
+            boolean big = on("biggerPins");
+            Object v = current(PIN_SIZE, patched(PIN_SIZE, 150));
+            float factor = big ? Math.max(50, Math.min(300, v instanceof Integer ? (Integer) v : 150)) / 100f : 1f;
+            java.util.Map<String, GodotPins.Entry> original, inCopy;
+            try (InputStream in = new java.io.BufferedInputStream(new FileInputStream(copy))) {
+                inCopy = GodotPins.find(in, GodotPins.SCENES);
+            }
+            // The originals, read from the APK in one pass, in the order they sit in the pack.
+            java.util.Map<String, byte[]> scenes = new java.util.HashMap<>();
+            try (InputStream in = new java.io.BufferedInputStream(c.getAssets().open(PCK_ASSET))) {
+                original = GodotPins.find(in, GodotPins.SCENES);
+            }
+            if (original.size() != GodotPins.SCENES.length || !original.equals(inCopy)) {
+                Log.w("UA", "Waze customization: bigger alert pins: Waze's copy of its pack is not the APK's "
+                        + "or has no alert scenes (" + original.size() + "), left alone");
+                return;
+            }
+            List<String> order = new ArrayList<>(original.keySet());
+            java.util.Collections.sort(order, (a, b) -> Long.compare(original.get(a).offset, original.get(b).offset));
+            try (InputStream in = new java.io.BufferedInputStream(c.getAssets().open(PCK_ASSET))) {
+                long at = 0;
+                for (String s : order) {
+                    GodotPins.Entry e = original.get(s);
+                    GodotPins.skipFully(in, e.offset - at);
+                    scenes.put(s, GodotPins.read(in, e.size));
+                    at = e.offset + e.size;
+                }
+            }
+            int keys = 0, written = 0;
+            try (java.io.RandomAccessFile f = new java.io.RandomAccessFile(copy, "rw")) {
+                byte[] magic = new byte[4], have = new byte[8];
+                for (String s : order) {
+                    GodotPins.Entry e = original.get(s);
+                    f.seek(e.offset);
+                    f.readFully(magic);
+                    if (magic[0] != 'R' || magic[1] != 'S' || magic[2] != 'R' || magic[3] != 'C') {
+                        Log.w("UA", "Waze customization: bigger alert pins: the copy's " + s + " is not where it should be");
+                        continue;
+                    }
+                    for (GodotPins.Key k : GodotPins.keys(scenes.get(s))) {
+                        keys++;
+                        byte[] want = GodotPins.scaled(k, factor);
+                        f.seek(e.offset + k.at);
+                        f.readFully(have);
+                        if (java.util.Arrays.equals(have, want)) continue;
+                        f.seek(e.offset + k.at);
+                        f.write(want);
+                        written++;
+                    }
+                }
+            }
+            Log.i("UA", "Waze customization: bigger alert pins " + (big ? Math.round(factor * 100) + "%" : "off") + ", "
+                    + keys + " pin sizes, " + written + " written");
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: bigger alert pins", t);
+        }
+    }
+
+    /** First start: once Waze has copied its pack, rewrite it, for the start after this one. */
+    private static void waitForPins(File copy) {
+        if (waitingForPins) return;
+        waitingForPins = true;
+        Thread t = new Thread(() -> {
+            for (int i = 0; i < 90; i++) {
+                if (copy.isFile()) {
+                    try {
+                        Thread.sleep(5000);   // let the copy finish
+                    } catch (InterruptedException ignored) {
+                    }
+                    applyPins();
+                    return;
+                }
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        }, "ua-pins");
+        t.setDaemon(true);
+        t.start();
     }
 
     /** First start: once Waze has copied its skin, rewrite it, for the start after this one. */
@@ -761,10 +874,7 @@ public final class Customization {
             for (Value v : valuesOf(key)) body.addView(valueRow(a, v, night, text, sub));
         }
         TextView note = new TextView(a);
-        note.setText("Switches and values take effect right away. A screen that still shows the old behaviour "
-                + "picks it up after Shut off and reopening Waze. Tap a value to change it; Reset puts the "
-                + "patch's value back. The speedometer changes as it next shows a speed; Map skin and Black "
-                + "night map from Waze's next start (Shut off, then open Waze).");
+        note.setText("Tap a value to change it. Some changes show after Shut off and reopening Waze.");
         note.setTextColor(sub);
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         note.setPadding(dp(a, 20), dp(a, 16), dp(a, 20), dp(a, 24));
@@ -822,7 +932,7 @@ public final class Customization {
         Runnable refresh = () -> {
             Object value = current(v.name, v.patched);
             boolean changed = !value.equals(v.patched);
-            now.setText(shown(label, value) + (changed ? "  (patched: " + shown(label, v.patched) + ")" : ""));
+            now.setText(shown(label, value) + (changed ? "  ·  patch " + shown(label, v.patched) : ""));
         };
         refresh.run();
         r.setOnClickListener(x -> edit(a, v, label, night, refresh));
@@ -833,7 +943,7 @@ public final class Customization {
     private static void edit(Activity a, Value v, Label label, boolean night, Runnable refresh) {
         int theme = night ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert;
         Object stock = label.stock != null ? label.stock : wazeDefault(v.name);
-        String info = "Patched: " + shown(label, v.patched) + (stock != null ? "\nWaze: " + shown(label, stock) : "");
+        String info = "Patch " + shown(label, v.patched) + (stock != null ? "  ·  Waze " + shown(label, stock) : "");
         Object value = current(v.name, v.patched);
         AlertDialog.Builder b = new AlertDialog.Builder(a, theme).setTitle(label.title);
         if (label.choices != null) {
@@ -862,10 +972,10 @@ public final class Customization {
             box.setPadding(dp(a, 24), dp(a, 8), dp(a, 24), 0);
             TextView unit = new TextView(a);
             unit.setTextColor(night ? 0xFF9AA0A6 : 0xFF5F6368);
-            String range = label.hex ? "Six hex digits, like EBE7DD."
-                    : label.tenths ? String.format(Locale.ROOT, "0 to %.1f.", label.max / 10.0)
-                    : (label.unit.isEmpty() ? "" : "In " + label.unit + ", ") + "0 to " + label.max + ".";
-            unit.setText(info + "\n" + range + (v.name.startsWith("SKIN_") ? "\nFrom Waze's next start." : ""));
+            String range = label.hex ? "Six hex digits, like EBE7DD"
+                    : label.tenths ? String.format(Locale.ROOT, "0–%.1f", label.max / 10.0)
+                    : "0–" + label.max + (label.unit.isEmpty() ? "" : " " + label.unit);
+            unit.setText(info + "  ·  " + range);
             box.addView(input);
             box.addView(unit);
             b.setView(box);

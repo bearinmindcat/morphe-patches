@@ -22,8 +22,7 @@ private const val ADVIL_REQUEST = "Lcom/waze/jni/protos/AdvilRequest;"
 @Suppress("unused")
 val wazeHideAdsPatch = bytecodePatch(
     name = "Hide ads",
-    description = "Removes the sponsored pins on the map and on Android Auto, the full-screen ads shown " +
-        "while you are stopped, and the ad statistics Waze sends.",
+    description = "Removes sponsored pins, stop ads and ad tracking.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeConfigOverridesPatch)
@@ -69,8 +68,7 @@ val wazeHideAdsPatch = bytecodePatch(
 @Suppress("unused")
 val wazeNoGoogleAssistantPatch = bytecodePatch(
     name = "No Google Assistant",
-    description = "Keeps Google Assistant out of Waze: no Assistant button, onboarding or settings entry, whatever " +
-        "Waze's server enables for your region.",
+    description = "Removes Google Assistant from Waze.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -84,8 +82,7 @@ val wazeNoGoogleAssistantPatch = bytecodePatch(
 @Suppress("unused")
 val wazeNoAiReportingPatch = bytecodePatch(
     name = "No AI reporting",
-    description = "Turns off conversational reporting, Waze's Gemini voice assistant for reports, together with " +
-        "its activation dialog, tips and onboarding.",
+    description = "Turns off Gemini voice reporting.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -119,7 +116,7 @@ private object CanSetMoodFingerprint : Fingerprint(
 @Suppress("unused")
 val wazeAllMoodsPatch = bytecodePatch(
     name = "All moods",
-    description = "Every mood can be chosen: the ones Waze keeps for higher ranks and the beta moods it hides.",
+    description = "Unlocks every mood, beta ones too.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -147,8 +144,7 @@ val wazeAllMoodsPatch = bytecodePatch(
 @Suppress("unused")
 val wazeReportSpeedLimitPatch = bytecodePatch(
     name = "Report speed limit",
-    description = "Turns on Waze's own switch for correcting the speed limit from the speedometer, the old mods' " +
-        "\"Report speed limit\". Waze's server keeps it off; what it shows is not verified here.",
+    description = "Lets you correct speed limits from the speedometer (unverified).",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -162,8 +158,7 @@ val wazeReportSpeedLimitPatch = bytecodePatch(
 @Suppress("unused")
 val wazeSpeedCamerasEverywherePatch = bytecodePatch(
     name = "Speed cameras everywhere",
-    description = "Turns speed camera and police alerts back on in the countries where Waze's server " +
-        "switches them off. Warning of speed cameras is against the law in some of those countries.",
+    description = "Camera and police alerts in every country. Camera warnings are illegal in some.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -178,7 +173,7 @@ val wazeSpeedCamerasEverywherePatch = bytecodePatch(
 @Suppress("unused")
 val wazeCameraSoundAnySpeedPatch = bytecodePatch(
     name = "Speed camera sound at any speed",
-    description = "Plays the speed camera sound for every camera, not only when you are over the speed limit.",
+    description = "Plays the camera sound even when you are not speeding.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeConfigOverridesPatch)
@@ -191,10 +186,8 @@ val wazeCameraSoundAnySpeedPatch = bytecodePatch(
 @Suppress("unused")
 val wazeAlertDistancesPatch = bytecodePatch(
     name = "Alert distances",
-    description = "How far ahead, in metres, Waze warns of police, hazards, crashes, traffic jams and speed " +
-        "cameras. The defaults are the old Waze mods' (CGE); Waze's own are lower for most of them." +
-        " They can be changed later in Customization, at the bottom of Waze's side menu.",
-    default = false,
+    description = "How early each alert is announced.",
+    default = true,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeConfigOverridesPatch)
@@ -225,8 +218,7 @@ val wazeAlertDistancesPatch = bytecodePatch(
 @Suppress("unused")
 val wazeSpeedLimitSignPatch = bytecodePatch(
     name = "Speed limit sign",
-    description = "The style of the speed limit sign beside the speedometer, whatever the country. It can be " +
-        "changed later in Customization, at the bottom of Waze's side menu.",
+    description = "One speed limit sign style in every country.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -237,7 +229,7 @@ val wazeSpeedLimitSignPatch = bytecodePatch(
         default = "us",
         values = mapOf("US (white rectangle)" to "us", "World (red circle)" to "world"),
         title = "Sign style",
-        description = "Waze picks one by country.",
+        description = "Waze picks by country.",
         required = true,
     )
 
@@ -249,9 +241,7 @@ val wazeSpeedLimitSignPatch = bytecodePatch(
 @Suppress("unused")
 val wazeNavigationDistancesPatch = bytecodePatch(
     name = "Navigation distances",
-    description = "How far ahead Android Auto gives its heads-up, and how long a jam must last before the " +
-        "traffic bar shows it. The defaults are the old Waze mods' (Chuppito)." +
-        " They can be changed later in Customization, at the bottom of Waze's side menu.",
+    description = "Android Auto heads-up distances and the traffic bar threshold.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -283,10 +273,7 @@ private object CanUseLocationFingerprint : Fingerprint(
 @Suppress("unused")
 val wazeNoLocationGatePatch = bytecodePatch(
     name = "Open without device location",
-    description = "Waze opens with the phone's location switched off -- the map, search and planning work, " +
-        "and it picks up your position as soon as location is switched on -- instead of stopping at \"To use " +
-        "Waze, turn on device location\". Waze still needs the location permission. Can be switched off later " +
-        "in Customization, at the bottom of Waze's side menu.",
+    description = "Opens Waze with location off and uses it once it is on. Still needs the location permission.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)

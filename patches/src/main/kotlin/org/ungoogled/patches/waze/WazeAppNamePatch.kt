@@ -18,7 +18,7 @@ private const val DEWAZE_NAME = "De-Waze"
 @Suppress("unused")
 val wazeChangeAppNamePatch = resourcePatch(
     name = "Change app name",
-    description = "Sets the name shown under the launcher icon, in the app switcher and on Android Auto.",
+    description = "Renames Waze.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
@@ -27,7 +27,7 @@ val wazeChangeAppNamePatch = resourcePatch(
         key = "appName",
         default = DEWAZE_NAME,
         title = "App name",
-        description = "The name shown under the launcher icon, in the app switcher and on Android Auto.",
+        description = "Shown on the home screen and Android Auto.",
         required = true,
     )
 
