@@ -26,6 +26,8 @@ private val rectangleShapesResourcePatch = resourcePatch(
     description = "Adds sharp-cornered variants of the app's corner-bearing resources.",
 ) {
     execute {
+        // Patcher 2.0 decodes resources on request: decode what the walk below reads.
+        decode("res/values*/dimens.xml", "res/values*/styles.xml", "res/drawable*/*.xml", *FAB_MASKS.map { "res/drawable*/$it" }.toTypedArray())
         val res = this["res"]
         val dirs = res.listFiles()!!.filter { it.isDirectory && !ShapeResources.isGenerated(it) }
         var dimens = 0; var styles = 0; var drawables = 0; var masks = 0

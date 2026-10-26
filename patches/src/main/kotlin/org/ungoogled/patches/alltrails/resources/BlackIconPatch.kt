@@ -29,6 +29,8 @@ val blackIconPatch = resourcePatch(
     compatibleWith(COMPATIBILITY_ALLTRAILS)
 
     execute {
+        // Patcher 2.0 decodes resources on request: decode what is read below.
+        decode("res/drawable/ic_launcher_foreground.xml", "res/mipmap*")
         val res = this["res"]
 
         // The logo, white. The decoded vector keeps each attribute on its own line; only the

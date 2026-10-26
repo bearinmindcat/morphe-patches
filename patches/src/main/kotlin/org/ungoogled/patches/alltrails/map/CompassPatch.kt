@@ -54,6 +54,7 @@ private val northIconPatch = resourcePatch(
     description = "Adds the north-up compass icon.",
 ) {
     execute {
+        decode("res/drawable*/compass_arrow.xml")
         val needles = this["res"].listFiles()!!.filter { it.isDirectory && it.name.startsWith("drawable") }
             .map { File(it, "compass_arrow.xml") }.filter { it.isFile }
         if (needles.none { it.parentFile.name == "drawable" }) throw PatchException("drawable/compass_arrow.xml not found")

@@ -39,6 +39,8 @@ private val blackThemeResourcePatch = resourcePatch(
     description = "Adds black variants of the app's dark colour resources.",
 ) {
     execute {
+        // Patcher 2.0 decodes resources on request: decode what the walk below reads.
+        decode("res/values/colors.xml", "res/values-night*/colors.xml", "res/drawable*")
         val res = this["res"]
         var colours = 0; var drawables = 0; var combined = 0
         val sources = res.listFiles()!!.filter { it.isDirectory && !ShapeResources.isGenerated(it) }

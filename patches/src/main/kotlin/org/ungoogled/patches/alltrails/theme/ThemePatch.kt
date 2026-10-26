@@ -35,7 +35,7 @@ private val themeResourcePatch = resourcePatch(
     description = "Adds the AMOLED black theme overlay.",
 ) {
     execute {
-        val colours = File(this["res"], "values/colors.xml").readText()
+        val colours = get("res/values/colors.xml").readText()
         val missing = AMOLED_ATTRIBUTES.map { it.second }.filterNot { colours.contains("<color name=\"$it\">") }
         if (missing.isNotEmpty()) throw PatchException("Denali neutrals missing: $missing")
 

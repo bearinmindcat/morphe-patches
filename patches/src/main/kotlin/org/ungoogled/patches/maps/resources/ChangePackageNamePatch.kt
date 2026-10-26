@@ -131,6 +131,7 @@ val changePackageNamePatch = resourcePatch(
         }
 
         // Static launcher shortcuts (and anything else in res/xml naming this app's components).
+        decode("res/xml", "res/xml-*")
         val res = this["res"]
         for (dir in res.listFiles()!!.filter { it.isDirectory && (it.name == "xml" || it.name.startsWith("xml-")) }) {
             for (file in dir.listFiles()!!.filter { it.name.endsWith(".xml") }) {

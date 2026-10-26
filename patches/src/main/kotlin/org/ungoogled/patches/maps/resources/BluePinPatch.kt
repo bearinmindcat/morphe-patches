@@ -125,6 +125,8 @@ val bluePinPatch = resourcePatch(
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
+        // Patcher 2.0 decodes resources on request: decode what the walk below reads.
+        decode("res/drawable*/product_logo_maps*.png")
         val res = this["res"]
         var flat = 0; var gradient = 0
         for (dir in res.listFiles()!!.filter { it.isDirectory && (it.name == "drawable" || it.name.startsWith("drawable-")) }) {
@@ -138,7 +140,7 @@ val bluePinPatch = resourcePatch(
 
         var svgs = 0
         for (name in SVG_PINS) {
-            val file = File(res, "raw/$name").takeIf { it.isFile } ?: throw PatchException("raw/$name not found")
+            val file = get("res/raw/$name").takeIf { it.isFile } ?: throw PatchException("raw/$name not found")
             var text = file.readText()
             val before = text
             for ((from, to) in SVG_COLOURS) text = text.replace(from, to, ignoreCase = true)

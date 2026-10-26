@@ -79,6 +79,7 @@ val legacyIconPatch = resourcePatch(
 
     execute {
         val res = this["res"]
+        File(res, "drawable").mkdirs()
         // microG Maps: the same pin with microG's C laid over its circle.
         val pin = if (MicrogSelection.builds(this, "Legacy icon")) {
             File(res, "drawable/${LEGACY}_microg_c.xml").writeText(microgC())
