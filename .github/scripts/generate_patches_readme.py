@@ -57,6 +57,10 @@ APP_RENAMES = {
         '<img src="docs/icons/alltrails.png" width="20" height="20" align="top"> AllTrails',
         '<img src="docs/icons/alltrails-black.png" width="20" height="20" align="top"> AllTrails',
     ),
+    "com.samsung.android.honeyboard": (
+        '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
+        '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Private Keyboard',
+    ),
 }
 
 
