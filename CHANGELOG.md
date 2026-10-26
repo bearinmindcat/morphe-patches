@@ -1,3 +1,9 @@
+## [2.6.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.2...v2.6.3) (2026-10-26)
+
+### 🐛 Bug Fixes
+
+* microG Maps keeps the on-phone Timeline (microG records none); issue [#73](https://github.com/bearinmindcat/morphe-patches/issues/73) ([8a81fbe](https://github.com/bearinmindcat/morphe-patches/commit/8a81fbec5754a481a82d90617bf5658ed0896b20))
+
 ## [2.6.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.1...v2.6.2) (2026-10-26)
 
 ### 🐛 Bug Fixes
