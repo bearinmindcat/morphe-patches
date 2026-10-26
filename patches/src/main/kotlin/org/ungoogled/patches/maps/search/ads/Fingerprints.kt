@@ -122,3 +122,24 @@ internal object SponsoredRowInsertGuardFingerprint : Fingerprint(
         ),
     ),
 )
+
+/**
+ * Search's promoted-pin drawer (issue #71): the search list and the place sheet hand it the search response's
+ * ad pins with their prepared labels, and it draws them as the map's square pins carrying the ad's tagline.
+ */
+internal object SearchAdPinsDrawerFingerprint : Fingerprint(
+    name = "c",
+    returnType = "V",
+    parameters = listOf("Lceyi;", "I", "Llwd;"),
+)
+
+/** The callout pointing at an off-screen ad pin: picks one of the search response's ad pins, if any. */
+internal object AdPinCalloutFingerprint : Fingerprint(
+    name = "b",
+    returnType = "Lbwon;",
+    parameters = listOf("Lceyi;"),
+    filters = listOf(
+        methodCall(definingClass = "Ljava/util/List;", name = "isEmpty", opcode = Opcode.INVOKE_INTERFACE),
+        opcode(Opcode.MOVE_RESULT, MatchAfterImmediately()),
+    ),
+)

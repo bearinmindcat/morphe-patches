@@ -34,7 +34,7 @@ private object NavigationAdsLabelControllerFingerprint : Fingerprint(
 )
 
 internal val hideAdsPatch = bytecodePatch(
-    description = "Hides promoted map pins -- on the map and along a route, in directions and navigation -- " +
+    description = "Hides promoted map pins -- on the map, in search results and along a route, in directions and navigation -- " +
         "and \"Sponsored\" search result rows.",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -102,6 +102,13 @@ internal val hideAdsPatch = bytecodePatch(
                 drawer.leaveEarlyWhenHidingAds("return-void")
             }
         }
+
+        // Promoted pins in search results (issue #71): the search list and the place sheet hand the search
+        // response's ad pins, with their prepared labels, to one drawer -- the square pins carrying the ad's
+        // tagline. It returns at once when hiding ads, as it already does for an empty list; the callout that
+        // points at an off-screen ad pin answers "none", as it does for an empty list too.
+        SearchAdPinsDrawerFingerprint.method.leaveEarlyWhenHidingAds("return-void")
+        AdPinCalloutFingerprint.method.leaveEarlyWhenHidingAds("sget-object v0, Lbwml;->a:Lbwml;\nreturn-object v0")
 
         // Sponsored-pin placemark objects: the factory returns null instead of
         // building one. Both existing callers already skip a null result.

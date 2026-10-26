@@ -16,7 +16,7 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 @Suppress("unused")
 val hideAdsAndClutterPatch = bytecodePatch(
     name = "Hide ads and clutter",
-    description = "Hides promoted map pins (on the map and along a route) and \"Sponsored\" search results, " +
+    description = "Hides promoted map pins (on the map, in search results and along a route) and \"Sponsored\" search results, " +
         "Gemini's AI summaries (\"Know " +
         "before you go\" and the review summary), the row of businesses under an address on its place " +
         "sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched " +
