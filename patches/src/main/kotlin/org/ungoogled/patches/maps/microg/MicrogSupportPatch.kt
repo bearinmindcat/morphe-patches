@@ -152,7 +152,7 @@ private val microgManifestPatch = resourcePatch(
 val microgSupportPatch = bytecodePatch(
     name = "Add microG-RE support",
     description = "Builds microG Maps, a separate app that signs in to your Google account through microG-RE " +
-        "(MicroG-RE or ReVanced GmsCore). Not for original microG (com.google.android.gms) or root installs.",
+        "(MicroG-RE or ReVanced GmsCore). Not for root installs; for original microG, use Add original microG support.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)

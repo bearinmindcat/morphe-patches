@@ -1,7 +1,6 @@
 package org.ungoogled.patches.maps.microg
 
 import app.morphe.patcher.patch.PatchException
-import java.util.Collections
 import java.util.WeakHashMap
 
 /**
@@ -19,22 +18,32 @@ import java.util.WeakHashMap
  * with its account taken out.
  */
 internal object MicrogSelection {
-    private val selected: MutableSet<Any> = Collections.newSetFromMap(WeakHashMap())
+    /** Which microG a run builds for: microG-RE beside Play services, or original microG in its place. */
+    enum class Flavor(val patch: String) { RE("Add microG-RE support"), ORIGINAL("Add original microG support") }
+
+    private val selected = WeakHashMap<Any, Flavor>()
     private val ungoogled = WeakHashMap<Any, MutableList<String>>()
 
-    /** From the microG patch and its manifest half: this run builds microG Maps. */
-    fun select(context: Any) {
+    /** From a microG patch and its manifest half: this run builds microG Maps. */
+    fun select(context: Any, flavor: Flavor = Flavor.RE) {
         val earlier = ungoogled[context]
         if (!earlier.isNullOrEmpty()) throw PatchException(
-            "Add microG-RE support has to run before ${earlier.distinct().joinToString()}, which ran first and " +
+            "${flavor.patch} has to run before ${earlier.distinct().joinToString()}, which ran first and " +
                 "built Ungoogled Maps instead. Turn those off and patch again."
         )
-        selected += context
+        val other = selected[context]
+        if (other != null && other != flavor) throw PatchException(
+            "${Flavor.RE.patch} and ${Flavor.ORIGINAL.patch} cannot both be on. Pick the one for your microG."
+        )
+        selected[context] = flavor
     }
+
+    /** True when this run builds for original microG, which vouches for Maps under its own package name. */
+    fun original(context: Any) = selected[context] == Flavor.ORIGINAL
 
     /** For a patch microG Maps does its own way: true when this run builds microG Maps. */
     fun builds(context: Any, patch: String): Boolean {
-        if (context in selected) return true
+        if (selected.containsKey(context)) return true
         ungoogled.getOrPut(context) { mutableListOf() } += patch
         return false
     }

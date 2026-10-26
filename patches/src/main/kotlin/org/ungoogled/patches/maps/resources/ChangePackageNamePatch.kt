@@ -75,7 +75,8 @@ val changePackageNamePatch = resourcePatch(
         default = UNGOOGLED_PACKAGE,
         title = "Package name",
         description = "The package name to install under. Must be a valid Android package name. Left at " +
-            "$UNGOOGLED_PACKAGE, Add microG-RE support installs under $MICROG_PACKAGE instead.",
+            "$UNGOOGLED_PACKAGE, Add microG-RE support installs under $MICROG_PACKAGE instead and Add original " +
+            "microG support keeps $STOCK_PACKAGE.",
         required = true,
     ) {
         it != null && it.matches(Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$"))
@@ -84,6 +85,8 @@ val changePackageNamePatch = resourcePatch(
     execute {
         val old = STOCK_PACKAGE
         val microg = MicrogSelection.builds(this, "Change package name")
+        // Original microG vouches for Maps by its own package name and Google's certificate.
+        if (MicrogSelection.original(this)) return@execute
         val new = packageName.value!!.let { if (microg && it == UNGOOGLED_PACKAGE) MICROG_PACKAGE else it }
         val counts = linkedMapOf<String, Int>()
         fun rename(element: Element, attribute: String, separators: String = ".", what: String = attribute): Boolean {
