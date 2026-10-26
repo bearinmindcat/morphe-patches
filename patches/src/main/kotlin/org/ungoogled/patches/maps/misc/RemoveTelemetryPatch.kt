@@ -18,7 +18,7 @@ val removeTelemetryPatch = bytecodePatch(
     description = "Points the Firebase Installations and Play services compliance check-ins at " +
         "an unresolvable host, stops every ad impression and click ping from being sent, and " +
         "deregisters Google's logging, performance-monitoring, survey and Location History libraries " +
-        "and the on-device federated-learning services. With Add microG support, Firebase Installations " +
+        "and the on-device federated-learning services. With Add microG-RE support, Firebase Installations " +
         "and Location History are left alone, so Timeline, account sync and push messages keep working.",
     default = true,
 ) {

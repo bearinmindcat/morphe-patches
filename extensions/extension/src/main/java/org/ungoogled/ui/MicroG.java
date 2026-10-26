@@ -387,8 +387,8 @@ public final class MicroG {
                 try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
                 if (installed(a)) return;
                 String key = KEY_QUIET_MISSING;
-                String title = "microG is not installed";
-                String message = "Signing in, saved places, Timeline and location sharing need microG "
+                String title = "microG-RE is not installed";
+                String message = "Signing in, saved places, Timeline and location sharing need microG-RE "
                         + "(MicroG-RE or ReVanced GmsCore). Maps works without it, signed out.";
                 if (prefs.getBoolean(key, false)) return;
                 a.runOnUiThread(() -> show(a, prefs, key, title, message));

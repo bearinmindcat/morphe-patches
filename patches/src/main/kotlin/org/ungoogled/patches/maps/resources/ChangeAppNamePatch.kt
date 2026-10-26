@@ -33,7 +33,7 @@ val changeAppNamePatch = resourcePatch(
         default = UNGOOGLED_NAME,
         title = "App name",
         description = "The name shown under the launcher icon and in the app switcher. Left at " +
-            "$UNGOOGLED_NAME, Add microG support names the app $MICROG_NAME instead.",
+            "$UNGOOGLED_NAME, Add microG-RE support names the app $MICROG_NAME instead.",
         required = true,
     )
 

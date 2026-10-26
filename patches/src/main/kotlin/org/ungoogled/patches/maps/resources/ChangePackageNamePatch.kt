@@ -75,7 +75,7 @@ val changePackageNamePatch = resourcePatch(
         default = UNGOOGLED_PACKAGE,
         title = "Package name",
         description = "The package name to install under. Must be a valid Android package name. Left at " +
-            "$UNGOOGLED_PACKAGE, Add microG support installs under $MICROG_PACKAGE instead.",
+            "$UNGOOGLED_PACKAGE, Add microG-RE support installs under $MICROG_PACKAGE instead.",
         required = true,
     ) {
         it != null && it.matches(Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$"))

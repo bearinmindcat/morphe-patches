@@ -74,7 +74,7 @@ private val YOUR_DATA: (MethodReference) -> Boolean =
 val trimAccountMenuPatch = bytecodePatch(
     name = "Trim account menu",
     description = "Removes Your Timeline, Location sharing, Your data in Maps and Help & feedback " +
-        "from the account sheet. Left out with Add microG support, whose account features need them.",
+        "from the account sheet. Left out with Add microG-RE support, whose account features need them.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)

@@ -268,10 +268,11 @@ public final class CustomizationActivity extends Activity {
         }
 
         if (Shapes.locationSourcePatched()) {
-            // OsmAnd-style single choice. Every source is always listed; microg Services and
-            // Google Play Services are greyed out and unselectable while they cannot answer.
-            final String[] sources = {Shapes.SOURCE_ANDROID, Shapes.SOURCE_MICROG, Shapes.SOURCE_GOOGLE};
-            final String[] options = {"Android API", "microg Services", "Google Play Services"};
+            // OsmAnd-style single choice. Every source is always listed; the two Play services ones
+            // are greyed out and unselectable while they cannot answer. com.google.android.gms is
+            // Google's or original microG; app.revanced.android.gms is microG-RE (issue #76).
+            final String[] sources = {Shapes.SOURCE_ANDROID, Shapes.SOURCE_GOOGLE, Shapes.SOURCE_MICROG};
+            final String[] options = {"Android location API", "Google Play Services or microG", "microG-RE"};
             final boolean[] usable = new boolean[sources.length];
             for (int i = 0; i < sources.length; i++) usable[i] = Shapes.locationSourceUsable(this, sources[i]);
             final int inUse = java.util.Arrays.asList(sources).indexOf(Shapes.locationSourceInUse(this));

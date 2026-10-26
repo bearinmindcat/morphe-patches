@@ -30,7 +30,7 @@ val removePermissionsPatch = resourcePatch(
     description = "Removes permissions that only serve Google-account features or Google's data " +
         "collection: background location, physical activity, contacts, microphone (voice search stops " +
         "working), camera (Lens and Live View stop working), car speed, advertising ID, push messages " +
-        "and Google services settings. Left out with Add microG support, whose account features need them.",
+        "and Google services settings. Left out with Add microG-RE support, whose account features need them.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)

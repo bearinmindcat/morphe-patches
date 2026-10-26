@@ -30,7 +30,7 @@ private val PHENOTYPE_PACKAGES = listOf(
 )
 
 /**
- * Kept registered in microG Maps (Add microG support), which signs in: Location History / location
+ * Kept registered in microG Maps (Add microG-RE support), which signs in: Location History / location
  * sharing (ulr), activity controls (footprints), location consent, account sync and
  * the on-device Timeline. Deregistered, their features are switched off for a
  * signed-in account too.

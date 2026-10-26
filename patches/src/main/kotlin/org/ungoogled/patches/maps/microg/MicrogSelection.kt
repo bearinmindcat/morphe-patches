@@ -5,14 +5,14 @@ import java.util.Collections
 import java.util.WeakHashMap
 
 /**
- * Whether "Add microG support" is part of the patching run a patch is in.
+ * Whether "Add microG-RE support" is part of the patching run a patch is in.
  *
  * The patches it changes -- the removals that take the Google account out, telemetry,
  * and the package and app name -- ask with their own context object: Morphe hands every
  * patch of one run the same bytecode and resource contexts, so a run never sees another
  * run's choice, even in a Manager that patches several apps in one process.
  *
- * Morphe runs patches in name order, dependencies first, and "Add microG support" sorts
+ * Morphe runs patches in name order, dependencies first, and "Add microG-RE support" sorts
  * ahead of every patch that asks. Should that ever change, one of them would run before
  * the choice is known; each notes itself here when it goes the Ungoogled Maps way, and
  * the microG patch fails the build when it finds one, instead of shipping microG Maps
@@ -26,7 +26,7 @@ internal object MicrogSelection {
     fun select(context: Any) {
         val earlier = ungoogled[context]
         if (!earlier.isNullOrEmpty()) throw PatchException(
-            "Add microG support has to run before ${earlier.distinct().joinToString()}, which ran first and " +
+            "Add microG-RE support has to run before ${earlier.distinct().joinToString()}, which ran first and " +
                 "built Ungoogled Maps instead. Turn those off and patch again."
         )
         selected += context

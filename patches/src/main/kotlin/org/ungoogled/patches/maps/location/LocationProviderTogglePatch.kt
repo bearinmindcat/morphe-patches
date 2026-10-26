@@ -26,7 +26,7 @@ private const val MICROG_PACKAGE = "app.revanced.android.gms"
 
 /** Android 11+ package visibility: Maps must be allowed to see microG to use its location service. */
 private val microgVisibilityPatch = resourcePatch(
-    description = "Lets Maps see microG, for its location service.",
+    description = "Lets Maps see microG-RE, for its location service.",
 ) {
     execute {
         document("AndroidManifest.xml").use { manifest ->
@@ -46,7 +46,7 @@ private val microgVisibilityPatch = resourcePatch(
 val locationProviderTogglePatch = bytecodePatch(
     name = "Location provider toggle",
     description = "Adds a Location source choice to the Customization screen: Android's own location " +
-        "providers, microG's (microg Services) or Google Play services' fused provider. With Android, " +
+        "providers, microG-RE's or Google Play services' fused provider. With Android, " +
         "neither is ever asked for a location. A source that is missing or disabled is never used, so " +
         "location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no " +
         "fused provider answers, instead of GPS only, so a fix does not go stale indoors.",
@@ -64,7 +64,7 @@ val locationProviderTogglePatch = bytecodePatch(
         default = false,
         title = "Default to Play services location",
         description = "The location source Maps starts with. On: the fused provider -- Google Play " +
-            "services', or microG's in microG Maps -- whenever it is installed and enabled, Android's own " +
+            "services', or microG-RE's in microG Maps -- whenever it is installed and enabled, Android's own " +
             "providers otherwise. Off: Android's own providers. Can be changed later on the Customization screen.",
     )
 

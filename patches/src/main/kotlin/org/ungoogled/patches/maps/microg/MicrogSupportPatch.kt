@@ -150,17 +150,13 @@ private val microgManifestPatch = resourcePatch(
  */
 @Suppress("unused")
 val microgSupportPatch = bytecodePatch(
-    name = "Add microG support",
-    description = "Builds microG Maps, a separate app (org.ungoogled.android.apps.maps.microg) that signs in to your " +
-        "Google account through microG: saved places and lists, Timeline, location sharing, contributions and push " +
-        "messages. Remove sign-in prompts, Trim account menu and Remove permissions are left out of this build, " +
-        "Offline saved places keeps only its Local saved screen, which copies your account's saved lists to the " +
-        "phone (Pull from Google account), and its icon carries microG's C. Needs microG: MicroG-RE or ReVanced " +
-        "GmsCore. Not for root (mount) installs.",
+    name = "Add microG-RE support",
+    description = "Builds microG Maps, a separate app that signs in to your Google account through microG-RE " +
+        "(MicroG-RE or ReVanced GmsCore). Not for original microG (com.google.android.gms) or root installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    category("microG")
+    category("microG-RE")
     // A mount install keeps stock Maps' manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->
         if (installer == InstallerType.MOUNT) PatchAvailability.UNAVAILABLE else PatchAvailability.DISABLED
