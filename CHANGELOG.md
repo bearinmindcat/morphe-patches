@@ -1,3 +1,9 @@
+## [2.6.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.1...v2.6.2) (2026-10-26)
+
+### 🐛 Bug Fixes
+
+* built for Morphe Patcher 2.0, no more older-patcher warning (needs Morphe Manager 2.x); issue [#74](https://github.com/bearinmindcat/morphe-patches/issues/74) ([c830b58](https://github.com/bearinmindcat/morphe-patches/commit/c830b58ac86d4180cb751876fe3053564667973c))
+
 ## [2.6.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.0...v2.6.1) (2026-10-26)
 
 ### 🐛 Bug Fixes
