@@ -1,3 +1,9 @@
+## [2.6.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.3...v2.6.4) (2026-10-26)
+
+### 🐛 Bug Fixes
+
+* sponsored pins on the search map are hidden too; issue [#71](https://github.com/bearinmindcat/morphe-patches/issues/71) ([f025e19](https://github.com/bearinmindcat/morphe-patches/commit/f025e193ddc001559de9b5791545184b1431ad9f))
+
 ## [2.6.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.2...v2.6.3) (2026-10-26)
 
 ### 🐛 Bug Fixes
