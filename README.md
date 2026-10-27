@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;64 patches total
+> **[v2.7.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;67 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;29 patches</summary>
 <br>
@@ -83,7 +83,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;18 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;21 patches</summary>
 <br>
 
 **Supported version(s):** 5.24.5.0
@@ -102,6 +102,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [No AI reporting](#no-ai-reporting) | Turns off Gemini voice reporting. |  |
 | [No Google Assistant](#no-google-assistant) | Removes Google Assistant from Waze. |  |
 | [Open without device location](#open-without-device-location) | Opens Waze with location off and uses it once it is on. Still needs the location permission. |  |
+| [Remove permissions](#remove-permissions) | Removes contacts, calendar, phone, camera and advertising ID access. |  |
+| [Remove sign-in prompts](#remove-sign-in-prompts) | Stops Waze's own reminder to register your account. |  |
+| [Remove telemetry](#remove-telemetry) | No crash reports, usage stats or performance data. Traffic reporting stays. |  |
 | [Report speed limit](#report-speed-limit) | Lets you correct speed limits from the speedometer (unverified). |  |
 | [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone. Waze must be signed in and open. |  |
 | [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the camera sound even when you are not speeding. |  |

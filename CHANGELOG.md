@@ -1,3 +1,9 @@
+## [2.7.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.1...v2.7.2) (2026-10-27)
+
+### 🐛 Bug Fixes
+
+* remove permissions, telemetry (including Crashlytics) and sign-in prompts in waze; issue [#67](https://github.com/bearinmindcat/morphe-patches/issues/67) ([80fbec9](https://github.com/bearinmindcat/morphe-patches/commit/80fbec9688588ff79047c2ff2ad14f2c859cd064))
+
 ## [2.7.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.0...v2.7.1) (2026-10-27)
 
 ### 🐛 Bug Fixes
