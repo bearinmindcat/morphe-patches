@@ -65,6 +65,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery',
         '<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery',
     ),
+    "com.samsung.android.app.notes": (
+        '<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes',
+        '<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes',
+    ),
 }
 
 
