@@ -3,7 +3,6 @@ package org.ungoogled.patches.maps.search
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
-import org.ungoogled.patches.maps.microg.MicrogSelection
 
 internal val removeSignInPromoPatch = bytecodePatch(
     description = "Removes the \"Tired of typing?\" sign-in card from the search screen.",
@@ -11,7 +10,7 @@ internal val removeSignInPromoPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_MAPS)
 
     execute {
-        if (MicrogSelection.replaces(this, "Remove sign-in prompts")) return@execute
+        // microG Maps too (issue #80): the card only promotes signing in, which stays on the account sheet.
         // Maps has two independent builders for this card; either alone shows it.
 
         // 1. The appender the search screen actually uses: never append.
