@@ -103,6 +103,8 @@ public final class Customization {
                 "Larger alert pins on the map"});
         LABELS.put("noLocationGate", new String[]{"Open without device location",
                 "Opens with location off"});
+        LABELS.put("zoneBar", new String[]{"Average speed zone bar",
+                "Progress and your average speed in a zone"});
         LABELS.put("removeTelemetry", new String[]{"Remove telemetry",
                 "No crash reports or usage stats"});
         LABELS.put("removeSignInPrompts", new String[]{"Remove sign-in prompts",
@@ -155,6 +157,8 @@ public final class Customization {
     private static final String FONT_HUGE = "SKIN_FONT_HUGE", FONT_BIG = "SKIN_FONT_BIG", FONT_MEDIUM = "SKIN_FONT_MEDIUM",
             FONT_SMALL = "SKIN_FONT_SMALL", ARROW_HEAD = "SKIN_ARROW_HEAD", DAY_BACKGROUND = "SKIN_DAY_BACKGROUND";
     private static final String PIN_SIZE = "PIN_SIZE";
+    /** Average speed zone bar's tolerance: a percentage of the limit, and at least this many km/h or mph. */
+    static final String ZONE_TOLERANCE_PERCENT = "ZONE_TOLERANCE_PERCENT", ZONE_TOLERANCE_MIN = "ZONE_TOLERANCE_MIN";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -184,6 +188,8 @@ public final class Customization {
         VALUE_LABELS.put(ARROW_HEAD, Label.tenths("Navigation arrow head width", "x the tail", 300, 30));
         VALUE_LABELS.put(DAY_BACKGROUND, Label.hex("Day map background", "FAFCFA"));
         VALUE_LABELS.put(PIN_SIZE, new Label("Alert pin size", "%", 1, 300, 100));
+        VALUE_LABELS.put(ZONE_TOLERANCE_PERCENT, new Label("Tolerance above the limit", "%", 1, 50));
+        VALUE_LABELS.put(ZONE_TOLERANCE_MIN, new Label("Tolerance, at least", "km/h or mph", 1, 50));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -311,10 +317,34 @@ public final class Customization {
         return c == null ? null : c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /** Whether [feature] is switched on; every patched feature starts on. */
+    /** Features that go online or draw over Waze: off until switched on. */
+    private static final Set<String> STARTS_OFF = new java.util.HashSet<>(java.util.Arrays.asList("zoneBar"));
+
+    /** Whether [feature] is switched on; every patched feature starts on, but those in STARTS_OFF. */
     public static boolean on(String feature) {
+        boolean start = !STARTS_OFF.contains(feature);
         SharedPreferences p = prefs();
-        return p == null || p.getBoolean(feature, true);
+        return p == null ? start : p.getBoolean(feature, start);
+    }
+
+    /** For the self-tests: switches [feature]. */
+    static void setForTest(String feature, boolean on) {
+        set(feature, on);
+    }
+
+    /** A number of [feature]'s: the one changed on this screen, else the patch's, else [fallback]. */
+    static int number(String name, int fallback) {
+        Object v = current(name, patched(name, fallback));
+        return v instanceof Integer ? (Integer) v : fallback;
+    }
+
+    /** The Waze screen in front, if any. */
+    static Activity activity() {
+        return resumed.get();
+    }
+
+    static Context appContext() {
+        return context();
     }
 
     private static void set(String feature, boolean on) {
@@ -322,6 +352,7 @@ public final class Customization {
         if (p != null) p.edit().putBoolean(feature, on).commit();
         if (feature.equals("mapSkin") || feature.equals("blackNightMap")) applySkin();
         if (feature.equals("biggerPins")) applyPins();
+        if (feature.equals("zoneBar")) ZoneBar.switched(on);
         reapply(feature + (on ? " on" : " off"));
     }
 
@@ -447,6 +478,7 @@ public final class Customization {
      * (com.waze.config.e, a()). The other interface-typed field is a Kotlin Lazy, with two methods.
      */
     private static Object wazeDefault(String name) {
+        if (!name.startsWith("CONFIG_VALUE_")) return null;
         try {
             Object config = Class.forName("com.waze.config.ConfigValues").getField(name).get(null);
             for (Class<?> c = config.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
