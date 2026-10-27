@@ -99,3 +99,14 @@ internal object ApiKeyReaderFingerprint : Fingerprint(
     parameters = listOf("Landroid/content/Context;", "Ljava/lang/String;"),
     filters = listOf(string("API key not found.  Check that <meta-data android:name=\"")),
 )
+
+/**
+ * What Maps does with Google's device-compliance verdict (GmsCompliance's GetEnforcement): for a phone
+ * that is not Play Protect certified it opens the full-screen "This device isn't Play Protect certified"
+ * page and finishes Maps' own activity. The callback switches on the verdict's name.
+ */
+internal object DeviceComplianceVerdictFingerprint : Fingerprint(
+    returnType = "V",
+    parameters = listOf("Ljava/lang/Object;"),
+    filters = listOf(string("DO_NOT_ENFORCE"), string("https://www.google.com/maps")),
+)
