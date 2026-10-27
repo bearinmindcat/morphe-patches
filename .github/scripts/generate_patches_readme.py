@@ -61,6 +61,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
         '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Private Keyboard',
     ),
+    "com.sec.android.gallery3d": (
+        '<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery',
+        '<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery',
+    ),
 }
 
 
