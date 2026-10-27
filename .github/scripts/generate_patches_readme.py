@@ -59,7 +59,7 @@ APP_RENAMES = {
     ),
     "com.samsung.android.honeyboard": (
         '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
-        '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Private Keyboard',
+        '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
     ),
     "com.sec.android.gallery3d": (
         '<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery',
