@@ -105,6 +105,8 @@ public final class Customization {
                 "Opens with location off"});
         LABELS.put("zoneBar", new String[]{"Average speed zone bar",
                 "Progress and your average speed in a zone"});
+        LABELS.put("flockCameras", new String[]{"Flock cameras",
+                "Chime when a plate reader is ahead. Uses OpenStreetMap"});
         LABELS.put("removeTelemetry", new String[]{"Remove telemetry",
                 "No crash reports or usage stats"});
         LABELS.put("removeSignInPrompts", new String[]{"Remove sign-in prompts",
@@ -318,7 +320,7 @@ public final class Customization {
     }
 
     /** Features that go online or draw over Waze: off until switched on. */
-    private static final Set<String> STARTS_OFF = new java.util.HashSet<>(java.util.Arrays.asList("zoneBar"));
+    private static final Set<String> STARTS_OFF = new java.util.HashSet<>(java.util.Arrays.asList("zoneBar", "flockCameras"));
 
     /** Whether [feature] is switched on; every patched feature starts on, but those in STARTS_OFF. */
     public static boolean on(String feature) {
@@ -353,6 +355,7 @@ public final class Customization {
         if (feature.equals("mapSkin") || feature.equals("blackNightMap")) applySkin();
         if (feature.equals("biggerPins")) applyPins();
         if (feature.equals("zoneBar")) ZoneBar.switched(on);
+        if (feature.equals("flockCameras")) Flock.switched(on);
         reapply(feature + (on ? " on" : " off"));
     }
 
