@@ -1,3 +1,18 @@
+## [2.7.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.4...v2.7.0) (2026-10-27)
+
+### 🐛 Bug Fixes
+
+* Hide AI also hides Ask Maps, its chip under the search bar and its button in navigation; issue [#68](https://github.com/bearinmindcat/morphe-patches/issues/68) ([7752997](https://github.com/bearinmindcat/morphe-patches/commit/77529976b17bfff2268beb6947d62f77597d8f14)), closes [#82](https://github.com/bearinmindcat/morphe-patches/issues/82)
+* Maps no longer closes behind the device isn't Play Protect certified page; issue [#70](https://github.com/bearinmindcat/morphe-patches/issues/70) ([59467d8](https://github.com/bearinmindcat/morphe-patches/commit/59467d8b4dd37759bca8671541b0ad8be0424da2))
+* microG Maps skips the Make it your map page and the Tired of typing card too; issue [#80](https://github.com/bearinmindcat/morphe-patches/issues/80) ([ed6b150](https://github.com/bearinmindcat/morphe-patches/commit/ed6b150b818c2bd227f06c6d4320c0cc4e9b67f1))
+* the map loads on phones with no Play services at all (Android's own Cronet); issue [#69](https://github.com/bearinmindcat/morphe-patches/issues/69) ([e98bcd5](https://github.com/bearinmindcat/morphe-patches/commit/e98bcd534b371ecdbc6dbaffbc9003feaa450fd8))
+* Your Timeline opens the on-phone Timeline in microG Maps; issue [#73](https://github.com/bearinmindcat/morphe-patches/issues/73) ([0a70729](https://github.com/bearinmindcat/morphe-patches/commit/0a707297e4f2ed5bdc54aac5e6cdd9f47da6a566))
+
+### ✨ New Features
+
+* add samsung gallery non-one ui support ([dff6a5f](https://github.com/bearinmindcat/morphe-patches/commit/dff6a5f391e60f7b2a9cba635d7fd6bf4fbc8270))
+* add samsung keyboard patches ([8e8345d](https://github.com/bearinmindcat/morphe-patches/commit/8e8345d2289e47686f1ea83aa0263e60d685049a))
+
 ## [2.6.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.3...v2.6.4) (2026-10-26)
 
 ### 🐛 Bug Fixes
