@@ -5,6 +5,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.literal
+import app.morphe.patcher.string
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.smali.ExternalLabel
@@ -23,6 +24,21 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
 /** AI_REVIEW_SUMMARY_DISCLAIMER, "Summarized with Gemini" under the review summary. */
 private const val AI_REVIEW_SUMMARY_DISCLAIMER = 0x7f1401c3
+
+/** ASKMAPS_ENTRYPOINT_LABEL, "Ask Maps": only the Ask Maps chip under the search bar shows it. */
+private const val ASK_MAPS_CHIP_LABEL = 0x7f140320
+
+/** The Ask Maps chip's label getter; its class is the chip. */
+private object AskMapsChipFingerprint : Fingerprint(
+    filters = listOf(literal(ASK_MAPS_CHIP_LABEL)),
+)
+
+/** Whether Ask Maps (Gemini) runs during navigation: its button on the navigation sheet and its voice session. */
+private object AskMapsInNavigationFingerprint : Fingerprint(
+    returnType = "Z",
+    parameters = listOf(),
+    filters = listOf(string("AskMapsNavigationFeatureAvailabilityImpl.isAskMapsInNavigationEnabled")),
+)
 
 /** The review summary's layout, the only code that draws that label. */
 private object ReviewSummaryLayoutFingerprint : Fingerprint(
@@ -46,8 +62,8 @@ private val SUMMARY_CHECK = listOf(
 
 internal val hideAiPatch = bytecodePatch(
     description = "Hides Gemini's AI summaries: the \"Know before you go\" card on place sheets and the " +
-        "review summary (\"Summarized with Gemini\") on the Reviews tab. Can be switched off on the " +
-        "Customization screen.",
+        "review summary (\"Summarized with Gemini\") on the Reviews tab, and Ask Maps: its chip under the " +
+        "search bar and its button in navigation. Can be switched off on the Customization screen.",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // HIDE_AI is refreshed from the Customization switch at every Activity attach.
@@ -129,5 +145,52 @@ internal val hideAiPatch = bytecodePatch(
         val register = (yes as OneRegisterInstruction).registerA
         check.replaceInstruction(4, "sget-boolean v$register, $SHAPES->HIDE_AI:Z")
         check.addInstruction(5, "xor-int/lit8 v$register, v$register, 0x1")
+
+        // Ask Maps' chip under the search bar (issues #68, #82). Every chip row asks one factory for it and adds
+        // it only when it got one -- null is what a phone without Ask Maps gets -- so the factory answers null.
+        val chip = AskMapsChipFingerprint.originalMethod.definingClass
+        val factories = mutableListOf<Pair<String, Method>>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (method in classDef.methods) {
+                if (method.returnType != chip) continue
+                val builds = method.implementation?.instructions?.any { insn ->
+                    insn.opcode == Opcode.NEW_INSTANCE && ((insn as ReferenceInstruction).reference as TypeReference).type == chip
+                } == true
+                if (builds) factories += classDef.type to method
+            }
+        }
+        val (owner, built) = factories.singleOrNull()
+            ?: throw PatchException("expected one Ask Maps chip factory, found ${factories.size}")
+        val factory = mutableClassDefBy(owner).methods.single {
+            it.name == built.name && it.parameterTypes == built.parameterTypes && it.returnType == chip
+        }
+        // v0 is a local: the factory takes three arguments and has more registers than those and `this`.
+        if (factory.implementation!!.registerCount - factory.parameterTypes.size - 1 < 1) throw PatchException("Ask Maps chip factory has no local register")
+        factory.addInstructionsWithLabels(
+            0,
+            """
+                sget-boolean v0, $SHAPES->HIDE_AI:Z
+                if-eqz v0, :ask_maps_chip
+                const/4 v0, 0x0
+                return-object v0
+            """,
+            ExternalLabel("ask_maps_chip", factory.implementation!!.instructions.first()),
+        )
+
+        // Ask Maps in navigation (issues #17, #68): the navigation sheet's Gemini button and its voice session
+        // only start when this says yes, as on a phone the server gives no Ask Maps.
+        AskMapsInNavigationFingerprint.method.let { inNavigation ->
+            inNavigation.addInstructionsWithLabels(
+                0,
+                """
+                    sget-boolean v0, $SHAPES->HIDE_AI:Z
+                    if-eqz v0, :ask_maps_navigation
+                    const/4 v0, 0x0
+                    return v0
+                """,
+                ExternalLabel("ask_maps_navigation", inNavigation.implementation!!.instructions.first()),
+            )
+        }
     }
 }
