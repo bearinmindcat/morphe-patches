@@ -2,6 +2,7 @@ package org.ungoogled.ui;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -35,6 +36,14 @@ public final class TimelineActivity extends UiScreen {
     private static final long MAX_HOLD_MS = 12 * 3_600_000L;
     private static final int PERMISSIONS = 1, EXPORT_GPX = 2;
     private TimelineService.Db db;
+
+    /**
+     * Maps' own way into Google's Timeline, in microG Maps (issue #73): Google's Timeline goes to microG, which
+     * records none, so turning it on only said "Something went wrong". This one records on the phone.
+     */
+    public static void open(Context context) {
+        context.startActivity(Screens.intent(context, TimelineActivity.class));
+    }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
