@@ -103,6 +103,10 @@ public final class Customization {
                 "Larger alert pins on the map"});
         LABELS.put("noLocationGate", new String[]{"Open without device location",
                 "Opens with location off"});
+        LABELS.put("removeTelemetry", new String[]{"Remove telemetry",
+                "No crash reports or usage stats"});
+        LABELS.put("removeSignInPrompts", new String[]{"Remove sign-in prompts",
+                "No reminder to register your account"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */
