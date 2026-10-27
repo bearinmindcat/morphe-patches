@@ -27,7 +27,8 @@ private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
 val anyMediaAppPatch = bytecodePatch(
     name = "Any media app",
     description = "Navigation's Default media app (Settings > Navigation) offers every music and podcast app " +
-        "that works with Android Auto, such as Poweramp, not only Spotify, YouTube Music and Pandora.",
+        "that works with Android Auto, such as Poweramp, also where Google switches media controls off. " +
+        "YouTube Music and Spotify only connect to Google's own Maps.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -73,7 +74,41 @@ val anyMediaAppPatch = bytecodePatch(
                 ins[i].opcode == Opcode.MOVE_RESULT_OBJECT && (ins[i] as OneRegisterInstruction).registerA == builder
         } ?: throw PatchException("the media app list's builder is no longer made in the same method")
         if (builder > 15) throw PatchException("media app list builder in v$builder, out of invoke range")
+
+        // Issue #78: in front of the builder Maps asks its server whether media controls exist at all (the same
+        // switch navigation's media bar reads); "no" left the list empty whatever was installed. Always yes.
+        val gate = (made - 1 downTo 0).firstNotNullOfOrNull { i ->
+            ((ins[i] as? ReferenceInstruction)?.reference as? MethodReference)?.takeIf {
+                ins[i].opcode == Opcode.INVOKE_VIRTUAL && it.returnType == "Z" && it.parameterTypes.isEmpty()
+            }
+        } ?: throw PatchException("media controls switch not found in front of the media app list")
+        val available = mutableClassDefBy(gate.definingClass).methods.single {
+            it.name == gate.name && it.parameterTypes.isEmpty() && it.returnType == "Z"
+        }
+        // It has no register but `this`, which it can overwrite on its way out.
+        available.addInstructions(0, "const/4 p0, 0x1\nreturn p0")
+
         method.addInstructions(made + 1, "invoke-static { v$builder }, $MEDIA_APPS->addAll(Ljava/lang/Object;)V")
+
+        // Issue #78: the partners Maps lists only when its server says so join after its list is built.
+        val now = method.implementation!!.instructions.toList()
+        val build = (made + 2 until now.size).firstOrNull { i ->
+            val call = (now[i] as? ReferenceInstruction)?.reference as? MethodReference
+            now[i].opcode == Opcode.INVOKE_VIRTUAL && (now[i] as Instruction35c).registerC == builder &&
+                call?.returnType == "Lcom/google/common/collect/ImmutableList;" && call.parameterTypes.isEmpty()
+        } ?: throw PatchException("the media app list is no longer built in the same method")
+        val result = now.getOrNull(build + 1) as? OneRegisterInstruction
+        if (result == null || now[build + 1].opcode != Opcode.MOVE_RESULT_OBJECT) throw PatchException("the built media app list is not kept")
+        val list = result.registerA
+        if (list > 15) throw PatchException("media app list in v$list, out of invoke range")
+        method.addInstructions(
+            build + 2,
+            """
+                invoke-static { v$list }, $MEDIA_APPS->complete(Ljava/lang/Object;)Ljava/lang/Object;
+                move-result-object v$list
+                check-cast v$list, Lcom/google/common/collect/ImmutableList;
+            """,
+        )
 
         // The extension builds entries and adds them by these names.
         fun answer(name: String, value: String) {

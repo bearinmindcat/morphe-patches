@@ -7,9 +7,13 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -22,6 +26,12 @@ public final class MediaApps {
     /** Maps' partners: Spotify has a connection of its own; the others Maps lists itself, in their colours. */
     private static final Set<String> PARTNERS = new HashSet<>(Arrays.asList(
             "com.spotify.music", "com.google.android.music", "com.google.android.apps.youtube.music", "com.pandora.android"));
+    /**
+     * The partners Maps lists itself only when its server says so (issue #78): added after Maps' own list when
+     * installed and not already there. Spotify is not one: Maps reaches it through Spotify's own connection.
+     */
+    private static final List<String> LISTED_PARTNERS = Arrays.asList(
+            "com.google.android.apps.youtube.music", "com.google.android.music", "com.pandora.android");
     /** What Android Auto looks for in an app's manifest before it shows the app. */
     private static final String ANDROID_AUTO = "com.google.android.gms.car.application";
     /** color/quantum_googblue500 and color/google_blue200: Maps' own blue, for an app with no colour here. */
@@ -72,6 +82,38 @@ public final class MediaApps {
             return ai.metaData != null && ai.metaData.containsKey(ANDROID_AUTO);
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    /** Right after Maps finishes its list: the partners it left out, when installed with a media browser service. */
+    public static Object complete(Object list) {
+        try {
+            Context c = Shapes.appContext();
+            if (c == null || !(list instanceof List)) return list;
+            Class<?> entryType = Class.forName(entryClass(), false, list.getClass().getClassLoader());
+            Field name = null;
+            for (Field f : entryType.getDeclaredFields()) {
+                if (f.getType() == String.class) { name = f; break; }
+            }
+            if (name == null) return list;
+            name.setAccessible(true);
+            Set<String> listed = new HashSet<>();
+            for (Object entry : (List<?>) list) listed.add((String) name.get(entry));
+            Set<String> browsers = new HashSet<>();
+            for (ResolveInfo r : c.getPackageManager().queryIntentServices(new Intent("android.media.browse.MediaBrowserService"), 0)) {
+                if (r.serviceInfo != null) browsers.add(r.serviceInfo.packageName);
+            }
+            Constructor<?> entry = entryType.getConstructor(String.class, int.class, int.class);
+            List<Object> all = new ArrayList<>((List<?>) list);
+            for (String pkg : LISTED_PARTNERS) {
+                if (!listed.contains(pkg) && browsers.contains(pkg)) all.add(entry.newInstance(pkg, COLOR, TOUCH_COLOR));
+            }
+            if (all.size() == ((List<?>) list).size()) return list;
+            return Class.forName("com.google.common.collect.ImmutableList", false, list.getClass().getClassLoader())
+                    .getMethod("copyOf", Collection.class).invoke(null, all);
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media apps", t);
+            return list;
         }
     }
 }
