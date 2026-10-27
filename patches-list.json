@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -324,7 +324,7 @@
     },
     {
       "name": "Any media app",
-      "description": "Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, not only Spotify, YouTube Music and Pandora.",
+      "description": "Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, also where Google switches media controls off. YouTube Music and Spotify only connect to Google's own Maps.",
       "default": true,
       "category": null,
       "dependencies": [
@@ -999,6 +999,36 @@
           "targets": [
             {
               "version": "15.9.01.7",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-One UI ROM support",
+      "description": "Makes Samsung Notes installable and usable on non-One UI ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "ResourcePatch",
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.samsung.android.app.notes",
+          "name": "Samsung Notes",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#E8412C",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "4.4.48.15",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": null,

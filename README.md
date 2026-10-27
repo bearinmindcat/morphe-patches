@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;63 patches total
+> **[v2.7.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;64 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;29 patches</summary>
 <br>
@@ -35,7 +35,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Account sheet cleanup](#account-sheet-cleanup) | Removes the "More from this app" label from the account sheet, and keeps the sheet open when you come back from Settings or Customization or tap "Your profile", instead of dropping back to the map. |  |
 | [Add microG-RE support](#add-microg-re-support) | Builds microG Maps, a separate app that signs in to your Google account through microG-RE (MicroG-RE or ReVanced GmsCore). Not for root installs; for original microG, use Add original microG support. |  |
 | [Add original microG support](#add-original-microg-support) | Signs in through original microG on ROMs with signature spoofing. Keeps Maps' own package name; allow signature spoofing for it. |  |
-| [Any media app](#any-media-app) | Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, not only Spotify, YouTube Music and Pandora. |  |
+| [Any media app](#any-media-app) | Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, also where Google switches media controls off. YouTube Music and Spotify only connect to Google's own Maps. |  |
 | [Avoid Flock cameras](#avoid-flock-cameras) | Steers driving directions around Flock cameras: when Google's route passes one, a camera-free way is worked out with BRouter, an OpenStreetMap router, and Maps asks Google again for a route through it, so Google still times and navigates the trip, and keeps it through reroutes. A detour longer than half again the distance is dropped. Off until turned on in Waze & external data source, with Flock cameras; your route's start and end go to brouter.de. Trips with stops are left as they are. |  |
 | [Better offline maps](#better-offline-maps) | Reworks the offline area picker: zooming out really selects more instead of being shrunk to Google's size cap, the box can be resized by dragging its edges and corners, a large area is split into several downloads whose true total size is shown, and areas already downloaded are drawn on the map. Can be turned off on the Customization screen. |  |
 | [Black theme](#black-theme) | AMOLED-black theme. Pins Maps' own dark mode and its separate navigation colour scheme, and remaps colour resources, drawable fills and draw-time paints so no surface is left grey. |  |
@@ -112,7 +112,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Private Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
 
 **Supported version(s):** 5.9.40.75
@@ -138,6 +138,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Gallery installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.4.48.15
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
 
 </details>
 

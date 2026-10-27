@@ -1,3 +1,10 @@
+## [2.7.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.0...v2.7.1) (2026-10-27)
+
+### 🐛 Bug Fixes
+
+* add samsung notes non-one ui support ([7de436b](https://github.com/bearinmindcat/morphe-patches/commit/7de436b7a98bb325347735ac1e26677ba44cefca))
+* any media app also works where Google switches media controls off; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([fe3eed9](https://github.com/bearinmindcat/morphe-patches/commit/fe3eed9f18b68a8d099909d5ace86c9bc277a032))
+
 ## [2.7.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.6.4...v2.7.0) (2026-10-27)
 
 ### 🐛 Bug Fixes
