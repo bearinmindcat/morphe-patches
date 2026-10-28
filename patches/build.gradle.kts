@@ -3,7 +3,7 @@ group = "org.ungoogled"
 patches {
     about {
         name = "bearinmind patches"
-        description = "Ungoogled Maps and microG Maps: de-Googling, privacy and UI patches for Google Maps. Waze: true black, no ads, speed camera and alert settings. AllTrails: better tracking and filters, 2D/3D compass, themes. Samsung Keyboard: telemetry off, no GIF tracking, always incognito. Samsung Gallery and Samsung Notes: run on non-Samsung phones."
+        description = "Ungoogled Maps and microG Maps: de-Googling, privacy and UI patches for Google Maps. Waze: true black, no ads, speed camera and alert settings. AllTrails: better tracking and filters, 2D/3D compass, themes. Samsung Keyboard: telemetry off, no GIF tracking, always incognito. Samsung Gallery and Samsung Notes: run on non-Samsung phones. Sound Assistant: individual app volumes on non-Samsung phones."
         source = "git@github.com:bearinmindcat/morphe-patches.git"
         author = "bearinmindcat"
         contact = "https://github.com/bearinmindcat"
