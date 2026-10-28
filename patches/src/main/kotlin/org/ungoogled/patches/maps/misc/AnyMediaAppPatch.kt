@@ -4,6 +4,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
@@ -12,6 +13,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.w3c.dom.Element
 
 private const val MEDIA_APPS = "Lorg/ungoogled/ui/MediaApps;"
 private const val MEDIA_BROWSER = "android.media.browse.MediaBrowserService"
@@ -23,6 +25,27 @@ private const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
  * connection of its own -- and keeps the installed apps with a media browser service among
  * them. Every other app that works with Android Auto goes into that list first (issue #9).
  */
+/**
+ * Since Android 11 Maps sees only the apps its manifest names: its <queries> lists the partners alone, so
+ * every other media app -- Jellyfin, say (issue #78) -- was invisible to its search for media browser
+ * services and never offered. Ask for every app that has one.
+ */
+private val mediaAppsVisiblePatch = resourcePatch(description = "Lets Maps see every app with a media browser service.") {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val root = manifest.documentElement
+            val queries = (0 until root.childNodes.length).map { root.childNodes.item(it) }
+                .filterIsInstance<Element>().firstOrNull { it.tagName == "queries" }
+                ?: manifest.createElement("queries").also { root.appendChild(it) }
+            queries.appendChild(
+                manifest.createElement("intent").apply {
+                    appendChild(manifest.createElement("action").apply { setAttribute("android:name", MEDIA_BROWSER) })
+                },
+            )
+        }
+    }
+}
+
 @Suppress("unused")
 val anyMediaAppPatch = bytecodePatch(
     name = "Any media app",
@@ -32,7 +55,7 @@ val anyMediaAppPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch)
+    dependsOn(sharedExtensionPatch, mediaAppsVisiblePatch)
 
     execute {
         // The list's builder: the one method naming both YouTube Music and the media browser service.
