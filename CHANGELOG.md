@@ -1,3 +1,11 @@
+## [2.7.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.2...v2.7.3) (2026-10-28)
+
+### 🐛 Bug Fixes
+
+* any media app sees Jellyfin and every other music or podcast app (Android hid the ones Maps did not name); issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([a9bafa6](https://github.com/bearinmindcat/morphe-patches/commit/a9bafa6fe72161b6930d55d0175cf315ea8946d9))
+* average speed zone bar in waze (progress, your average speed and green/orange/red against the limit); issue [#60](https://github.com/bearinmindcat/morphe-patches/issues/60) ([c8cec47](https://github.com/bearinmindcat/morphe-patches/commit/c8cec47bd41f3c4441044e7a95c3194254c9ef1f))
+* flock camera alerts in waze (chime and note when one is ahead, from OpenStreetMap); issue [#47](https://github.com/bearinmindcat/morphe-patches/issues/47) ([68ffbeb](https://github.com/bearinmindcat/morphe-patches/commit/68ffbeb42a443469a4b700b3b184fb8099cddd0d))
+
 ## [2.7.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.1...v2.7.2) (2026-10-27)
 
 ### 🐛 Bug Fixes
