@@ -1,3 +1,10 @@
+## [2.7.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.3...v2.7.4) (2026-10-28)
+
+### 🐛 Bug Fixes
+
+* add samsung sound assistant non-one ui support (individual app volumes); issue [#84](https://github.com/bearinmindcat/morphe-patches/issues/84) ([be3a4d1](https://github.com/bearinmindcat/morphe-patches/commit/be3a4d1588effe90e4ea07d4da2c171f83dbaba9))
+* Hide AI hides every Ask Maps button, also after Maps reloads its layout; issue [#82](https://github.com/bearinmindcat/morphe-patches/issues/82) ([f4d8845](https://github.com/bearinmindcat/morphe-patches/commit/f4d8845009a1c507bbfb12ff4da7fa0a7ddc8431))
+
 ## [2.7.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.2...v2.7.3) (2026-10-28)
 
 ### 🐛 Bug Fixes

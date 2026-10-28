@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.7.3",
+  "version": "2.7.4",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -1059,6 +1059,36 @@
           "targets": [
             {
               "version": "4.4.48.15",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-One UI ROM support",
+      "description": "Runs Sound Assistant on non-One UI ROMs, where only Individual app volumes work.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "BytecodePatch",
+        "ResourcePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.samsung.android.soundassistant",
+          "name": "Sound Assistant",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#3E91FF",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "8.1.00.6",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": null,

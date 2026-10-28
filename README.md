@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;69 patches total
+> **[v2.7.4](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;70 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;29 patches</summary>
 <br>
@@ -155,6 +155,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 8.1.00.6
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Sound Assistant on non-One UI ROMs, where only Individual app volumes work. |  |
 
 </details>
 
