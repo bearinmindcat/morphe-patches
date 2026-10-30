@@ -77,6 +77,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant',
         '<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant',
     ),
+    "com.sec.android.app.myfiles": (
+        '<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files',
+        '<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files',
+    ),
 }
 
 

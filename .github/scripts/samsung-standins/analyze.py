@@ -3,7 +3,8 @@ missing = set(l.strip() for l in open('samsung-ext.txt') if l.strip())
 inv = re.compile(r'invoke-(static|virtual|interface|direct|super)(?:/range)? \{[^}]*\}, (L[^;]+;)->([^(]+)\(([^)]*)\)(\S+)')
 fld = re.compile(r'([si])(get|put)(?:-\w+)? [vp]\d+, (?:[vp]\d+, )?(L[^;]+;)->([^:]+):(\S+)')
 typ = re.compile(r'(?:check-cast|instance-of|const-class|new-instance|new-array|filled-new-array)[^,]*, (\[*L[^;]+;)')
-info = collections.defaultdict(lambda: {"methods": {}, "fields": {}, "extendedBy": [], "implementedBy": [], "typeUse": 0, "newInstance": False})
+info = collections.defaultdict(lambda: {"methods": {}, "fields": {}, "extendedBy": [], "implementedBy": [], "typeUse": 0, "newInstance": False, "caught": False})
+catch = re.compile(r'^\.catch (L[^;]+;)')
 for root, _, files in os.walk('smali'):
     for f in files:
         p = os.path.join(root, f); cls = None
@@ -17,6 +18,10 @@ for root, _, files in os.walk('smali'):
             if s.startswith('.implements '):
                 it = s.split()[1]
                 if it in missing: info[it]["implementedBy"].append(cls)
+                continue
+            m = catch.match(s)
+            if m and m.group(1) in missing:
+                info[m.group(1)]["caught"] = True
                 continue
             m = inv.search(s)
             if m and m.group(2) in missing:
@@ -36,7 +41,8 @@ for root, _, files in os.walk('smali'):
                     info[t]["typeUse"] += 1
                     if s.startswith('new-instance'): info[t]["newInstance"] = True
 out = {c: {"methods": {k: sorted(v) for k, v in d["methods"].items()}, "fields": {k: sorted(v) for k, v in d["fields"].items()},
-           "extendedBy": d["extendedBy"], "implementedBy": d["implementedBy"], "typeUse": d["typeUse"], "newInstance": d["newInstance"]}
+           "extendedBy": d["extendedBy"], "implementedBy": d["implementedBy"], "typeUse": d["typeUse"], "newInstance": d["newInstance"],
+           **({"caught": True} if d["caught"] else {})}
        for c, d in info.items()}
 for c in missing:
     out.setdefault(c, {"methods": {}, "fields": {}, "extendedBy": [], "implementedBy": [], "typeUse": 0, "newInstance": False})

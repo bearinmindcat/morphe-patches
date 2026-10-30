@@ -1,6 +1,7 @@
 import json, re, os, sys, collections
 u = json.load(open('usage.json')); missing = set(u)
 OUT = sys.argv[1]
+APP = sys.argv[2] if len(sys.argv) > 2 else 'Samsung Notes'
 PRIM = {'Z':'boolean','B':'byte','S':'short','C':'char','I':'int','J':'long','F':'float','D':'double','V':'void'}
 OK_PREFIX = ('Ljava/', 'Landroid/', 'Ldalvik/', 'Lorg/xml/', 'Lorg/json/', 'Ljavax/', 'Lorg/w3c/')
 skipped = []
@@ -75,6 +76,9 @@ def body_for(c, indent, nested):
         head = f'{mod}interface {simple}'
     elif c.endswith('$Stub;'):
         head = f'{mod}abstract class {simple} extends android.os.Binder implements {jtype(outer_of(c))}'
+    elif d.get('caught'):
+        # Named in a catch clause: the verifier wants a Throwable.
+        head = f'{mod}class {simple} extends java.lang.Exception'
     else:
         head = f'{mod}class {simple}'
     lines.append(indent + head + ' {')
@@ -115,7 +119,7 @@ for top in tops:
     path = os.path.join(OUT, pkg, simple + '.java')
     os.makedirs(os.path.dirname(path), exist_ok=True)
     src = [f'package {pkg.replace("/", ".")};', '',
-           '/** Generated stand-in (.github/scripts/samsung-standins): names and signatures Samsung Notes uses, answering "absent" off One UI (no Samsung code). */']
+           f'/** Generated stand-in (.github/scripts/samsung-standins): names and signatures {APP} uses, answering "absent" off One UI (no Samsung code). */']
     src += body_for(top, '', False)
     open(path, 'w').write('\n'.join(src) + '\n'); n += 1
 print('files', n, 'skipped', len(skipped)); [print('  skip', s) for s in skipped]

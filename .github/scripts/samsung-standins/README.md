@@ -10,4 +10,4 @@
 #   comm -23 types.txt defined.txt | grep -E '^Lcom/samsung/|^Lcom/sec/|^Landroid/.*/Sem[A-Z]' > samsung-ext.txt
 #   for d in classes*.dex; do baksmali d -j 4 $d -o smali; done
 #   python3 analyze.py            # -> usage.json
-#   python3 gen.py <extension java src dir>
+#   python3 gen.py <extension java src dir> "<app name>"
