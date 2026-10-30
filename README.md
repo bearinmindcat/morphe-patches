@@ -135,7 +135,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pdfcraft-pdf.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 | Patch | Description | Options |

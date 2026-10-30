@@ -59,7 +59,7 @@ APP_RENAMES = {
     ),
     "io.github.artcraftandroid.pdfcraft": (
         '<img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft',
-        '<img src="docs/icons/pdfcraft-pdf.png" width="20" height="20" align="top"> PdfCraft',
+        '<img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft',
     ),
     "com.samsung.android.honeyboard": (
         '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
