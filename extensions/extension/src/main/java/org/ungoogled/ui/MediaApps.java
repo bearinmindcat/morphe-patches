@@ -116,4 +116,24 @@ public final class MediaApps {
             return list;
         }
     }
+
+    /**
+     * Navigation's "open the media app" (issue #78): Maps starts ACTION_MAIN for the package without a category,
+     * which only reaches apps with a MAIN activity in the default category -- its partners have one, most apps
+     * (Jellyfin, Pocket Casts) only have their launcher activity, so it said "Failed to launch application". Start
+     * the app's own launcher entry instead, with Maps' flags and referrer.
+     */
+    public static Intent launchable(Context c, Intent intent) {
+        try {
+            String pkg = intent.getPackage();
+            if (c == null || pkg == null) return intent;
+            Intent launch = c.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch == null) return intent;
+            launch.addFlags(intent.getFlags());
+            if (intent.getExtras() != null) launch.putExtras(intent.getExtras());
+            return launch;
+        } catch (Throwable t) {
+            return intent;
+        }
+    }
 }

@@ -6,6 +6,7 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
@@ -132,6 +133,48 @@ val anyMediaAppPatch = bytecodePatch(
                 check-cast v$list, Lcom/google/common/collect/ImmutableList;
             """,
         )
+
+        // Issue #78: "open the media app" from navigation's media panel starts ACTION_MAIN for the package without a
+        // category, which most apps do not answer ("Failed to launch application"). The method is the one building
+        // that intent (MAIN + Maps' own referrer); right before it is started, the app's launcher intent replaces it.
+        run {
+            val opens = mutableListOf<Pair<String, Method>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    val strings = m.implementation?.instructions?.mapNotNull {
+                        ((it as? ReferenceInstruction)?.reference as? StringReference)?.string
+                    }.orEmpty()
+                    if ("android.intent.action.MAIN" in strings && "android-app://" in strings &&
+                        "android.intent.extra.REFERRER" in strings
+                    ) opens += c.type to m
+                }
+            }
+            // The generic media apps' panel and Spotify's both open their app this way.
+            if (opens.isEmpty() || opens.size > 3) throw PatchException("media app launch: found ${opens.size} methods")
+            for ((type, found) in opens) {
+            val open = mutableClassDefBy(type).methods.single {
+                it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == found.returnType
+            }
+            val insns = open.implementation!!.instructions.toList()
+            val start = insns.indexOfFirst { insn ->
+                val r = (insn as? ReferenceInstruction)?.reference as? MethodReference
+                r != null && r.parameterTypes.map(CharSequence::toString) == listOf("Landroid/content/Context;", "Landroid/content/Intent;", "I")
+            }
+            if (start < 0) throw PatchException("the media app is no longer started with (Context, Intent, int)")
+            val call = insns[start] as Instruction35c
+            val context = call.registerD
+            val intent = call.registerE
+            if (context > 15 || intent > 15) throw PatchException("media app launch registers out of range")
+            open.addInstructions(
+                start,
+                """
+                    invoke-static { v$context, v$intent }, $MEDIA_APPS->launchable(Landroid/content/Context;Landroid/content/Intent;)Landroid/content/Intent;
+                    move-result-object v$intent
+                """,
+            )
+            }
+        }
 
         // The extension builds entries and adds them by these names.
         fun answer(name: String, value: String) {
