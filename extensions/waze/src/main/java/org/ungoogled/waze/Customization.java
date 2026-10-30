@@ -107,6 +107,8 @@ public final class Customization {
                 "Progress and your average speed in a zone"});
         LABELS.put("flockCameras", new String[]{"Flock cameras",
                 "Chime when a plate reader is ahead. Uses OpenStreetMap"});
+        LABELS.put("speedCameras", new String[]{"Speed camera alerts",
+                "Chime when a speed camera is ahead. Uses OpenStreetMap"});
         LABELS.put("removeTelemetry", new String[]{"Remove telemetry",
                 "No crash reports or usage stats"});
         LABELS.put("removeSignInPrompts", new String[]{"Remove sign-in prompts",
@@ -320,7 +322,7 @@ public final class Customization {
     }
 
     /** Features that go online or draw over Waze: off until switched on. */
-    private static final Set<String> STARTS_OFF = new java.util.HashSet<>(java.util.Arrays.asList("zoneBar", "flockCameras"));
+    private static final Set<String> STARTS_OFF = new java.util.HashSet<>(java.util.Arrays.asList("zoneBar", "flockCameras", "speedCameras"));
 
     /** Whether [feature] is switched on; every patched feature starts on, but those in STARTS_OFF. */
     public static boolean on(String feature) {
@@ -356,6 +358,7 @@ public final class Customization {
         if (feature.equals("biggerPins")) applyPins();
         if (feature.equals("zoneBar")) ZoneBar.switched(on);
         if (feature.equals("flockCameras")) Flock.switched(on);
+        if (feature.equals("speedCameras")) SpeedCameras.switched(on);
         reapply(feature + (on ? " on" : " off"));
     }
 
