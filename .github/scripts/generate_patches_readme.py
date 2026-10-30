@@ -85,6 +85,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music',
         '<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music',
     ),
+    "com.samsung.android.shealthmonitor": (
+        '<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor',
+        '<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor',
+    ),
 }
 
 
