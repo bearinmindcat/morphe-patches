@@ -1,3 +1,9 @@
+## [2.7.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.4...v2.7.5) (2026-10-30)
+
+### 🐛 Bug Fixes
+
+* add pdfcraft patches (custom icon and app name) ([7989e49](https://github.com/bearinmindcat/morphe-patches/commit/7989e49652d86b22aa7cea1b9369ed1d7c278f9a))
+
 ## [2.7.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.3...v2.7.4) (2026-10-28)
 
 ### 🐛 Bug Fixes

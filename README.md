@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.4](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;70 patches total
+> **[v2.7.5](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;72 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;29 patches</summary>
 <br>
@@ -131,6 +131,17 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [No GIF tracking](#no-gif-tracking) | Stops GIPHY and Tenor view and share pings. |  |
 | [Remove internet permission](#remove-internet-permission) | Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores keyboard policies pushed from Samsung's servers. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/pdfcraft.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pdfcraft-pdf.png" width="20" height="20" align="top"> PdfCraft&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Change app name](#change-app-name) | Renames PdfCraft on the home screen. | • App name |
+| [Custom icon](#custom-icon) | Replaces the launcher icon with a PDF icon or your own image. | • Icon<br>• Your own image<br>• Background<br>• Fill the whole icon |
 
 </details>
 
