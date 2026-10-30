@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.5](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;72 patches total
+> **[v2.7.6](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;74 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;29 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
 
 <p>
@@ -45,6 +45,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy. | • Package name |
 | [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet, with switches for the patches here that can be turned back off inside the app. |  |
 | [Flock cameras](#flock-cameras) | Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the ones near you from an OpenStreetMap server, over the same area as the speed cameras. |  |
+| [Follow playing media](#follow-playing-media) | Navigation's media controls show what an app is playing, also apps that refuse Maps such as Pocket Casts and TIDAL. Needs notification access (Customization), not on root mount installs. |  |
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG-RE support, microG's C sits in the pin's circle. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG-RE's or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
@@ -83,7 +84,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;23 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;24 patches</summary>
 <br>
 
 **Supported version(s):** 5.24.5.0
@@ -109,6 +110,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Remove telemetry](#remove-telemetry) | No crash reports, usage stats or performance data. Traffic reporting stays. |  |
 | [Report speed limit](#report-speed-limit) | Lets you correct speed limits from the speedometer (unverified). |  |
 | [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone. Waze must be signed in and open. |  |
+| [Speed camera alerts](#speed-camera-alerts) | Chime when a speed camera is ahead, from OpenStreetMap, in any country. No map pins or routing. Off until switched on. |  |
 | [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the camera sound even when you are not speeding. |  |
 | [Speed cameras everywhere](#speed-cameras-everywhere) | Camera and police alerts in every country. Camera warnings are illegal in some. |  |
 | [Speed limit sign](#speed-limit-sign) | One speed limit sign style in every country. | • Sign style |

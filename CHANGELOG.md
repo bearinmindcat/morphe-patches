@@ -1,3 +1,13 @@
+## [2.7.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.5...v2.7.6) (2026-10-30)
+
+### 🐛 Bug Fixes
+
+* add Follow playing media, navigation's media controls show what an app plays, also apps that refuse Maps; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([4c0a47c](https://github.com/bearinmindcat/morphe-patches/commit/4c0a47c9dba25d43b8c11db7314573cb926f5611))
+* any media app also offers apps without Android Auto support while they play (Follow playing media); issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([423e2d7](https://github.com/bearinmindcat/morphe-patches/commit/423e2d71f26d3abf58cc3073cd4610dcaa15442e))
+* build for Morphe patcher 2.0.0 so Morphe Manager 2.1.0 can load the patches ([0135980](https://github.com/bearinmindcat/morphe-patches/commit/0135980e20d75b4ed4a5baf22428179c59762003))
+* open apps without a default main activity from navigation's media panel; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([367d550](https://github.com/bearinmindcat/morphe-patches/commit/367d550cc6a6ce6f2ef234a464dc620c7c891f19))
+* speed camera alerts in waze from OpenStreetMap (any country, e.g. France); issue [#87](https://github.com/bearinmindcat/morphe-patches/issues/87) ([b3602d4](https://github.com/bearinmindcat/morphe-patches/commit/b3602d474aa7db5ce4e5489318448c21a66739e6))
+
 ## [2.7.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.4...v2.7.5) (2026-10-30)
 
 ### 🐛 Bug Fixes
