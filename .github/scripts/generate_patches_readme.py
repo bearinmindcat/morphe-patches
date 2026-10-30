@@ -81,6 +81,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files',
         '<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files',
     ),
+    "com.sec.android.app.music": (
+        '<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music',
+        '<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music',
+    ),
 }
 
 
