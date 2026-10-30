@@ -87,6 +87,19 @@ public final class PlayingMedia {
         }
     }
 
+    /** The packages with a media session open; none without notification access. */
+    static java.util.Set<String> sessionPackages(Context c) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        try {
+            for (MediaController s : c.getSystemService(MediaSessionManager.class)
+                    .getActiveSessions(new ComponentName(c, MediaListener.class))) {
+                out.add(s.getPackageName());
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
     /** The app's playing session, or with {@code any} the first it has open; null without notification access. */
     private static MediaController sessionOf(Context c, String pkg, boolean any) {
         List<MediaController> all;

@@ -53,11 +53,15 @@ public final class MediaApps {
                     .getConstructor(String.class, int.class, int.class);
             Method add = method(builder.getClass(), addMethod());
             Set<String> seen = new HashSet<>();
+            // Issue #78: an app without Android Auto support joins while it has a media session open (Follow
+            // playing media). Every app listed is connected to at each navigation start; one already playing is
+            // already running, the rest would all be started for it.
+            Set<String> open = PlayingMedia.sessionPackages(c);
             for (ResolveInfo r : pm.queryIntentServices(new Intent("android.media.browse.MediaBrowserService"), 0)) {
                 if (r.serviceInfo == null) continue;
                 String pkg = r.serviceInfo.packageName;
                 if (PARTNERS.contains(pkg) || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
-                if (!androidAuto(pm, pkg)) continue;
+                if (!androidAuto(pm, pkg) && !open.contains(pkg)) continue;
                 add.invoke(builder, entry.newInstance(pkg, COLOR, TOUCH_COLOR));
             }
         } catch (Throwable t) {
