@@ -86,6 +86,7 @@ final class SavedStore {
         }
 
         static Place fromJson(JSONObject o) {
+            validatePlaceJson(o);
             Place p = new Place();
             p.ftid = o.has("ftid") ? o.optString("ftid", null) : null;
             p.name = o.optString("name", "");
@@ -96,6 +97,8 @@ final class SavedStore {
             p.reviews = o.optInt("reviews", 0);
             p.lat = o.optDouble("lat");
             p.lng = o.optDouble("lng");
+            checkCoordinates(p.lat, p.lng);
+            if (Float.isInfinite(p.rating)) throw new IllegalArgumentException("Invalid rating");
             p.added = o.optLong("added", System.currentTimeMillis());
             JSONArray l = o.optJSONArray("lists");
             if (l != null) for (int i = 0; i < l.length(); i++) p.lists.add(l.optString(i));
@@ -106,12 +109,51 @@ final class SavedStore {
 
     /** "photos": [...], or a first version's single "photo". */
     static void readPhotos(JSONObject o, List<String> into) {
-        JSONArray a = o.optJSONArray("photos");
-        if (a != null) for (int i = 0; i < a.length(); i++) { String u = a.optString(i, ""); if (!u.isEmpty()) into.add(u); }
+        JSONArray a = optionalArray(o, "photos");
+        if (a != null) for (int i = 0; i < a.length(); i++) { String u = string(a.opt(i)); if (!u.isEmpty()) into.add(u); }
         else if (!o.optString("photo", "").isEmpty()) into.add(o.optString("photo"));
     }
 
+    private static String string(Object value) {
+        if (!(value instanceof String)) throw new IllegalArgumentException("Expected a string");
+        return (String) value;
+    }
+
+    static JSONArray optionalArray(JSONObject o, String key) {
+        if (!o.has(key)) return null;
+        Object value = o.opt(key);
+        if (!(value instanceof JSONArray)) throw new IllegalArgumentException("Expected an array: " + key);
+        return (JSONArray) value;
+    }
+
+    static void validatePlaceJson(JSONObject o) {
+        for (String key : new String[]{"ftid", "name", "note", "category", "photo"}) {
+            if (o.has(key)) string(o.opt(key));
+        }
+        for (String key : new String[]{"lat", "lng"}) {
+            if (!(o.opt(key) instanceof Number)) throw new IllegalArgumentException("Missing or invalid coordinates");
+        }
+        checkCoordinates(o.optDouble("lat"), o.optDouble("lng"));
+        if (o.has("rating") && (!(o.opt("rating") instanceof Number) || !Float.isFinite((float) o.optDouble("rating")))) {
+            throw new IllegalArgumentException("Invalid rating");
+        }
+        JSONArray memberships = optionalArray(o, "lists");
+        if (memberships != null) for (int i = 0; i < memberships.length(); i++) string(memberships.opt(i));
+    }
+
+    /** Android's JSONObject accepts non-JSON syntax and trailing data; validate the source first. */
+    static JSONObject parseJson(String text) throws Exception {
+        try (android.util.JsonReader reader = new android.util.JsonReader(new java.io.StringReader(text))) {
+            reader.setLenient(false);
+            if (reader.peek() != android.util.JsonToken.BEGIN_OBJECT) throw new IllegalArgumentException("Expected a JSON object");
+            reader.skipValue();
+            if (reader.peek() != android.util.JsonToken.END_DOCUMENT) throw new IllegalArgumentException("Trailing JSON data");
+        }
+        return new JSONObject(text);
+    }
+
     private static boolean loaded;
+    private static Exception loadError;
     /** List id -> name, in display order. */
     static final Map<String, String> lists = new LinkedHashMap<>();
     /** Key -> place, newest last. */
@@ -127,16 +169,53 @@ final class SavedStore {
     static synchronized void load(Context c) {
         if (loaded) return;
         loaded = true;
-        lists.clear();
-        places.clear();
-        labels.clear();
-        hiddenOnMap.clear();
-        home = work = null;
+        loadError = null;
+        clearState();
         try {
             File f = new File(c.getFilesDir(), FILE);
-            if (f.exists()) read(new JSONObject(readAll(new java.io.FileInputStream(f))), true);
-        } catch (Throwable ignored) {}
+            if (f.exists()) read(parseJson(readAll(new java.io.FileInputStream(f))), true);
+        } catch (Exception e) {
+            clearState();
+            loadError = e;
+            warnSave(c, "Saved places could not be read; the original file has been preserved");
+        }
         ensureDefaultLists();
+    }
+
+    private static void clearState() {
+        lists.clear(); places.clear(); labels.clear(); hiddenOnMap.clear(); home = work = null;
+    }
+
+    /** Keep original objects for rollback; imports work on a deep copy made from json. */
+    private static final class Snapshot {
+        final JSONObject json;
+        final Map<String, String> listNames = new LinkedHashMap<>(lists);
+        final Map<String, Place> savedPlaces = new LinkedHashMap<>(places);
+        final Map<String, Place> savedLabels = new LinkedHashMap<>(labels);
+        final Set<String> hidden = new LinkedHashSet<>(hiddenOnMap);
+        final Place savedHome = home, savedWork = work;
+
+        Snapshot() throws Exception { json = toJson(); }
+
+        void restore() {
+            clearState();
+            lists.putAll(listNames);
+            places.putAll(savedPlaces);
+            labels.putAll(savedLabels);
+            hiddenOnMap.addAll(hidden);
+            home = savedHome; work = savedWork;
+        }
+    }
+
+    static void checkCoordinates(double lat, double lng) {
+        if (!Double.isFinite(lat) || !Double.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            throw new IllegalArgumentException("Missing or invalid place coordinates");
+        }
+    }
+
+    static void warnSave(Context c, String message) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(c, message, android.widget.Toast.LENGTH_LONG).show());
     }
 
     static boolean isDefault(String id) {
@@ -162,24 +241,37 @@ final class SavedStore {
 
     /** Reads our own format; [replace] false merges into what is already there. */
     private static void read(JSONObject root, boolean replace) throws Exception {
-        JSONArray l = root.optJSONArray("lists");
+        if (!isStore(root)) throw new IllegalArgumentException("Unknown saved places object");
+        JSONArray l = optionalArray(root, "lists");
         if (l != null) for (int i = 0; i < l.length(); i++) {
             JSONObject o = l.getJSONObject(i);
-            if (replace || !lists.containsKey(o.getString("id"))) lists.put(o.getString("id"), o.getString("name"));
+            String id = string(o.opt("id")), name = string(o.opt("name"));
+            if (id.isEmpty()) throw new IllegalArgumentException("Missing list id");
+            if (replace || !lists.containsKey(id)) lists.put(id, name);
         }
-        JSONArray ps = root.optJSONArray("places");
+        JSONArray ps = optionalArray(root, "places");
         if (ps != null) for (int i = 0; i < ps.length(); i++) merge(Place.fromJson(ps.getJSONObject(i)));
-        if (root.has("home") && (replace || home == null)) home = Place.fromJson(root.getJSONObject("home"));
-        if (root.has("work") && (replace || work == null)) work = Place.fromJson(root.getJSONObject("work"));
-        JSONArray lb = root.optJSONArray("labels");
+        if (root.has("home")) { Place p = Place.fromJson(root.getJSONObject("home")); if (replace || home == null) home = p; }
+        if (root.has("work")) { Place p = Place.fromJson(root.getJSONObject("work")); if (replace || work == null) work = p; }
+        JSONArray lb = optionalArray(root, "labels");
         if (lb != null) for (int i = 0; i < lb.length(); i++) {
             JSONObject o = lb.getJSONObject(i);
-            String label = o.optString("label", "");
-            JSONObject at = o.optJSONObject("place");
-            if (!label.isEmpty() && at != null && (replace || !labels.containsKey(label))) labels.put(label, Place.fromJson(at));
+            String label = string(o.opt("label"));
+            if (label.isEmpty()) throw new IllegalArgumentException("Missing label");
+            Place at = Place.fromJson(o.getJSONObject("place"));
+            if (replace || !labels.containsKey(label)) labels.put(label, at);
         }
-        JSONArray hidden = root.optJSONArray("hiddenOnMap");
-        if (hidden != null) for (int i = 0; i < hidden.length(); i++) hiddenOnMap.add(hidden.optString(i));
+        JSONArray hidden = optionalArray(root, "hiddenOnMap");
+        if (hidden != null) for (int i = 0; i < hidden.length(); i++) hiddenOnMap.add(string(hidden.opt(i)));
+        JSONArray history = optionalArray(root, "history");
+        if (history != null) HistoryStore.validateImport(history);
+    }
+
+    private static boolean isStore(JSONObject root) {
+        for (String key : new String[]{"lists", "places", "home", "work", "labels", "hiddenOnMap", "history"}) {
+            if (root.has(key)) return true;
+        }
+        return false;
     }
 
     private static void merge(Place p) {
@@ -190,13 +282,29 @@ final class SavedStore {
 
     static synchronized void save(Context c) {
         try {
-            File tmp = new File(c.getFilesDir(), FILE + ".tmp");
-            try (OutputStream out = new FileOutputStream(tmp)) {
-                out.write(toJson().toString(1).getBytes(StandardCharsets.UTF_8));
-            }
-            if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
-        } catch (Throwable ignored) {}
-        SavedOnMap.refresh();
+            saveChecked(c);
+            SavedOnMap.refresh();
+        } catch (Exception e) {
+            warnSave(c, "Saved places could not be saved: " + e.getMessage());
+        }
+    }
+
+    private static void saveChecked(Context c) throws Exception {
+        if (loadError != null) throw new java.io.IOException("The saved places file could not be read; refusing to overwrite it", loadError);
+        byte[] data = toJson().toString(1).getBytes(StandardCharsets.UTF_8);
+        writeSaved(c, data);
+    }
+
+    private static void writeSaved(Context c, byte[] data) throws Exception {
+        File tmp = new File(c.getFilesDir(), FILE + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
+            out.write(data);
+            out.getFD().sync();
+        }
+        if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) {
+            tmp.delete();
+            throw new java.io.IOException("Could not replace the saved places file");
+        }
     }
 
     static synchronized JSONObject toJson() throws Exception {
@@ -459,33 +567,42 @@ final class SavedStore {
      * CSV per list, named after the list) or a whole Takeout .zip, whose Saved lists and
      * Saved Places.json are all taken.
      */
-    static Imported importFiles(Context c, List<Uri> from) throws Exception {
+    static int importFile(Context c, Uri from) throws Exception {
+        return importFiles(c, java.util.Collections.singletonList(from)).places;
+    }
+
+    static synchronized Imported importFiles(Context c, List<Uri> from) throws Exception {
         load(c);
+        if (loadError != null) throw new java.io.IOException("Cannot import until the saved places file can be read", loadError);
         Imported r = new Imported();
-        int before;
-        Set<String> listsBefore;
-        synchronized (SavedStore.class) {
-            before = places.size();
-            listsBefore = new LinkedHashSet<>(lists.keySet());
-        }
-        for (Uri uri : from) {
-            try (InputStream raw = c.getContentResolver().openInputStream(uri)) {
-                if (raw == null) throw new java.io.IOException("cannot read " + uri);
-                java.io.BufferedInputStream in = new java.io.BufferedInputStream(raw);
-                in.mark(4);
-                byte[] head = new byte[4];
-                int n = in.read(head);
-                in.reset();
-                if (n == 4 && head[0] == 'P' && head[1] == 'K' && head[2] == 3 && head[3] == 4) importZip(c, in, r);
-                else {
-                    importText(c, readAll(in), displayName(c, uri));
-                    r.files++;
+        Snapshot previous = new Snapshot();
+        int before = places.size();
+        Set<String> listsBefore = new LinkedHashSet<>(lists.keySet());
+        JSONArray history = new JSONArray();
+        File saved = new File(c.getFilesDir(), FILE);
+        byte[] original = saved.exists() ? java.nio.file.Files.readAllBytes(saved.toPath()) : null;
+        boolean savedWritten = false;
+        try {
+            clearState();
+            read(previous.json, true);
+            for (Uri uri : from) {
+                try (InputStream raw = c.getContentResolver().openInputStream(uri)) {
+                    if (raw == null) throw new java.io.IOException("cannot read " + uri);
+                    java.io.BufferedInputStream in = new java.io.BufferedInputStream(raw);
+                    in.mark(4);
+                    byte[] head = new byte[4];
+                    int n = 0, next;
+                    while (n < head.length && (next = in.read(head, n, head.length - n)) != -1) n += next;
+                    in.reset();
+                    if (n == 4 && head[0] == 'P' && head[1] == 'K') importZip(c, in, r, history);
+                    else {
+                        importText(c, readAll(in), displayName(c, uri), history);
+                        r.files++;
+                    }
                 }
             }
-        }
-        // A place looked at in Maps recently has its position (and photos) in the recent places already.
-        HistoryStore.load(c);
-        synchronized (SavedStore.class) {
+            // A recently viewed place already has its position (and photos) in history.
+            HistoryStore.load(c);
             for (Place p : places.values()) {
                 if (p.located()) continue;
                 HistoryStore.Entry seen = HistoryStore.find(p.key());
@@ -495,49 +612,83 @@ final class SavedStore {
                 if (known.located()) { p.lat = known.lat; p.lng = known.lng; }
             }
             ensureDefaultLists();
+            if (history.length() > 0) HistoryStore.validateImport(c, history);
             r.places = places.size() - before;
             for (String id : lists.keySet()) if (!listsBefore.contains(id)) r.lists++;
             for (Place p : places.values()) if (!p.located()) r.unlocated++;
+            saveChecked(c);
+            savedWritten = true;
+            // Separate files: runtime failures roll back; a process crash between renames is not atomic.
+            if (history.length() > 0) HistoryStore.merge(c, history);
+        } catch (Exception e) {
+            previous.restore();
+            if (savedWritten) {
+                try {
+                    if (original == null) java.nio.file.Files.deleteIfExists(saved.toPath());
+                    else writeSaved(c, original);
+                } catch (Exception rollback) { e.addSuppressed(rollback); }
+            }
+            throw e;
         }
-        save(c);
+        SavedOnMap.refresh();
         return r;
     }
 
-    /** One file's text, by what it holds; [name] is its file name, which names a Takeout list. */
-    private static void importText(Context c, String text, String name) throws Exception {
+    /** Dispatch by verified content, including inside archives; the name only names a CSV list. */
+    private static void importText(Context c, String text, String name, JSONArray history) throws Exception {
         String t = text.startsWith("\uFEFF") ? text.substring(1) : text;
         t = t.trim();
-        synchronized (SavedStore.class) {
-            if (t.startsWith("{")) {
-                JSONObject root = new JSONObject(t);
-                if (root.has("places") || root.has("lists")) read(root, false);
-                else importGeoJson(root);
-                JSONArray history = root.optJSONArray("history");
-                if (history != null) HistoryStore.merge(c, history);
-            } else if (t.startsWith("<")) {
-                importKml(c, t);
-            } else {
-                importCsv(t, name);
-            }
+        if (t.startsWith("{")) {
+            JSONObject root = parseJson(t);
+            JSONArray recent = optionalArray(root, "history");
+            if (recent != null) HistoryStore.validateImport(recent);
+            if (isStore(root)) read(root, false);
+            else importGeoJson(root);
+            if (recent != null) for (int i = 0; i < recent.length(); i++) history.put(recent.getJSONObject(i));
+        } else if (t.startsWith("<")) {
+            importKml(c, t);
+        } else {
+            importCsv(t, name);
         }
     }
 
-    /** A Takeout .zip: every saved list (Takeout/Saved/<list>.csv) and the starred places (Saved Places.json). */
-    private static void importZip(Context c, InputStream in, Imported r) throws Exception {
-        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in);
-        for (java.util.zip.ZipEntry e; (e = zip.getNextEntry()) != null; ) {
-            if (e.isDirectory()) continue;
-            String path = e.getName().replace('\\', '/');
-            String file = path.substring(path.lastIndexOf('/') + 1);
-            String lower = ("/" + path).toLowerCase(Locale.ROOT);
-            boolean list = lower.endsWith(".csv") && lower.contains("/saved/");
-            boolean starred = file.equalsIgnoreCase("Saved Places.json");
-            if (!list && !starred) continue;
-            ByteArrayOutputStream b = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            for (int n; (n = zip.read(buf)) > 0; ) b.write(buf, 0, n);
-            importText(c, b.toString("UTF-8"), file);
-            r.files++;
+    /** A Takeout archive: lists under Saved/ and Saved Places.json, ignoring unrelated entries. */
+    private static void importZip(Context c, InputStream in, Imported r, JSONArray history) throws Exception {
+        // ZipInputStream accepts a truncated archive without its central directory. ZipFile verifies it.
+        File archive = File.createTempFile("saved-import-", ".zip", c.getCacheDir());
+        try {
+            try (OutputStream out = new FileOutputStream(archive)) {
+                byte[] buf = new byte[8192];
+                for (int n; (n = in.read(buf)) != -1; ) out.write(buf, 0, n);
+            }
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive)) {
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+                int filesBefore = r.files;
+                while (entries.hasMoreElements()) {
+                    java.util.zip.ZipEntry e = entries.nextElement();
+                    if (e.isDirectory()) continue;
+                    String path = e.getName().replace('\\', '/');
+                    String file = path.substring(path.lastIndexOf('/') + 1);
+                    String lower = ("/" + path).toLowerCase(Locale.ROOT);
+                    boolean list = lower.endsWith(".csv") && lower.contains("/saved/");
+                    boolean starred = file.equalsIgnoreCase("Saved Places.json");
+                    if (!list && !starred) continue;
+                    byte[] data;
+                    try (InputStream entry = zip.getInputStream(e); ByteArrayOutputStream b = new ByteArrayOutputStream()) {
+                        byte[] buf = new byte[8192];
+                        for (int n; (n = entry.read(buf)) != -1; ) b.write(buf, 0, n);
+                        data = b.toByteArray();
+                    }
+                    java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+                    crc.update(data);
+                    if (data.length != e.getSize() || crc.getValue() != e.getCrc()) throw new java.io.IOException("Invalid ZIP entry");
+                    importText(c, new String(data, StandardCharsets.UTF_8), file, history);
+                    r.files++;
+                }
+                if (r.files == filesBefore) throw new IllegalArgumentException("No saved places files in ZIP");
+            }
+        } finally {
+            archive.delete();
         }
     }
 
@@ -553,9 +704,9 @@ final class SavedStore {
 
     private static final java.util.regex.Pattern FEATURE_ID = java.util.regex.Pattern.compile("!1s(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)");
     private static final java.util.regex.Pattern CID = java.util.regex.Pattern.compile("[?&]cid=(\\d+)");
-    private static final java.util.regex.Pattern PIN = java.util.regex.Pattern.compile("!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)");
+    private static final java.util.regex.Pattern PIN = java.util.regex.Pattern.compile("!3d([^!/?&#]+)!4d([^!/?&#]+)");
     private static final java.util.regex.Pattern SPOT = java.util.regex.Pattern.compile(
-            "(?:/search/|/place/|[?&](?:q|query|ll|destination)=|@)\\s*(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*\\+?(-?\\d{1,3}(?:\\.\\d+)?)");
+            "(?:/search/|/place/|[?&](?:q|query|ll|destination)=|@)\\s*([^,/?&#\\s]+)\\s*,\\s*([^,/?&#\\s]+)");
 
     /**
      * One saved list from Google Takeout: a CSV (Title, Note, URL, Tags, Comment) whose links
@@ -564,15 +715,20 @@ final class SavedStore {
      */
     private static void importCsv(String text, String fileName) {
         List<List<String>> rows = csv(text);
-        if (rows.isEmpty()) return;
+        if (rows.isEmpty()) throw new IllegalArgumentException("Empty CSV");
         List<String> header = rows.get(0);
-        int title = column(header, 0, "title"), note = column(header, 1, "note"), url = column(header, 2, "url"),
-                comment = column(header, 4, "comment");
+        int title = column(header, -1, "title"), note = column(header, -1, "note"), url = column(header, -1, "url"),
+                comment = column(header, -1, "comment");
+        if (title < 0 || url < 0) throw new IllegalArgumentException("Expected Takeout CSV Title and URL columns");
         String list = listForCsv(fileName);
         long now = System.currentTimeMillis();
         // The list's first row on top here too: the store keeps its newest last.
         for (int i = rows.size() - 1; i >= 1; i--) {
             List<String> row = rows.get(i);
+            boolean blank = true;
+            for (String value : row) if (!value.trim().isEmpty()) { blank = false; break; }
+            if (blank) continue;
+            if (row.size() < header.size()) throw new IllegalArgumentException("Incomplete CSV row");
             String link = cell(row, url);
             // A link written without quotes splits at its commas (a dropped pin's "lat,lng", a
             // viewport's "@lat,lng,zoom"): the extra cells are its pieces.
@@ -581,9 +737,13 @@ final class SavedStore {
                 StringBuilder joined = new StringBuilder(link);
                 for (int k = 1; k <= extra; k++) joined.append(',').append(cell(row, url + k));
                 link = joined.toString();
+                row = new ArrayList<>(row);
+                row.subList(url + 1, url + extra + 1).clear();
+            } else if (extra > 0) {
+                throw new IllegalArgumentException("Unexpected CSV columns");
             }
-            Place p = fromMapsLink(link, cell(row, title));
-            if (p == null) continue;
+            Place p = fromMapsLink(link, cell(row, title), true);
+            if (p == null) throw new IllegalArgumentException("CSV row has no usable Maps place");
             String n = cell(row, note), m = cell(row, comment);
             p.note = n.isEmpty() ? m : m.isEmpty() || m.equals(n) ? n : n + "\n" + m;
             if (list != null) p.lists.add(list);
@@ -615,6 +775,10 @@ final class SavedStore {
 
     /** A place from a Maps link: its feature id (or customer id), else the spot a dropped pin's link names. */
     static Place fromMapsLink(String url, String title) {
+        return fromMapsLink(url, title, false);
+    }
+
+    private static Place fromMapsLink(String url, String title, boolean strict) {
         Place p = new Place();
         String link = Uri.decode(url == null ? "" : url);
         java.util.regex.Matcher m = FEATURE_ID.matcher(link);
@@ -632,6 +796,9 @@ final class SavedStore {
         // A position only where the link really names the spot: a place's own (!3d!4d), or a dropped pin's.
         m = PIN.matcher(link);
         boolean spot = m.find();
+        if (strict && !spot && (link.contains("!3d") || link.contains("!4d"))) {
+            throw new IllegalArgumentException("Malformed Maps coordinates");
+        }
         if (!spot && p.ftid == null) {
             m = SPOT.matcher(link);
             spot = m.find();
@@ -639,8 +806,9 @@ final class SavedStore {
         if (spot) {
             try {
                 double lat = Double.parseDouble(m.group(1)), lng = Double.parseDouble(m.group(2));
-                if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) { p.lat = lat; p.lng = lng; }
-            } catch (Throwable ignored) {}
+                checkCoordinates(lat, lng);
+                p.lat = lat; p.lng = lng;
+            } catch (IllegalArgumentException e) { if (strict) throw e; }
         }
         if (p.ftid == null && !p.located()) return null;
         String name = title == null ? "" : title.trim();
@@ -677,29 +845,34 @@ final class SavedStore {
         List<List<String>> rows = new ArrayList<>();
         List<String> row = new ArrayList<>();
         StringBuilder f = new StringBuilder();
-        boolean quoted = false;
+        boolean quoted = false, closed = false;
         for (int i = 0; i < s.length(); i++) {
             char ch = s.charAt(i);
             if (quoted) {
                 if (ch != '"') f.append(ch);
                 else if (i + 1 < s.length() && s.charAt(i + 1) == '"') { f.append('"'); i++; }
-                else quoted = false;
+                else { quoted = false; closed = true; }
             } else if (ch == '"') {
+                if (f.length() != 0 || closed) throw new IllegalArgumentException("Malformed CSV quote");
                 quoted = true;
             } else if (ch == ',') {
                 row.add(f.toString());
                 f.setLength(0);
+                closed = false;
             } else if (ch == '\n' || ch == '\r') {
                 if (ch == '\r' && i + 1 < s.length() && s.charAt(i + 1) == '\n') i++;
                 row.add(f.toString());
                 f.setLength(0);
+                closed = false;
                 rows.add(row);
                 row = new ArrayList<>();
             } else {
+                if (closed) throw new IllegalArgumentException("Text after CSV quote");
                 f.append(ch);
             }
         }
-        if (f.length() > 0 || !row.isEmpty()) {
+        if (quoted) throw new IllegalArgumentException("Unterminated CSV quote");
+        if (f.length() > 0 || !row.isEmpty() || closed) {
             row.add(f.toString());
             rows.add(row);
         }
@@ -752,22 +925,32 @@ final class SavedStore {
     }
 
     private static void importGeoJson(JSONObject root) throws Exception {
-        JSONArray features = root.optJSONArray("features");
-        if (features == null) return;
+        JSONArray features = optionalArray(root, "features");
+        if (features == null || (root.has("type") && !"FeatureCollection".equals(root.getString("type")))) {
+            throw new IllegalArgumentException("Expected a GeoJSON FeatureCollection");
+        }
         for (int i = 0; i < features.length(); i++) {
             JSONObject f = features.getJSONObject(i);
-            JSONObject g = f.optJSONObject("geometry");
-            JSONArray xy = g == null ? null : g.optJSONArray("coordinates");
-            if (xy == null || xy.length() < 2) continue;
+            if (f.has("type") && !"Feature".equals(f.getString("type"))) throw new IllegalArgumentException("Expected a GeoJSON Feature");
+            JSONObject g = f.getJSONObject("geometry");
+            if (g.has("type") && !"Point".equals(g.getString("type"))) throw new IllegalArgumentException("Expected a GeoJSON Point");
+            JSONArray xy = optionalArray(g, "coordinates");
+            if (xy == null || xy.length() < 2 || xy.length() > 3 || !(xy.opt(0) instanceof Number) || !(xy.opt(1) instanceof Number)) {
+                throw new IllegalArgumentException("Malformed GeoJSON coordinates");
+            }
+            if (xy.length() == 3 && (!(xy.opt(2) instanceof Number) || !Double.isFinite(xy.getDouble(2)))) {
+                throw new IllegalArgumentException("Invalid GeoJSON altitude");
+            }
             Place p = new Place();
             p.lng = xy.getDouble(0);
             p.lat = xy.getDouble(1);
+            checkCoordinates(p.lat, p.lng);
             if (p.lat == 0 && p.lng == 0) continue;
-            JSONObject props = f.optJSONObject("properties");
+            JSONObject props = f.has("properties") && !f.isNull("properties") ? f.getJSONObject("properties") : null;
             String name = null;
             if (props != null) {
-                JSONObject loc = props.optJSONObject("location");
-                if (loc == null) loc = props.optJSONObject("Location");
+                JSONObject loc = props.has("location") ? props.getJSONObject("location") : null;
+                if (loc == null && props.has("Location")) loc = props.getJSONObject("Location");
                 if (loc != null) name = firstOf(loc, "name", "Business Name", "address", "Address");
                 if (name == null) name = firstOf(props, "name", "Title", "title");
             }
@@ -787,12 +970,21 @@ final class SavedStore {
 
     private static void importKml(Context c, String text) throws Exception {
         XmlPullParser x = Xml.newPullParser();
+        x.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         x.setInput(new java.io.StringReader(text));
         String folder = null, name = null, coords = null, tag = null;
         boolean inPlacemark = false;
+        boolean rootSeen = false, rootClosed = false;
+        int depth = 0;
         for (int ev = x.getEventType(); ev != XmlPullParser.END_DOCUMENT; ev = x.next()) {
             if (ev == XmlPullParser.START_TAG) {
+                if (rootClosed) throw new IllegalArgumentException("Multiple KML roots");
+                depth++;
                 tag = x.getName();
+                if (!rootSeen) {
+                    if (!"kml".equals(tag)) throw new IllegalArgumentException("Expected KML");
+                    rootSeen = true;
+                }
                 if ("Placemark".equals(tag)) { inPlacemark = true; name = coords = null; }
             } else if (ev == XmlPullParser.TEXT && tag != null) {
                 String v = x.getText().trim();
@@ -802,11 +994,15 @@ final class SavedStore {
             } else if (ev == XmlPullParser.END_TAG) {
                 if ("Placemark".equals(x.getName())) {
                     inPlacemark = false;
+                    if (coords == null) throw new IllegalArgumentException("Missing KML coordinates");
                     if (coords != null) {
-                        String[] xy = coords.split("\\s+")[0].split(",");
+                        String[] xy = coords.split("\\s+")[0].split(",", -1);
+                        if (xy.length < 2 || xy.length > 3) throw new IllegalArgumentException("Malformed KML coordinates");
+                        if (xy.length == 3 && !Double.isFinite(Double.parseDouble(xy[2]))) throw new IllegalArgumentException("Invalid KML altitude");
                         Place p = new Place();
                         p.lng = Double.parseDouble(xy[0]);
                         p.lat = Double.parseDouble(xy[1]);
+                        checkCoordinates(p.lat, p.lng);
                         p.name = name != null ? name : String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng);
                         p.added = System.currentTimeMillis();
                         String list = listForFolder(folder);
@@ -815,8 +1011,12 @@ final class SavedStore {
                     }
                 }
                 tag = null;
+                if (--depth == 0) rootClosed = true;
             }
         }
+        if (!rootSeen) throw new IllegalArgumentException("Empty KML");
+        // Android's pull parser can report END_DOCUMENT even when elements remain open.
+        if (!rootClosed || depth != 0 || inPlacemark) throw new IllegalArgumentException("Incomplete KML document");
     }
 
     /** A KML folder becomes the list of the same name, created if needed; no folder, no list. */
