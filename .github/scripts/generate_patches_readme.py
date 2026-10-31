@@ -113,6 +113,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines',
         '<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines',
     ),
+    "com.samsung.android.messaging": (
+        '<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages',
+        '<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages',
+    ),
 }
 
 
