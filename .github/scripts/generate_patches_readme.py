@@ -97,6 +97,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor',
         '<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor',
     ),
+    "com.samsung.android.calendar": (
+        '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
+        '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
+    ),
 }
 
 
