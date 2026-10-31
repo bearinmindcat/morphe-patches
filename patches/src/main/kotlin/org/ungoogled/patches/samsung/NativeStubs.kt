@@ -27,12 +27,20 @@ private fun defaultReturn(type: String) = when (type) {
  * Classes that bind to a native library only One UI can load (a Samsung system library, or one of the app's own that
  * links against one): their native methods become Java methods answering nothing (void, 0, false, null), so the
  * features built on them stay off instead of every first call throwing UnsatisfiedLinkError. A class is matched by its
- * System.loadLibrary("<name>") of one of [libraries]. Returns the native methods replaced, by class.
+ * System.loadLibrary("<name>") of one of [libraries], or by name in [boundClasses] (a class whose natives bind to such a
+ * library that another class loads, e.g. a Kotlin companion). Returns the native methods replaced, by class.
  */
-internal fun BytecodePatchContext.stubNativeLibraries(libraries: Set<String>): Map<String, Int> {
+internal fun BytecodePatchContext.stubNativeLibraries(
+    libraries: Set<String>,
+    boundClasses: Set<String> = emptySet(),
+): Map<String, Int> {
     val classes = mutableListOf<String>()
     classDefForEach { c ->
         if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        if (c.type in boundClasses && c.methods.any { AccessFlags.NATIVE.isSet(it.accessFlags) }) {
+            classes += c.type
+            return@classDefForEach
+        }
         val loads = c.methods.any { m ->
             val instructions = m.implementation?.instructions?.toList() ?: return@any false
             instructions.withIndex().any { (i, insn) ->
