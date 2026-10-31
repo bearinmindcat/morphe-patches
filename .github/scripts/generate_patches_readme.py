@@ -101,6 +101,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
         '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
     ),
+    "com.samsung.android.app.reminder": (
+        '<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder',
+        '<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder',
+    ),
 }
 
 
