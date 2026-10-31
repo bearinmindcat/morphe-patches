@@ -109,6 +109,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather',
         '<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather',
     ),
+    "com.samsung.android.app.routines": (
+        '<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines',
+        '<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines',
+    ),
 }
 
 
