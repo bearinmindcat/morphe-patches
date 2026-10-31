@@ -125,6 +125,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock',
         '<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock',
     ),
+    "com.sec.android.app.popupcalculator": (
+        '<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator',
+        '<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator',
+    ),
 }
 
 
