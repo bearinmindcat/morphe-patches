@@ -129,6 +129,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator',
         '<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator',
     ),
+    "com.sec.android.app.voicenote": (
+        '<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder',
+        '<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder',
+    ),
 }
 
 
