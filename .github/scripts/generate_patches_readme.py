@@ -105,6 +105,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder',
         '<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder',
     ),
+    "com.sec.android.daemonapp": (
+        '<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather',
+        '<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather',
+    ),
 }
 
 
