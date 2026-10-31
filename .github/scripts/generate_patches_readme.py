@@ -117,6 +117,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages',
         '<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages',
     ),
+    "com.samsung.android.app.contacts": (
+        '<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts',
+        '<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts',
+    ),
 }
 
 
