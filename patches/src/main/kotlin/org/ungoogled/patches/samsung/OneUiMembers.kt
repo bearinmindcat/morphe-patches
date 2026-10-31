@@ -49,7 +49,7 @@ private fun moveResult(type: String) = when {
 }
 
 /** Turns the helper's Object answer in v0 into the shim's own return. */
-private fun returnFrom(type: String): String {
+internal fun returnFrom(type: String): String {
     if (type == "V") return "return-void"
     val box = BOXES[type] ?: return "check-cast v0, $type\nreturn-object v0"
     return """
@@ -61,7 +61,7 @@ private fun returnFrom(type: String): String {
 }
 
 /** Puts parameters [from] .. of the shim into the Object[] in v2 (index v3, box in v4). */
-private fun packArguments(parameters: List<String>, from: Int): String = buildString {
+internal fun packArguments(parameters: List<String>, from: Int): String = buildString {
     appendLine("const/16 v3, ${parameters.size - from}")
     appendLine("new-array v2, v3, [Ljava/lang/Object;")
     var p = registers(parameters.take(from))
