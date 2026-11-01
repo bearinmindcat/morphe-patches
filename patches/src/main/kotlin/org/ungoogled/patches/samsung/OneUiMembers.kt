@@ -87,7 +87,21 @@ internal fun packArguments(parameters: List<String>, from: Int): String = buildS
  * own shape, so each site only changes its target. [oneUi] and [sem] are the app extension's two classes (each app
  * carries its own copy, since an extension is merged into one app). Returns the calls and field accesses moved.
  */
-internal fun BytecodePatchContext.redirectOneUiMembers(oneUi: String, sem: String): Pair<Int, Int> {
+internal fun BytecodePatchContext.redirectOneUiMembers(oneUi: String, sem: String): Pair<Int, Int> =
+    redirectMembers(oneUi, sem) { owner, name -> owner.startsWith("Landroid/") && ONE_UI_MEMBER.containsMatchIn(name) }
+
+/**
+ * The machinery behind redirectOneUiMembers, for any vendor: every call to and field access of a member for which
+ * [isMember] (owner class, member name) says yes goes through [helper]'s call/callSuper/get/set, via one generated
+ * method per member in [shimClass]. Also used for HyperOS (xiaomi/MiuiMembers).
+ */
+internal fun BytecodePatchContext.redirectMembers(
+    helper: String,
+    shimClass: String,
+    isMember: (owner: String, name: String) -> Boolean,
+): Pair<Int, Int> {
+    val oneUi = helper
+    val sem = shimClass
     val semClass = mutableClassDefBy(sem)
     val shims = mutableMapOf<String, String>()
 
@@ -151,7 +165,7 @@ internal fun BytecodePatchContext.redirectOneUiMembers(oneUi: String, sem: Strin
         )
     }
 
-    fun oneUi(owner: String, name: String) = owner.startsWith("Landroid/") && ONE_UI_MEMBER.containsMatchIn(name)
+    fun oneUi(owner: String, name: String) = isMember(owner, name)
 
     val sites = mutableListOf<Pair<String, Method>>()
     classDefForEach { c ->
