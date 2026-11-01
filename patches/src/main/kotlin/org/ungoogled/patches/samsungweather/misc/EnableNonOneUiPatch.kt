@@ -96,8 +96,9 @@ private val oneUiMembersPatch = bytecodePatch(
 
 /**
  * Off One UI Weather runs on its own Android platform layer, but has no launcher icon, crashes opening the location
- * list (and other screens shown as pop-overs) and on the One UI classes and members its screens still call. The
- * extension carries stand-ins for those classes.
+ * list (and other screens shown as pop-overs) and on the One UI classes and members its screens still call. Below
+ * Android 15 it also died on start writing its Now Brief search index (appSearchPatch), and on Android 12 and 13
+ * opening a forecast (olderAndroidPatch). The extension carries stand-ins for those classes.
  */
 @Suppress("unused")
 val enableNonOneUiPatch = bytecodePatch(
@@ -106,6 +107,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_WEATHER)
-    dependsOn(launcherIconPatch, launcherStatePatch, popOverOptionsPatch, oneUiMembersPatch)
+    dependsOn(launcherIconPatch, launcherStatePatch, popOverOptionsPatch, oneUiMembersPatch, appSearchPatch, olderAndroidPatch)
     extendWith(SAMSUNG_WEATHER_EXTENSION)
 }

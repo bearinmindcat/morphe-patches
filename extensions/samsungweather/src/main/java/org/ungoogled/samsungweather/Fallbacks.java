@@ -5,8 +5,8 @@ import android.os.UserHandle;
 import android.telephony.TelephonyManager;
 
 /**
- * One UI members Weather needs a real answer for off One UI, from Android's own public calls. Everything else a
- * phone lacks answers "absent" (see OneUi).
+ * One UI members (and newer-Android ones, see Api) Weather needs a real answer for where the phone lacks them, from
+ * Android's own public calls. Everything else a phone lacks answers "absent" (see OneUi).
  */
 final class Fallbacks {
     static final Object NONE = new Object();
@@ -28,6 +28,9 @@ final class Fallbacks {
                     return receiver.hashCode();
                 case "Landroid/telephony/TelephonyManager;->semGetDataState(I)I":
                     return ((TelephonyManager) receiver).getDataState();
+                case "Landroid/app/Activity;->getLaunchedFromUid()I":
+                    // Android 14's; below it the launcher is unknown, which Weather treats as not trusted.
+                    return Process.INVALID_UID;
             }
         } catch (SecurityException | ClassCastException e) {
             return NONE;
