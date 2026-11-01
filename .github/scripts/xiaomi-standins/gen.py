@@ -13,7 +13,7 @@ ap.add_argument('--extends', help='file of "Lclass; Lsuperclass;" lines that ove
 ap.add_argument('--runtime', help='also write Miui/MiuiShims/Fallbacks (runtime/) into this Java package')
 ap.add_argument('--sdk', help='android.jar to compile against (default: newest under $ANDROID_HOME or ~/android-sdk)')
 ap.add_argument('--only', help='regex: only classes matching it (default: Xiaomi framework packages)',
-                default=r'^L(miui/|com/miui/|com/xiaomi/|android/.*/Miui|android/.*\$Miui|android/miui/|com/android/internal/app/Miui)')
+                default=r'^L(miui/|com/miui/|com/xiaomi/|android/.*/Miui|android/.*\$Miui|android/miui/|android/os/spc/|com/android/internal/app/Miui)')
 a = ap.parse_args()
 
 u = json.load(open(os.path.join(a.work, 'usage.json')))

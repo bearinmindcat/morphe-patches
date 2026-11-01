@@ -165,6 +165,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes',
         '<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes',
     ),
+    "com.xiaomi.scanner": (
+        '<img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner',
+        '<img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner',
+    ),
 }
 
 

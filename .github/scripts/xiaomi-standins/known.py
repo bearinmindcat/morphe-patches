@@ -21,6 +21,10 @@ FIELDS = {
     'Lmiui/os/Build;->TYPE:Ljava/lang/String;': 'android.os.Build.TYPE',
     'Lmiui/os/Build;->USER:Ljava/lang/String;': 'android.os.Build.USER',
     'Lmiui/os/Build;->FINGERPRINT:Ljava/lang/String;': 'android.os.Build.FINGERPRINT',
+    # Scanner calls HARDWARE.matches(..) and CPU_ABI.contains(..): null would be an NPE.
+    'Lmiui/os/Build;->HARDWARE:Ljava/lang/String;': 'android.os.Build.HARDWARE',
+    'Lmiui/os/Build;->DISPLAY:Ljava/lang/String;': 'android.os.Build.DISPLAY',
+    'Lmiui/os/Build;->CPU_ABI:Ljava/lang/String;': 'android.os.Build.SUPPORTED_ABIS[0]',
 }
 
 METHODS = {

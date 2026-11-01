@@ -54,5 +54,6 @@ Things to know:
 - `known.REFLECTED` lists fields Xiaomi's libraries only read by reflection (miuix's
   `miui.os.Build.IS_MIUI_LITE_VERSION`, looked up on every layout pass and cached only when found); gen.py adds them to
   a stand-in it writes anyway.
-- `--only` (default: `miui/`, `com/miui/`, `com/xiaomi/`, `Miui*` classes under `android/`) limits generation to the
-  Xiaomi framework; other missing classes (unused optional libraries such as ad SDKs, `java.awt`) are left alone.
+- `--only` (default: `miui/`, `com/miui/`, `com/xiaomi/`, `Miui*` classes under `android/`, HyperOS's `android/os/spc/`)
+  limits generation to the Xiaomi framework; other missing classes (unused optional libraries such as ad SDKs,
+  `java.awt`) are left alone.
