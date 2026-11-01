@@ -223,6 +223,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files',
         '<img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files',
     ),
+    "com.hihonor.notepad": (
+        '<img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes',
+        '<img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes',
+    ),
 }
 
 
