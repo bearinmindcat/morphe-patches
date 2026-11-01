@@ -13,7 +13,7 @@ object PdfCraftConstants {
         name = "PdfCraft",
         packageName = "io.github.artcraftandroid.pdfcraft",
         apkFileType = ApkFileType.APK,
-        appIconColor = 0x12A58A,
+        appIconColor = 0xB70228,
         // A null version: any PdfCraft version.
         targets = listOf(AppTarget(version = null)),
     )
