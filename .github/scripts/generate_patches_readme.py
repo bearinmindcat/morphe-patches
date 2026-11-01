@@ -50,6 +50,9 @@ VENDOR_GROUPS = [
     ("Honor Apps", "honor ", ("com.hihonor.",), ()),
     ("RedMagic Apps", "redmagic ", ("cn.nubia.",), ()),
     ("LG Apps", "lg ", ("com.lge.",), ()),
+    # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
+    ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
+     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ()),
 ]
 
 
@@ -241,6 +244,10 @@ APP_RENAMES = {
         '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
         '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
     ),
+    "com.oneplus.calculator": (
+        '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',
+        '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',
+    ),
 }
 
 
@@ -401,7 +408,9 @@ def build_content(expanded=False):
 
         def name(pkg):
             text = re.sub(r"<[^>]+>|&nbsp;", " ", pkg_label(pkg, group[pkg])).split("-&gt;")[0].strip().lower()
-            return text.removeprefix(prefix)
+            for p in (prefix if isinstance(prefix, tuple) else (prefix,)):
+                text = text.removeprefix(p)
+            return text
         names = sorted(group, key=name)
         count = sum(len(group[pkg]["patches"]) for pkg in group)
         apps  = "app" if len(group) == 1 else "apps"

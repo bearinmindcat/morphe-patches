@@ -1,0 +1,9 @@
+package android.view;
+
+/** Generated stand-in (.github/scripts/coloros-standins): names and signatures OnePlus Calculator uses, answering "absent" off ColorOS (no OPPO code). */
+public class OplusWindowManager {
+    public OplusWindowManager() {
+    }
+    public void requestKeyguard(java.lang.String p0) {
+    }
+}
