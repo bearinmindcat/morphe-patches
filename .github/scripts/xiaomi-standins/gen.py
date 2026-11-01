@@ -179,6 +179,13 @@ def split_params(s):
         out.append(s[i:j + 1]); i = j + 1
     return out
 
+# Kotlin members may carry names Java source cannot (HeyTap's DefValueUtilKt.default): skipped and listed
+JAVA_KEYWORDS = {'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const', 'continue',
+                 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if',
+                 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private',
+                 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized',
+                 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'}
+
 def compilable(t):
     # the phone's hidden classes (not in the SDK) and the app's own classes can't be named in the extension's source
     b = t.lstrip('[')
@@ -233,6 +240,9 @@ if SDK_BASES:
 
 # --- defaults ------------------------------------------------------------------------------------------------
 FACTORY = re.compile(r'^(build|create\w*|newInstance|getInstance|obtain|clone|copy)$')
+if getattr(known, 'FACTORIES', None):
+    # a vendor's own factory names (ColorOS: getDefault, get(Class), getOplusPackageManager, ...), opt-in
+    FACTORY = re.compile(FACTORY.pattern + '|' + known.FACTORIES)
 
 def default_return(t, params, cls, static, mname):
     if t == 'V': return None
@@ -328,7 +338,7 @@ def body_for(c, indent, nested):
     for f, ops in sorted(d['fields'].items()):
         name, t = f.split(':', 1)
         if f in inherited: continue  # the Android base class has it: keep the real one
-        if not compilable(t): skipped.append(c + '->' + f); continue
+        if not compilable(t) or name in JAVA_KEYWORDS: skipped.append(c + '->' + f); continue
         st = any(o.startswith('s') for o in ops)
         key = f'{c}->{f}'
         init = runtime_refs(known.FIELDS.get(key))
@@ -338,7 +348,7 @@ def body_for(c, indent, nested):
     for k, kinds in sorted(d['methods'].items()):
         name = k[:k.index('(')]; params = split_params(k[k.index('(') + 1:k.index(')')]); ret = k[k.index(')') + 1:]
         if name != '<init>' and k in inherited: continue  # the Android base class has it: keep the real one
-        if not all(compilable(t) for t in params + [ret]): skipped.append(c + '->' + k); continue
+        if not all(compilable(t) for t in params + [ret]) or name in JAVA_KEYWORDS: skipped.append(c + '->' + k); continue
         args = ', '.join(f'{jtype(t)} p{i}' for i, t in enumerate(params))
         if name == '<init>':
             if not is_if and ctor(c, simple, sup, params, pad): ctors.append(ctor(c, simple, sup, params, pad))

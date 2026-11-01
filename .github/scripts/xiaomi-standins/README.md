@@ -51,8 +51,10 @@ Editor) also need `redirectReflectedMiuiProperties(...)` (`patches/.../xiaomi/Re
 name becomes MiuiProps, which has the same static getters.
 
 Other vendors reuse this generator with their own answers: `--known <their known.py>` (its `HEADER`, `ONLY`,
-`RUNTIME_DIR`, and opt-in features such as `SDK_BASES` for stand-ins that extend Android's own classes). See
-`../honor-standins/`. Without `--known` the output is exactly as before.
+`RUNTIME_DIR`, and opt-in features such as `SDK_BASES` for stand-ins that extend Android's own classes, or `FACTORIES`
+for a vendor's own factory method names). See `../honor-standins/`. Without `--known` the output is exactly as before.
+Members named like a Java keyword (Kotlin's `DefValueUtilKt.default`) cannot be written in Java source and are skipped
+and listed.
 
 Things to know:
 - miuix probes the platform with `Class.forName("miui.util.HapticFeedbackUtil")` and reflection; with a stand-in
