@@ -48,6 +48,13 @@ Then in the patch (`patches/.../honor/`):
 - `followMagicDayNight()` (`MagicThemes.kt`): MagicOS gives each activity whose `hnc-theme` meta-data names
   Theme.Magic its own day/night theme; off MagicOS the declared Android theme (light Material, even dark Holo) stays,
   so action bars, popups and bar icons don't follow dark mode. Re-bases those activities on Android's DayNight theme.
+- `replaceMagicFrameworkIds(runtime, answers)` (`MagicFrameworkIds.kt`, bytecode): code can name androidhnext
+  resources by id too (`getColor(0x02050177)`, `new ContextThemeWrapper(context, Theme.Magic)`, a theme attribute
+  it resolves) and then dies on Resources$NotFoundException. Rewrites those literals to the app's own resources (the
+  bundled Honor UI kit has most of MagicOS's names) or Android's; a theme attribute gets the resource MagicOS answers
+  with, and `Theme.resolveAttribute` goes through the runtime `Magic.resolveAttribute`. List them with
+  `baksmali d classes.dex -o out; grep -rhE "const(/high16)? [vp][0-9]+, 0x2[0-9a-f]{6}$" out | sort | uniq -c`
+  (0x2000000 is a flag, not a resource).
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required Honor `uses-library`.
 - Vendor members on Android classes (none in Honor's own apps so far; YOYO and Honor Health have a few): redirect them
   like `xiaomi/MiuiMembers.kt` does, on top of `samsung/OneUiMembers.kt`'s `redirectMembers()`.

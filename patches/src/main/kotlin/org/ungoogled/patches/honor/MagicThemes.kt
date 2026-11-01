@@ -24,8 +24,9 @@ private fun Element.children(tag: String) =
  * phone's dark mode; the Android theme it declares (a light Material one, or even dark Holo) only matters elsewhere.
  * Off MagicOS that theme stays, so the app's own day or night colours sit under action bars, popup menus and bar icons
  * of the other mode. Re-bases each such activity on Android's day/night theme instead: an Android theme it names
- * directly becomes [MAGIC_DAY_NIGHT] (or its NoActionBar variant, as Theme.Magic.NoActionBar is), and an app style it
- * names gets that parent where its own chain reaches an Android theme. Returns the activities and styles changed.
+ * directly becomes [MAGIC_DAY_NIGHT] (or its NoActionBar variant, as Theme.Magic.NoActionBar is), as does Android's
+ * default when it names none, and an app style it names gets that parent where its own chain reaches an Android theme.
+ * Returns the activities and styles changed.
  */
 internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
     // activity theme -> whether MagicOS would give it no action bar
@@ -45,7 +46,8 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
                 val theme = activity.getAttribute("android:theme").ifEmpty { application.getAttribute("android:theme") }
                 val noActionBar = hnc.endsWith(".NoActionBar")
                 when {
-                    ANDROID_THEME.matches(theme) -> {
+                    // No theme anywhere: Android's default (DeviceDefault.Light.DarkActionBar), an Android theme too.
+                    theme.isEmpty() || ANDROID_THEME.matches(theme) -> {
                         val bar = noActionBar || theme.endsWith(".NoActionBar")
                         activity.setAttribute("android:theme", "@style/" + if (bar) MAGIC_DAY_NIGHT_NO_ACTION_BAR else MAGIC_DAY_NIGHT)
                         activities++

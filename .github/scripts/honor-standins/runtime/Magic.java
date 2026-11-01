@@ -1,5 +1,7 @@
 package org.ungoogled.APP;
 
+import android.content.res.Resources;
+import android.util.TypedValue;
 import java.lang.reflect.Method;
 
 /**
@@ -52,5 +54,23 @@ public final class Magic {
                 return false;
         }
         return def;
+    }
+
+    /**
+     * Theme.resolveAttribute for APP_NAME's code (patches/.../honor/MagicFrameworkIds.kt sends its calls here): where
+     * the code asked for one of MagicOS's theme attributes (?androidhnext:attr/...), the patch put the app's own
+     * resource MagicOS answers with (the same dimension or colour), which no theme has as an attribute; that resource
+     * is the answer, as MagicOS's theme would give it.
+     */
+    public static boolean resolveAttribute(Resources.Theme theme, int id, TypedValue out, boolean resolveRefs) {
+        if (theme.resolveAttribute(id, out, resolveRefs)) return true;
+        if ((id >>> 24) != 0x7f) return false;
+        try {
+            theme.getResources().getValue(id, out, resolveRefs);
+            out.resourceId = id;
+            return true;
+        } catch (Resources.NotFoundException e) {
+            return false;
+        }
     }
 }
