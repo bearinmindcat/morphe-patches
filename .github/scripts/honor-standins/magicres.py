@@ -24,7 +24,8 @@ def axml_refs(data):
             for k in range(acount):
                 q = pos + 16 + astart + k * asize
                 dtype, value = data[q + 15], struct.unpack_from('<I', data, q + 16)[0]
-                if dtype in (1, 2) and value >> 24 == 0x02: out.append(('?' if dtype == 2 else '@', value))
+                # reference / attribute, or their "dynamic" forms (7 / 8) aapt2 writes for a shared library's ids
+                if dtype in (1, 2, 7, 8) and value >> 24 == 0x02: out.append(('?' if dtype in (2, 8) else '@', value))
         pos += csize
     return out
 

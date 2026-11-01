@@ -198,5 +198,73 @@ public final class Magic {
         Drawable mutable = icon.mutate();
         mutable.setTintList(color);
         return mutable;
+     * Window.setDecorFitsSystemWindows for APP_NAME: since Android 15 an app built for it is laid out edge to edge and
+     * "fits" is ignored, so content the app keeps out of the status and navigation bars this way went under them.
+     * Pads the window's content by as much of the bars (and the keyboard, for adjustResize) as it overlaps, after each
+     * layout and insets change, as fitting did.
+     */
+    public static void setDecorFitsSystemWindows(android.view.Window window, boolean fits) {
+        window.setDecorFitsSystemWindows(fits);
+        if (android.os.Build.VERSION.SDK_INT < 35) return;
+        android.view.View decor = window.getDecorView();
+        android.view.View content = decor.findViewById(android.R.id.content);
+        if (content == null) return;
+        android.view.View.OnLayoutChangeListener old = FITTED.remove(content);
+        if (old != null) {
+            content.removeOnLayoutChangeListener(old);
+            decor.setOnApplyWindowInsetsListener(null);
+            content.setPadding(0, 0, 0, 0);
+        }
+        if (!fits) return;
+        android.view.View.OnLayoutChangeListener fit = (v, l, t, r, b, ol, ot, or, ob) -> fitContent(window, v);
+        FITTED.put(content, fit);
+        content.addOnLayoutChangeListener(fit);
+        decor.setOnApplyWindowInsetsListener((v, insets) -> {
+            android.view.WindowInsets result = v.onApplyWindowInsets(insets);
+            content.post(() -> fitContent(window, content));
+            return result;
+        });
+        decor.requestApplyInsets();
+    }
+
+    private static final java.util.Map<android.view.View, android.view.View.OnLayoutChangeListener> FITTED =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    private static void fitContent(android.view.Window window, android.view.View content) {
+        android.view.WindowInsets insets = content.getRootWindowInsets();
+        android.view.View decor = window.getDecorView();
+        if (insets == null || decor.getWidth() == 0) return;
+        // A translucent window (a sheet over the previous screen) is meant to cover the bars.
+        android.content.res.TypedArray style = window.getContext().obtainStyledAttributes(new int[]{android.R.attr.windowIsTranslucent});
+        boolean translucent = style.getBoolean(0, false);
+        style.recycle();
+        if (translucent) {
+            if (content.getPaddingTop() != 0 || content.getPaddingBottom() != 0) content.setPadding(0, 0, 0, 0);
+            return;
+        }
+        // A window with a showing action bar has the bars kept clear by the action bar's own layout (as before).
+        if (window.getCallback() instanceof android.app.Activity) {
+            android.app.ActionBar bar = ((android.app.Activity) window.getCallback()).getActionBar();
+            if (bar != null && bar.isShowing()) {
+                if (content.getPaddingTop() != 0 || content.getPaddingBottom() != 0) content.setPadding(0, 0, 0, 0);
+                return;
+            }
+        }
+        int types = android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout();
+        int adjust = window.getAttributes().softInputMode & android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
+        if (adjust == android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE) types |= android.view.WindowInsets.Type.ime();
+        android.graphics.Insets bars = insets.getInsets(types);
+        int[] at = new int[2];
+        content.getLocationInWindow(at);
+        int left = Math.max(0, bars.left - at[0]);
+        int top = Math.max(0, bars.top - at[1]);
+        int right = Math.max(0, bars.right - (decor.getWidth() - at[0] - content.getWidth()));
+        int bottom = Math.max(0, bars.bottom - (decor.getHeight() - at[1] - content.getHeight()));
+        if (content.getPaddingLeft() != left || content.getPaddingTop() != top || content.getPaddingRight() != right
+                || content.getPaddingBottom() != bottom) {
+            content.setPadding(left, top, right, bottom);
+        }
+    }
+
     }
 }

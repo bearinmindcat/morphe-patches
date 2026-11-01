@@ -10,11 +10,16 @@ import org.w3c.dom.Element
 private val ANDROID_THEME = Regex("""^@android:style/Theme(\.(Holo|Material|DeviceDefault))?(\.Light)?(\.DarkActionBar|\.NoActionBar)?$""")
 
 /** MagicOS's day/night themes an activity can ask for in its "hnc-theme" meta-data (dialogs and the like are left alone). */
-private val MAGIC_THEME = Regex("""^androidhnext:style/Theme\.Magic(\.NoActionBar|\.WithActionBar)?$""")
+private val MAGIC_THEME = Regex("""^androidhnext:style/Theme\.Magic(\.NoActionBar|\.WithActionBar|\.NoTitleBar|\.Translucent)?$""")
+
+/** The meta-data naming that theme: "hnc-theme", or Huawei's older "hwc-theme" (Calendar, Files, Notes). */
+private val MAGIC_THEME_KEYS = setOf("hnc-theme", "hwc-theme")
 
 /** The app styles added: Android's own day/night theme, with status and navigation bar icons that follow it. */
 internal const val MAGIC_DAY_NIGHT = "MagicDayNight"
 internal const val MAGIC_DAY_NIGHT_NO_ACTION_BAR = "MagicDayNight.NoActionBar"
+/** MagicOS's translucent day/night theme (sheets and overlays drawn over the previous screen). */
+internal const val MAGIC_DAY_NIGHT_TRANSLUCENT = "MagicDayNight.Translucent"
 
 private fun Element.children(tag: String) =
     (0 until childNodes.length).map { childNodes.item(it) }.filterIsInstance<Element>().filter { it.tagName == tag }
@@ -34,19 +39,27 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
     var activities = 0
     document("AndroidManifest.xml").use { manifest ->
         val application = manifest.getElementsByTagName("application").item(0) as Element
-        fun magic(element: Element): String? = element.children("meta-data")
-            .firstOrNull { it.getAttribute("android:name") == "hnc-theme" }?.getAttribute("android:value")
-            ?.takeIf { MAGIC_THEME.matches(it) }
-        val appMagic = magic(application)
+        fun meta(element: Element): String? = element.children("meta-data")
+            .firstOrNull { it.getAttribute("android:name") in MAGIC_THEME_KEYS }?.getAttribute("android:value")
+        val appMagic = meta(application)?.takeIf { MAGIC_THEME.matches(it) }
         for (tag in listOf("activity", "activity-alias")) {
             val list = manifest.getElementsByTagName(tag)
             for (i in 0 until list.length) {
                 val activity = list.item(i) as Element
-                val hnc = magic(activity) ?: appMagic ?: continue
+                // An activity's own MagicOS theme wins over the application's, also when it is one left alone (dialogs,
+                // translucent ones).
+                val own = meta(activity)
+                val hnc = (if (own != null) own.takeIf { MAGIC_THEME.matches(it) } else appMagic) ?: continue
                 val theme = activity.getAttribute("android:theme").ifEmpty { application.getAttribute("android:theme") }
-                val noActionBar = hnc.endsWith(".NoActionBar")
+                val noActionBar = hnc.endsWith(".NoActionBar") || hnc.endsWith(".NoTitleBar")
+                val translucent = hnc.endsWith(".Translucent")
                 when {
-                    // No theme anywhere: Android's default (DeviceDefault.Light.DarkActionBar), an Android theme too.
+                    // Translucent: only where the activity names no theme of its own (or a plain Android one).
+                    translucent -> if (theme.isEmpty() || ANDROID_THEME.matches(theme)) {
+                        activity.setAttribute("android:theme", "@style/$MAGIC_DAY_NIGHT_TRANSLUCENT")
+                        activities++
+                    }
+                    // No theme at all (Android's default, light with an action bar): as an Android theme named directly.
                     theme.isEmpty() || ANDROID_THEME.matches(theme) -> {
                         val bar = noActionBar || theme.endsWith(".NoActionBar")
                         activity.setAttribute("android:theme", "@style/" + if (bar) MAGIC_DAY_NIGHT_NO_ACTION_BAR else MAGIC_DAY_NIGHT)
@@ -103,6 +116,15 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
                 add(
                     MAGIC_DAY_NIGHT_NO_ACTION_BAR, "@style/$MAGIC_DAY_NIGHT",
                     listOf("android:windowActionBar" to "false", "android:windowNoTitle" to "true"),
+                )
+                add(
+                    // With an action bar, as MagicOS's (the app hides it itself).
+                    MAGIC_DAY_NIGHT_TRANSLUCENT, "@style/$MAGIC_DAY_NIGHT",
+                    listOf(
+                        "android:windowIsTranslucent" to "true",
+                        "android:windowBackground" to "@android:color/transparent",
+                        "android:backgroundDimEnabled" to "false",
+                    ),
                 )
             }
         }

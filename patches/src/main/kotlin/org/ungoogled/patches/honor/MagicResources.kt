@@ -81,7 +81,8 @@ internal val MAGIC_FRAMEWORK_VALUES = mapOf(
     "@0x020e012e" to "10.0sp", // dimen/magic_master_caption_2
 )
 
-private val MAGIC_REFERENCE = Regex("""([?@])0x(02[0-9a-f]{6})""", RegexOption.IGNORE_CASE)
+// "??0x..." / "@@0x..." is how a "dynamic" reference (aapt2's encoding for a shared library's ids) decodes.
+private val MAGIC_REFERENCE = Regex("""([?@])\1?0x(02[0-9a-f]{6})""", RegexOption.IGNORE_CASE)
 
 /**
  * Off MagicOS there is no androidhnext package: a layout or style value that names one of its theme attributes fails
@@ -116,4 +117,34 @@ internal fun ResourcePatchContext.replaceMagicFrameworkReferences(extra: Map<Str
     }
     if (unknown.isNotEmpty()) throw PatchException("MagicOS framework references without an answer: ${unknown.joinToString()}")
     return replaced
+}
+
+private val CUBIC_BEZIER = Regex("""<cubicBezierInterpolator\b([^>]*?)/>""")
+private fun attribute(attributes: String, name: String) =
+    Regex("""android:$name="([^"]*)"""").find(attributes)?.groupValues?.get(1) ?: "0"
+
+/**
+ * Honor's apps define interpolators with MagicOS's own `<cubicBezierInterpolator>` tag (control points in
+ * android:fromXDelta/fromYDelta and android:toXDelta/toYDelta), which only MagicOS's AnimationUtils knows: elsewhere
+ * loading one fails ("Unknown interpolator name"). Rewrites each as Android's `<pathInterpolator>` with the same
+ * control points. Returns the files changed.
+ */
+internal fun ResourcePatchContext.convertMagicInterpolators(): Int {
+    var files = 0
+    for (path in listDecodableFiles("res/**").filter { it.endsWith(".xml") && (it.contains("/interpolator") || it.contains("/anim")) }) {
+        val file = get(path)
+        if (!file.isFile) continue
+        val text = file.readText()
+        if (!CUBIC_BEZIER.containsMatchIn(text)) continue
+        file.writeText(
+            CUBIC_BEZIER.replace(text) { match ->
+                val a = match.groupValues[1]
+                val namespaces = Regex("""xmlns:\w+="[^"]*"""").findAll(a).joinToString("") { it.value + " " }
+                """<pathInterpolator $namespaces""" + """android:controlX1="${attribute(a, "fromXDelta")}" android:controlY1="${attribute(a, "fromYDelta")}" """ +
+                    """android:controlX2="${attribute(a, "toXDelta")}" android:controlY2="${attribute(a, "toYDelta")}"/>"""
+            },
+        )
+        files++
+    }
+    return files
 }

@@ -294,6 +294,9 @@ def abstract_impls(sup, have, pad):
 def ctor(c, simple, sup, params, pad):
     args = ', '.join(f'{jtype(t)} p{i}' for i, t in enumerate(params))
     call = ''
+    # a known constructor body (e.g. the super call to a base that has no fitting constructor)
+    known_body = known.METHODS.get(f'{c}-><init>(' + ''.join(params) + ')V')
+    if known_body: return f'{pad}public {simple}({args}) {{\n{pad}    {runtime_refs(known_body)}\n{pad}}}'
     if SDK_BASES and sup in SDK:
         have = sdk_ctors(sup)
         want = '(' + ''.join(params) + ')V'

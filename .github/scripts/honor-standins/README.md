@@ -24,6 +24,10 @@ Xiaomi, whose output is unchanged):
 - `MAGIC_SDK_INT` is 0: no MagicOS API level, so version-gated MagicOS calls and Honor's HiView telemetry stay off.
 - `SystemPropertiesEx` answers with the phone's real properties (`RUNTIME.Magic`), so MagicOS-only ones (`msc.*`,
   `ro.build.version.magic`) are empty and the app takes its own defaults.
+- `ActionBarEx.setStartIcon/setEndIcon` (MagicOS's toolbar cancel/done icons, view ids android:id/icon1 and icon2 that
+  the app looks up) are drawn by `runtime/MagicToolbar`: the toolbar's navigation button and an end button.
+- A known body for a constructor (`Lowner;-><init>(...)V`) is used as is, e.g. the super call to a base class that has
+  no constructor of the app's shape (`HwUniversalKeyStoreProvider` -> `java.security.Provider`).
 
 ## Use
 
@@ -73,8 +77,23 @@ Then in the patch (`patches/.../honor/`):
   (MagicOS framework on the boot class path) for the few places a port swaps a MagicOS-only component.
 - A stand-in whose members name a class the app itself bundles (Recorder ships a stub `HwToolbar`) is skipped by the
   generator; write it by hand, with a copy of that class in the extension (Morphe merges it into the app's).
+- `replaceMagicFrameworkLiterals(answers, magic)` (`MagicLiterals.kt`): app code names androidhnext ids too
+  (`getTheme().resolveAttribute(0x020100ca, ...)`, Theme.Magic for a ContextThemeWrapper, interpolators); each
+  literal becomes the port's answer (the app's own copy of the resource, which Honor's bundled UI kit ships, or an
+  Android id), and Theme.resolveAttribute calls go to the runtime `Magic.resolveAttribute`, which answers a plain
+  resource put in place of an attribute with its value. Unknown literals stop the patch, listed.
+- `convertMagicInterpolators()` (`MagicResources.kt`): MagicOS's `<cubicBezierInterpolator>` tag -> `<pathInterpolator>`.
+- `followMagicDayNight()` reads Huawei's older `hwc-theme` meta-data as well as `hnc-theme` (Calendar, Files, Notes).
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required Honor `uses-library`.
 - Vendor members on Android classes (none in Honor's own apps so far; YOYO and Honor Health have a few): redirect them
   like `xiaomi/MiuiMembers.kt` does, on top of `samsung/OneUiMembers.kt`'s `redirectMembers()`.
 
 Always run the ART verifier sweep afterwards: 0 rejected classes.
+
+Merge note (2026-11-02): Compass/Clock/Recorder and Calendar/Files/Notes were ported in parallel and built
+equivalent helpers under different names -- `MagicFrameworkIds` ~ `MagicLiterals`, `MagicIcons` ~ Notes' icon
+handling, `replaceMagicInterpolators` ~ `convertMagicInterpolators`, `Magic.toolbarButton` ~ `MagicToolbar`. Each
+app keeps the helper it was tested with (its extension carries its own generated `Magic`). The runtime `Magic`
+template keeps the interpolator-only `getIdentifier` (answering other framework lookups breaks Honor libraries'
+MagicOS detection -- Recorder). Unify them before the next Honor port: pick one of each pair, re-patch every Honor
+app and check the patched output is unchanged (or re-test it).
