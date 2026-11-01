@@ -50,6 +50,10 @@ Apps (and SDKs) that look the class up by reflection (`Class.forName("android.os
 Editor) also need `redirectReflectedMiuiProperties(...)` (`patches/.../xiaomi/ReflectedProperties.kt`): the looked-up
 name becomes MiuiProps, which has the same static getters.
 
+Other vendors reuse this generator with their own answers: `--known <their known.py>` (its `HEADER`, `ONLY`,
+`RUNTIME_DIR`, and opt-in features such as `SDK_BASES` for stand-ins that extend Android's own classes). See
+`../honor-standins/`. Without `--known` the output is exactly as before.
+
 Things to know:
 - miuix probes the platform with `Class.forName("miui.util.HapticFeedbackUtil")` and reflection; with a stand-in
   present the class is found, so every stand-in must keep answering "not supported" (members it lacks throw

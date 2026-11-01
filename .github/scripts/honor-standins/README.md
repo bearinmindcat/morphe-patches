@@ -1,0 +1,55 @@
+# Honor (MagicOS) stand-in generator
+
+Off MagicOS, Honor's apps call framework classes only Honor's ROM has -- the `com.hihonor.android.*` "Ex" wrappers
+(`com.hihonor.android.os.SystemPropertiesEx`, `ActivityManagerEx`, `WindowManagerEx$LayoutParamsEx`, ...), HiView
+telemetry, MagicOS widgets, leftovers of Huawei's `com.huawei.android.*` -- and die with NoClassDefFoundError at
+launch. Their layouts also name MagicOS's framework widgets (`<com.hihonor.android.widget.HwToolbar>`) and theme
+attributes of MagicOS's framework resource package (`androidhnext`, id 0x02). Honor phones have Google Play services,
+so these apps do not need HMS; what they need is the framework.
+
+The generator is the Xiaomi one (`../xiaomi-standins/gen.py`, same `Missing.java`), run with this directory's
+`known.py` (Honor's answers) and `runtime/` (`Magic`: the phone's system properties for `SystemPropertiesEx`). The
+stand-ins carry Honor's names and signatures only, no Honor code; on an Honor phone the framework's own classes load
+first, so they never run there. `known.py` switches on what MagicOS needs beyond the Xiaomi lessons (all off for
+Xiaomi, whose output is unchanged):
+
+- **Framework widgets extend Android's own.** `com.hihonor.android.widget.ListView` extends `android.widget.ListView`,
+  `HwToolbar` extends `Toolbar` (`SUPER_RULES`: Hw/Hn prefix dropped, first Android class of that name). Such a
+  stand-in keeps every member Android already has (generating "absent" `getAdapter()` would break the list) and calls
+  Android's constructors.
+- **Widgets named only in XML.** With `--apk` the app's binary XML (layouts, preferences, ...) is read for tags and
+  `class=` attributes in the framework's widget packages (`INFLATED_ONLY`); those get stand-ins with LayoutInflater's
+  constructors. A widget with no Android namesake is listed as a note -- give it a base in `SUPERS` or an `--extends`
+  file (e.g. `TextArrowPreference`, `SubTabWidget`, `HwDialogTitle`, `HnIconVectorDrawable`, a drawable tag).
+- `MAGIC_SDK_INT` is 0: no MagicOS API level, so version-gated MagicOS calls and Honor's HiView telemetry stay off.
+- `SystemPropertiesEx` answers with the phone's real properties (`RUNTIME.Magic`), so MagicOS-only ones (`msc.*`,
+  `ro.build.version.magic`) are empty and the app takes its own defaults.
+
+## Use
+
+```bash
+X=.github/scripts/xiaomi-standins; H=.github/scripts/honor-standins
+# 1. what the app uses that the phone lacks (boot classpath pulled once per emulator image, see ../xiaomi-standins)
+java -Xmx4g -cp "$CP" $X/Missing.java boot <app.apk> work/
+# 2. stand-ins + runtime (Magic) into the extension
+python3 $H/gen.py work/ extensions/honor<app>/src/main/java "Honor <App>" --apk <app.apk> --runtime org.ungoogled.honor<app>
+# 3. MagicOS framework resources the app's XML names, with MagicOS's own answers (androidhnext APK: APKMirror,
+#    "androidhnext" by Honor, signed by Honor's platform key 483013ce...)
+python3 $H/magicres.py <app.apk> androidhnext.apk
+```
+
+Then in the patch (`patches/.../honor/`):
+- `replaceMagicFrameworkReferences()` (`MagicResources.kt`): every `?0x0201...` theme attribute and `@0x02...`
+  resource of `androidhnext` in the app's XML becomes the value MagicOS's Theme.Magic gives it. Without it the first
+  layout using one fails to inflate ("Failed to resolve attribute"), and Morphe cannot re-encode a file that names
+  it. The shared table holds the values that are the same on every phone configuration (sizes, margins, text sizes);
+  `magicres.py` lists the rest (night-mode colours, framework drawables and styles), which a port answers in `extra`
+  -- the helper stops the patch, listing them, until it does.
+- `followMagicDayNight()` (`MagicThemes.kt`): MagicOS gives each activity whose `hnc-theme` meta-data names
+  Theme.Magic its own day/night theme; off MagicOS the declared Android theme (light Material, even dark Holo) stays,
+  so action bars, popups and bar icons don't follow dark mode. Re-bases those activities on Android's DayNight theme.
+- `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required Honor `uses-library`.
+- Vendor members on Android classes (none in Honor's own apps so far; YOYO and Honor Health have a few): redirect them
+  like `xiaomi/MiuiMembers.kt` does, on top of `samsung/OneUiMembers.kt`'s `redirectMembers()`.
+
+Always run the ART verifier sweep afterwards: 0 rejected classes.
