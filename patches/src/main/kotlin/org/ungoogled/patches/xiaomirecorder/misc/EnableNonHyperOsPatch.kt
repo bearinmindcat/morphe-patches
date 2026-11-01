@@ -1,0 +1,105 @@
+package org.ungoogled.patches.xiaomirecorder.misc
+
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import org.ungoogled.patches.samsung.makeLibrariesOptional
+import org.ungoogled.patches.xiaomi.redirectMiuiProperties
+import org.ungoogled.patches.xiaomirecorder.XiaomiRecorderConstants.COMPATIBILITY_XIAOMI_RECORDER
+
+internal const val XIAOMI_RECORDER_EXTENSION = "extensions/xiaomirecorder.mpe"
+
+private const val RECORD_AUDIO = "android.permission.RECORD_AUDIO"
+
+/** Permissions only a system app gets (call and app-audio recording), which the recording service demanded. */
+private val PRIVILEGED = setOf(
+    "android.permission.CAPTURE_AUDIO_OUTPUT",
+    "android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT",
+    "android.permission.CALL_AUDIO_INTERCEPTION",
+)
+
+/** The manifest requires micloud-sdk, a HyperOS library: without it Android refuses the install. */
+private val optionalLibrariesPatch = resourcePatch(
+    description = "Lets Xiaomi Recorder install without HyperOS's libraries.",
+) {
+    execute {
+        val required = makeLibrariesOptional()
+        java.util.logging.Logger.getLogger("XiaomiRecorder").info("Required libraries made optional: $required")
+        // Measured against 7.7.9: micloud-sdk and org.apache.http.legacy.
+        if (required < 1) throw PatchException("no required uses-library found")
+    }
+}
+
+/**
+ * Off HyperOS miuix takes Recorder for China's build (see redirectMiuiProperties): it then waits for a CTA consent that
+ * only MIUI's Security app gives and never binds its recording service, so the record button did nothing.
+ */
+private val globalBuildPatch = bytecodePatch(
+    description = "Runs Xiaomi Recorder as Xiaomi's Global build.",
+) {
+    extendWith(XIAOMI_RECORDER_EXTENSION)
+
+    execute {
+        val reads = redirectMiuiProperties("Lorg/ungoogled/xiaomirecorder/MiuiProps;")
+        java.util.logging.Logger.getLogger("XiaomiRecorder").info("System property reads: $reads")
+        // Measured against 7.7.9: 10, among them miuix.core.util.SystemProperties.get.
+        if (reads < 1) throw PatchException("no system property reads found")
+    }
+}
+
+/**
+ * The recording service refuses to start (code -3) unless the app holds RECORD_AUDIO and three permissions only a
+ * system app gets, which HyperOS grants its preinstalled Recorder. Microphone recording needs RECORD_AUDIO alone, so
+ * the check now asks for that; call and app-audio recording stay impossible.
+ */
+private val recordPermissionPatch = bytecodePatch(
+    description = "Lets the recording service start with the microphone permission alone.",
+) {
+    execute {
+        var changed = 0
+        val owners = mutableListOf<String>()
+        classDefForEach { c ->
+            if (c.fields.none { it.name == "permissions" && it.type == "[Ljava/lang/String;" }) return@classDefForEach
+            val init = c.methods.firstOrNull { it.name == "<init>" } ?: return@classDefForEach
+            val strings = init.implementation?.instructions?.mapNotNull {
+                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string
+            }.orEmpty()
+            if (RECORD_AUDIO in strings && strings.containsAll(PRIVILEGED)) owners += c.type
+        }
+        for (owner in owners) {
+            val init = mutableClassDefBy(owner).methods.first { it.name == "<init>" }
+            init.implementation!!.instructions.toList().forEachIndexed { index, instruction ->
+                if (instruction.opcode != Opcode.CONST_STRING && instruction.opcode != Opcode.CONST_STRING_JUMBO) return@forEachIndexed
+                val string = ((instruction as ReferenceInstruction).reference as StringReference).string
+                if (string !in PRIVILEGED) return@forEachIndexed
+                val register = (instruction as OneRegisterInstruction).registerA
+                init.replaceInstruction(index, "const-string v$register, \"$RECORD_AUDIO\"")
+                changed++
+            }
+        }
+        java.util.logging.Logger.getLogger("XiaomiRecorder").info("Record permission checks: $owners, $changed")
+        // Measured against 7.7.9: com.android.soundrecorder.ai.airecorder.aop.PermissionInterceptor, 3 permissions.
+        if (changed < 3) throw PatchException("recording service permission check not found ($owners, $changed)")
+    }
+}
+
+/**
+ * Off HyperOS Recorder is refused at install (micloud-sdk) and then dies at once on miui.os.Build (a HyperOS class).
+ * The extension carries stand-ins for the 57 HyperOS classes it uses (generated by .github/scripts/xiaomi-standins); on
+ * a Xiaomi phone the framework's own classes load first, so they never run there.
+ */
+@Suppress("unused")
+val enableNonHyperOsPatch = bytecodePatch(
+    name = "Enable non-HyperOS ROM support",
+    description = "Makes Xiaomi Recorder installable and usable on non-Xiaomi ROMs.",
+    default = true,
+) {
+    compatibleWith(COMPATIBILITY_XIAOMI_RECORDER)
+    dependsOn(optionalLibrariesPatch, globalBuildPatch, recordPermissionPatch)
+    extendWith(XIAOMI_RECORDER_EXTENSION)
+}

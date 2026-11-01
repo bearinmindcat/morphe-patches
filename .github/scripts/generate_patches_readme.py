@@ -157,6 +157,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery',
         '<img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery',
     ),
+    "com.android.soundrecorder": (
+        '<img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder',
+        '<img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder',
+    ),
 }
 
 
