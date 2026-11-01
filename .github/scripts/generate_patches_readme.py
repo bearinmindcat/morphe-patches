@@ -46,6 +46,7 @@ def pkg_emoji(pkg):
 VENDOR_GROUPS = [
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
+    ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
 ]
 
 
@@ -184,6 +185,10 @@ APP_RENAMES = {
     "com.android.calendar": (
         '<img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar',
         '<img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar',
+    ),
+    "com.nothing.gallery": (
+        '<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery',
+        '<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery',
     ),
 }
 
