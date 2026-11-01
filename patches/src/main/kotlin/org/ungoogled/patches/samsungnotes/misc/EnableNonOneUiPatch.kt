@@ -12,7 +12,7 @@ internal const val SAMSUNG_NOTES_EXTENSION = "extensions/samsungnotes.mpe"
 /**
  * Off One UI the libraries Samsung's system provides are missing. Notes requires one Java library,
  * com.samsung.device, which alone stops the install; it and every native library become optional, and the features
- * built on them stay off.
+ * built on them stay off. Its system-app multiArch flag goes too, so it installs with stripped libraries.
  */
 private val manifestPatch = resourcePatch {
     execute {
@@ -27,6 +27,12 @@ private val manifestPatch = resourcePatch {
                 }
             }
             if (required == 0) throw PatchException("no required Samsung library in the manifest")
+
+            // A system app's multiArch: Android then demands native code for every ABI the phone runs, 32-bit too.
+            // With the 32-bit libraries left out (Morphe Manager's "strip libraries"), a phone that also runs
+            // 32-bit code refuses the install ("multiArch app's native libs don't support all the natively
+            // supported ABIs"). Notes runs in its own process only, so its primary ABI is all it needs.
+            (manifest.getElementsByTagName("application").item(0) as Element).removeAttribute("android:multiArch")
         }
     }
 }
