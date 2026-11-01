@@ -190,6 +190,10 @@ APP_RENAMES = {
         '<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery',
         '<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery',
     ),
+    "com.nothing.soundrecorder": (
+        '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
+        '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
+    ),
 }
 
 
