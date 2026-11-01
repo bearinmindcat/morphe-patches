@@ -41,6 +41,11 @@ def pkg_emoji(pkg):
     return "📦"
 
 
+def is_samsung(pkg):
+    """Samsung's own apps, listed together under one "Samsung Apps" spoiler."""
+    return pkg.startswith(("com.samsung.", "com.sec."))
+
+
 # Apps this bundle renames, rendered as "<source app>  →  <patched app>" in the
 # spoiler summary instead of the generic 📦 label. The patched name comes from a
 # patch option, not from patches-list.json, so it is declared here.
@@ -274,12 +279,38 @@ def build_content(expanded=False):
         f"{total} {total_noun} total"
     ]
 
-    # One spoiler per app, in the order they appear in the JSON
-    for pkg, entry in by_pkg.items():
+    def app_spoiler(pkg, entry):
         patches = list(entry["patches"].values())
-        label   = pkg_label(pkg, entry)
-        lines.append(spoiler(label, len(patches), entry["targets"], patches_table(patches), expanded,
-                             screenshots_row(pkg)))
+        return spoiler(pkg_label(pkg, entry), len(patches), entry["targets"], patches_table(patches), expanded,
+                       screenshots_row(pkg))
+
+    # One spoiler per app, in the order they appear in the JSON; Samsung's apps are grouped in one spoiler of
+    # their own, by name, after the others.
+    samsung = {pkg: entry for pkg, entry in by_pkg.items() if is_samsung(pkg)}
+    for pkg, entry in by_pkg.items():
+        if pkg not in samsung:
+            lines.append(app_spoiler(pkg, entry))
+            lines.append("")
+
+    if samsung:
+        def name(pkg):
+            text = re.sub(r"<[^>]+>|&nbsp;", " ", pkg_label(pkg, samsung[pkg])).split("-&gt;")[0].strip().lower()
+            return text.removeprefix("samsung ")
+        names = sorted(samsung, key=name)
+        count = sum(len(samsung[pkg]["patches"]) for pkg in samsung)
+        apps  = "app" if len(samsung) == 1 else "apps"
+        noun  = "patch" if count == 1 else "patches"
+        inner = "\n\n".join(app_spoiler(pkg, samsung[pkg]) for pkg in names)
+        tag   = "<details open>" if expanded else "<details>"
+        lines.append(f"""{tag}
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;{len(samsung)} {apps}&nbsp;&nbsp;•&nbsp;&nbsp;{count} {noun}</summary>
+<br>
+<blockquote>
+
+{inner}
+
+</blockquote>
+</details>""")
         lines.append("")
 
     # Universal patches (no specific app)
