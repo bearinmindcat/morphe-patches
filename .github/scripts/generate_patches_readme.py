@@ -211,6 +211,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-clock.png" width="20" height="20" align="top"> Honor Clock',
         '<img src="docs/icons/honor-clock.png" width="20" height="20" align="top"> Honor Clock',
     ),
+    "com.hihonor.soundrecorder": (
+        '<img src="docs/icons/honor-recorder.png" width="20" height="20" align="top"> Honor Recorder',
+        '<img src="docs/icons/honor-recorder.png" width="20" height="20" align="top"> Honor Recorder',
+    ),
 }
 
 
