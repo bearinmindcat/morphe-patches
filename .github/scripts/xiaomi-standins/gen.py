@@ -21,6 +21,9 @@ abstract = json.load(open(os.path.join(a.work, 'abstract.json')))
 only = re.compile(a.only)
 classes = {c: d for c, d in u['classes'].items() if only.search(c)}
 missing = set(classes)
+for c, fs in getattr(known, 'REFLECTED', {}).items():
+    for f in fs:
+        if c in classes: classes[c]['fields'].setdefault(f, ['sget'])
 PRIM = {'Z': 'boolean', 'B': 'byte', 'S': 'short', 'C': 'char', 'I': 'int', 'J': 'long', 'F': 'float', 'D': 'double', 'V': 'void'}
 skipped, notes = [], []
 

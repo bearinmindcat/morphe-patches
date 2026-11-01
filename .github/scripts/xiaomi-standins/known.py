@@ -28,6 +28,13 @@ METHODS = {
     'Lmiui/os/Build;->getCustVariant()Ljava/lang/String;': f'return {REGION}.toLowerCase(java.util.Locale.ROOT);',
 }
 
+# Fields Xiaomi's libraries only read by reflection, added to a stand-in whenever the app needs that class anyway: miuix
+# looks up miui.os.Build.IS_MIUI_LITE_VERSION on every layout pass and caches only an answer, so without it each pass
+# throws and logs NoSuchFieldException. Values come from FIELDS, else the type's default (false / 0 / null).
+REFLECTED = {
+    'Lmiui/os/Build;': ['IS_MIUI_LITE_VERSION:Z'],
+}
+
 # Xiaomi framework classes and the Android class each one extends on HyperOS (what the app may cast them to or
 # where Android instantiates them), when the app's own use doesn't show it.
 SUPERS = {

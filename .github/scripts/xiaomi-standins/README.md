@@ -40,9 +40,19 @@ Then in the patch: `redirectMiuiMembers("Lorg/ungoogled/xiaomi<app>/Miui;", "Lor
 `uses-library` such as `micloud-sdk`, and app-specific answers in the extension's `Fallbacks.java` (never overwritten
 by gen.py). Always run the ART verifier sweep afterwards: 0 rejected classes.
 
+Apps that bundle miuix and read Xiaomi's region properties (Gallery: `ro.product.mod_device`, `ro.miui.region`,
+`ro.miui.build.region`) behave like China's build off HyperOS -- miuix's `IS_INTERNATIONAL_BUILD` is
+`ro.product.mod_device` ending in `_global` -- so a Global APK asks for China's consent and keeps features off. For
+those, `redirectMiuiProperties("Lorg/ungoogled/xiaomi<app>/MiuiProps;")` (`patches/.../xiaomi/MiuiProperties.kt`)
+sends `android.os.SystemProperties` and MiCloud's `miui.cloud.os.SystemProperties` reads to the runtime `MiuiProps`,
+which answers those three as a Global build where the phone has no value.
+
 Things to know:
 - miuix probes the platform with `Class.forName("miui.util.HapticFeedbackUtil")` and reflection; with a stand-in
   present the class is found, so every stand-in must keep answering "not supported" (members it lacks throw
   NoSuchMethodException, which miuix catches).
+- `known.REFLECTED` lists fields Xiaomi's libraries only read by reflection (miuix's
+  `miui.os.Build.IS_MIUI_LITE_VERSION`, looked up on every layout pass and cached only when found); gen.py adds them to
+  a stand-in it writes anyway.
 - `--only` (default: `miui/`, `com/miui/`, `com/xiaomi/`, `Miui*` classes under `android/`) limits generation to the
   Xiaomi framework; other missing classes (unused optional libraries such as ad SDKs, `java.awt`) are left alone.

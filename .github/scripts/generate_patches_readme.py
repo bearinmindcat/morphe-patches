@@ -142,6 +142,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
     ),
+    "com.miui.gallery": (
+        '<img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery',
+        '<img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery',
+    ),
 }
 
 
