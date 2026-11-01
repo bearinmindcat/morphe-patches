@@ -47,6 +47,8 @@ public final class MediaMirror extends ContentProvider {
     @Override
     public boolean onCreate() {
         authority = getContext().getPackageName() + ".mediamirror";
+        // Providers start with the app's process, before any of its screens.
+        ActivityState.track(getContext());
         return true;
     }
 

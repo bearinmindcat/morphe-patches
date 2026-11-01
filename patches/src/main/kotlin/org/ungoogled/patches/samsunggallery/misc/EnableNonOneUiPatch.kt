@@ -19,6 +19,9 @@ private const val MEDIA_QUERIES = "Lorg/ungoogled/samsunggallery/MediaQueries;"
 /** The URIs Gallery uses off One UI (its "generic device" table), unobfuscated. */
 private const val MEDIA_URI_GED = "Lcom/samsung/android/gallery/support/providers/MediaUriGed;"
 private const val PREFERENCE_FEATURES = "Lcom/samsung/android/gallery/support/utils/PreferenceFeatures;"
+/** Gallery's Android-only answers to what One UI adds (used where SEM version is 0), unobfuscated. */
+private const val GED_API_COMPAT = "Lcom/samsung/android/gallery/support/library/v0/GedApiCompatImpl;"
+private const val ACTIVITY_STATE = "Lorg/ungoogled/samsunggallery/ActivityState;"
 
 /**
  * Off One UI the libraries Samsung's system provides are missing; Gallery asks for 45, one of them required
@@ -81,6 +84,20 @@ val enableNonOneUiPatch = bytecodePatch(
             throw PatchException("Samsung file id lookup still queries MediaStore directly")
         }
         java.util.logging.Logger.getLogger("SamsungGallery").info("Content queries: $queries")
+
+        // "Is the screen in front?" comes from One UI's Activity.semIsResumed; Gallery's answer for other phones is a
+        // flat no, so whatever Gallery starts only from a screen in front never started: Edit did nothing ("Edit Menu
+        // Select failed: paused"). Answered from the activity itself.
+        mutableClassDefBy(GED_API_COMPAT).methods.firstOrNull {
+            it.name == "isActivityResumed" && it.parameterTypes == listOf("Landroid/app/Activity;") && it.returnType == "Z"
+        }?.addInstructions(
+            0,
+            """
+                invoke-static { p1 }, $ACTIVITY_STATE->isResumed(Landroid/app/Activity;)Z
+                move-result v0
+                return v0
+            """,
+        ) ?: throw PatchException("no isActivityResumed in Gallery's generic-device API table")
 
         // Off One UI Gallery reads One UI version 0 and keeps to its generic-device paths, which work; but it turns
         // "MX albums" (One UI 5's album model) on only from One UI 5, and this build has the screens only for that
