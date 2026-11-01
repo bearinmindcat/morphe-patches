@@ -169,6 +169,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner',
         '<img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner',
     ),
+    "com.miui.weather2": (
+        '<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather',
+        '<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather',
+    ),
 }
 
 
