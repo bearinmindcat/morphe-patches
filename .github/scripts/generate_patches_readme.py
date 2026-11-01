@@ -203,6 +203,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player',
         '<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player',
     ),
+    "com.hihonor.compass": (
+        '<img src="docs/icons/honor-compass.png" width="20" height="20" align="top"> Honor Compass',
+        '<img src="docs/icons/honor-compass.png" width="20" height="20" align="top"> Honor Compass',
+    ),
 }
 
 
