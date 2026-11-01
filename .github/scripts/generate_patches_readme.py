@@ -177,6 +177,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather',
         '<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather',
     ),
+    "com.miui.screenrecorder": (
+        '<img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder',
+        '<img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder',
+    ),
 }
 
 
