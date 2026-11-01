@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -1185,6 +1185,191 @@
           "targets": [
             {
               "version": "8.1.00.6",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Compass usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.miui.compass",
+          "name": "Xiaomi Compass",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#93B1C8",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "17.1.4.1",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Gallery installable and usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "ResourcePatch",
+        "BytecodePatch",
+        "BytecodePatch",
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.miui.gallery",
+          "name": "Xiaomi Gallery",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#7683FF",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "4.3.1.15-global",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Notes installable and usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "ResourcePatch",
+        "BytecodePatch",
+        "BytecodePatch",
+        "BytecodePatch",
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.miui.notes",
+          "name": "Xiaomi Notes",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#FDC038",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "3.2.7.9",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Recorder installable and usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "ResourcePatch",
+        "BytecodePatch",
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.android.soundrecorder",
+          "name": "Xiaomi Recorder",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#FF4848",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "7.7.9",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Scanner usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "BytecodePatch",
+        "BytecodePatch",
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.xiaomi.scanner",
+          "name": "Xiaomi Scanner",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#252B32",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "15.9.78",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-HyperOS ROM support",
+      "description": "Makes Xiaomi Weather usable on non-Xiaomi ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "BytecodePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.miui.weather2",
+          "name": "Xiaomi Weather",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#42A6F1",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "G-17.0.3.26",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": null,

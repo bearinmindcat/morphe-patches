@@ -1,3 +1,14 @@
+## [2.8.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.0...v2.8.1) (2026-11-01)
+
+### 🐛 Bug Fixes
+
+* add xiaomi compass non-hyperos support ([be4c333](https://github.com/bearinmindcat/morphe-patches/commit/be4c333a70ca054fe2632c59c628460cb4f09dfb))
+* add xiaomi gallery non-hyperos support ([ea6f872](https://github.com/bearinmindcat/morphe-patches/commit/ea6f87277c9370c95ffebc8881245833559e6809))
+* add xiaomi notes non-hyperos support ([b16367e](https://github.com/bearinmindcat/morphe-patches/commit/b16367ea8f9d3eb6f7baac825c23bca52b683a1a))
+* add xiaomi recorder non-hyperos support ([739bb97](https://github.com/bearinmindcat/morphe-patches/commit/739bb973056c892eee2e0b1120b1acb903ab11c3))
+* add xiaomi scanner non-hyperos support ([b67faf1](https://github.com/bearinmindcat/morphe-patches/commit/b67faf14ea851006111ffae74030bf8f1e5483fd))
+* add xiaomi weather non-hyperos support ([f05247f](https://github.com/bearinmindcat/morphe-patches/commit/f05247f5e9cbb33f486213d8c3b75800d0848f7d))
+
 ## [2.8.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.6...v2.8.0) (2026-11-01)
 
 ### 🐛 Bug Fixes

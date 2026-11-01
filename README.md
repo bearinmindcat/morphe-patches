@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;92 patches total
+> **[v2.8.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;98 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -357,6 +357,86 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Weather usable on non-One UI ROMs. |  |
+
+</details>
+
+</blockquote>
+</details>
+
+<details>
+<summary>📱 Xiaomi Apps&nbsp;&nbsp;•&nbsp;&nbsp;6 apps&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<br>
+<blockquote>
+
+<details>
+<summary><img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 17.1.4.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Compass usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-gallery.png" width="20" height="20" align="top"> Xiaomi Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.3.1.15-global
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Gallery installable and usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 3.2.7.9
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Notes installable and usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 7.7.9
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Recorder installable and usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-scanner.png" width="20" height="20" align="top"> Xiaomi Scanner&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 15.9.78
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Scanner usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** G-17.0.3.26
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Weather usable on non-Xiaomi ROMs. |  |
 
 </details>
 
