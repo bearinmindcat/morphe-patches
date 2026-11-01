@@ -187,6 +187,25 @@ METHODS = {
         result.resultCode = RUNTIME.MagicAssets.delete(p0, p1 == null ? null : p1.getString(BUNDLE_ASSETHANDLE)) ? 0 : -1;
         result.resultInfo = new java.util.ArrayList<>();
         return result;""",
+    'Lcom/hihonor/android/widget/pattern/HwDialogTitle;->setElementText(Ljava/lang/CharSequence;I)V': """
+        if (p1 != 0) return;
+        setTextAppearance(android.R.style.TextAppearance_DeviceDefault_DialogWindowTitle);
+        setText(p0);""",
+    # MagicOS's navigation-bar blur view (a View the app adds and removes): an empty view.
+    'Lcom/hihonor/android/widget/HwImmersiveMode;-><init>(Landroid/app/Activity;)V': 'super(p0);',
+    # MagicOS's expanded app bar -> runtime/MagicAppbar (a plain app bar from the layout the port adds).
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;-><init>(Landroid/app/Activity;)V': 'RUNTIME.MagicAppbar.attach(this, p0);',
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;->getLayoutRes(I)I': 'return RUNTIME.MagicAppbar.layout(this);',
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;->setContentView(ILandroid/view/View;)V':
+        'RUNTIME.MagicAppbar.setContentView(this, p0, p1);',
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;->setCustomView(Landroid/view/View;)V':
+        'RUNTIME.MagicAppbar.setCustomView(this, p0);',
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;->getAppbar()Landroid/view/View;': 'return RUNTIME.MagicAppbar.appbar(this);',
+    'Lcom/hihonor/android/widget/appbar/HwExpandedAppbarController;->getCurrentVisibleHeight()I':
+        'return RUNTIME.MagicAppbar.visibleHeight(this);',
+    # MagicOS's layered vector icon (the app's uikit HnIconVectorDrawable wraps it and sets its layer colours by
+    # reflection): the icon paths carry a grey placeholder fill, so the first layer's colour tints the whole icon.
+    'Lcom/hihonor/android/widget/HnIconVectorDrawableUtils;->setLayerColor(II)V': 'if (p1 == 1) setTint(p0);',
     # Huawei's customisation factory: "<class>Impl" when the app has one (it checks its own conditions), else the class.
     'Lcom/hihonor/android/cust/HwCustUtils;->createObj(Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;': """
         Object[] args = p1 == null ? new Object[0] : p1;
@@ -227,6 +246,14 @@ SUPERS = {
     # ExternalStorageRandomAccessFile exists; off MagicOS it uses java.io's own, but the verifier needs the types).
     'Lcom/hihonor/android/libcore/io/ExternalStorageFileInputStream;': 'Ljava/io/FileInputStream;',
     'Lcom/hihonor/android/libcore/io/ExternalStorageFileOutputStream;': 'Ljava/io/FileOutputStream;',
+    # MagicOS's dialog title (a title line, element 0, of a dialog's custom layout): a TextView.
+    'Lcom/hihonor/android/widget/pattern/HwDialogTitle;': 'Landroid/widget/TextView;',
+    # Notes: MagicOS views and drawables its own classes extend or treat as views/drawables.
+    'Lcom/hihonor/android/widget/HwToolbarMenuView;': 'Landroid/widget/ActionMenuView;',
+    'Lcom/hihonor/android/widget/RemoteableRelativeLayout;': 'Landroid/widget/RelativeLayout;',
+    'Lcom/hihonor/android/widget/HwImmersiveMode;': 'Landroid/view/View;',
+    'Lcom/hihonor/android/widget/HnIconVectorDrawable;': 'Landroid/graphics/drawable/VectorDrawable;',
+    'Lcom/hihonor/android/widget/HnIconVectorDrawableUtils;': 'Landroid/graphics/drawable/VectorDrawable;',
     # MagicOS's sub-tab bar (named in a TV layout of Calendar's): a horizontal strip.
     'Lcom/hihonor/android/widget/SubTabWidget;': 'Landroid/widget/LinearLayout;',
 }

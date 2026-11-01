@@ -148,3 +148,25 @@ internal fun ResourcePatchContext.convertMagicInterpolators(): Int {
     }
     return files
 }
+
+/**
+ * MagicOS's LayoutInflater makes its own subclass of a plain widget a layout names (an <ImageView> becomes a
+ * com.hihonor.android.widget.ImageView, ...), and Honor's apps cast to those classes: off MagicOS that cast failed
+ * (ClassCastException). Rewrites the plain tags in the app's layouts to the MagicOS class ([widgets]: tag to class;
+ * the stand-ins extend Android's own widget). Returns the layout files changed.
+ */
+internal fun ResourcePatchContext.useMagicWidgets(widgets: Map<String, String>): Int {
+    val tag = Regex("""(</?)(${widgets.keys.joinToString("|")})([\s/>])""")
+    var files = 0
+    for (path in listDecodableFiles("res/layout*/*.xml")) {
+        val file = get(path)
+        if (!file.isFile) continue
+        val text = file.readText()
+        val changed = tag.replace(text) { m -> m.groupValues[1] + widgets.getValue(m.groupValues[2]) + m.groupValues[3] }
+        if (changed != text) {
+            file.writeText(changed)
+            files++
+        }
+    }
+    return files
+}

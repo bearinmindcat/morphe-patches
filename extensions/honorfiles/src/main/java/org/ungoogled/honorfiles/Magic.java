@@ -153,17 +153,56 @@ public final class Magic {
         if (id != 0 || name == null) return id;
         String full = name.indexOf(':') >= 0 ? name : (pkg == null ? "" : pkg + ":") + (type == null || name.indexOf('/') >= 0 ? "" : type + "/") + name;
         String magic = "androidhnext:style/Theme.Magic";
+        if (full.startsWith("androidhnext:dimen/")) {
+            // MagicOS's sizes of its own devices' bars (split toolbar, freeform caption, multi-window drag bar): the
+            // app's copy, else none -- a zero size (AppCompat's abc_switch_padding, 0px), as the callers read 0.
+            String app = appPackage();
+            if (app == null) return 0;
+            int own = res.getIdentifier(full.substring("androidhnext:dimen/".length()), "dimen", app);
+            return own != 0 ? own : res.getIdentifier("abc_switch_padding", "dimen", app);
+        }
+        if (full.startsWith("androidhnext:id/")) {
+            // Views of MagicOS layouts the port stands in with its own (e.g. MagicAppbar's): the app's "magic_" ids.
+            String app = appPackage();
+            return app == null ? 0 : res.getIdentifier("magic_" + full.substring("androidhnext:id/".length()), "id", app);
+        }
         if (!full.startsWith(magic)) return 0;
         String variant = full.substring(magic.length());
         String style = variant.isEmpty() || variant.equals(".WithActionBar") ? "MagicDayNight"
                 : variant.equals(".NoActionBar") || variant.equals(".NoTitleBar") ? "MagicDayNight.NoActionBar" : null;
         if (style == null) return 0;
+        String app = appPackage();
+        return app == null ? 0 : res.getIdentifier(style, "style", app);
+    }
+
+    private static String appPackage() {
         try {
             android.content.Context app = (android.content.Context) Class.forName("android.app.ActivityThread")
                     .getMethod("currentApplication").invoke(null);
-            return app == null ? 0 : res.getIdentifier(style, "style", app.getPackageName());
+            return app == null ? null : app.getPackageName();
         } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * A theme colour Honor Files's code reads by attribute id (getTheme().obtainStyledAttributes(new int[]{id})): where
+     * the patch put the app's own colour resource in place of a MagicOS attribute, that colour.
+     */
+    public static int themeColor(android.content.Context context, int id) {
+        if (context == null) return 0;
+        try {
+            if ((id >>> 24) == 0x7f && !"attr".equals(context.getResources().getResourceTypeName(id))) {
+                return context.getColor(id);
+            }
+        } catch (RuntimeException e) {
             return 0;
+        }
+        android.content.res.TypedArray a = context.getTheme().obtainStyledAttributes(new int[]{id});
+        try {
+            return a.getColor(0, 0);
+        } finally {
+            a.recycle();
         }
     }
 }

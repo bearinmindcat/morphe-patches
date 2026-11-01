@@ -266,5 +266,24 @@ public final class Magic {
         }
     }
 
+    /**
+     * A theme colour APP_NAME's code reads by attribute id (getTheme().obtainStyledAttributes(new int[]{id})): where
+     * the patch put the app's own colour resource in place of a MagicOS attribute, that colour.
+     */
+    public static int themeColor(android.content.Context context, int id) {
+        if (context == null) return 0;
+        try {
+            if ((id >>> 24) == 0x7f && !"attr".equals(context.getResources().getResourceTypeName(id))) {
+                return context.getColor(id);
+            }
+        } catch (RuntimeException e) {
+            return 0;
+        }
+        android.content.res.TypedArray a = context.getTheme().obtainStyledAttributes(new int[]{id});
+        try {
+            return a.getColor(0, 0);
+        } finally {
+            a.recycle();
+        }
     }
 }

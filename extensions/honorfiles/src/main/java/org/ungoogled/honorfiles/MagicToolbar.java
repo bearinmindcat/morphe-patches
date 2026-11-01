@@ -23,6 +23,9 @@ import android.widget.Toolbar;
  * a toolbar, the action bar gets a custom view holding both around the title.
  */
 public final class MagicToolbar {
+    /** The start icon each toolbar shows as its navigation icon. */
+    private static final java.util.Map<Toolbar, Drawable> STARTS = new java.util.WeakHashMap<>();
+
     private MagicToolbar() {
     }
 
@@ -32,11 +35,18 @@ public final class MagicToolbar {
             return;
         }
         if (!visible) {
-            toolbar.setNavigationIcon(null);
+            // MagicOS's start icon is its own view beside the navigation button: hiding it leaves a navigation icon
+            // the app set itself (a back arrow) alone.
+            if (toolbar.getNavigationIcon() != null && toolbar.getNavigationIcon() == STARTS.get(toolbar)) {
+                toolbar.setNavigationIcon(null);
+                toolbar.setNavigationOnClickListener(null);
+            }
+            STARTS.remove(toolbar);
             return;
         }
         Drawable d = icon != null ? icon : glyph(toolbar.getContext(), false);
         toolbar.setNavigationIcon(d);
+        STARTS.put(toolbar, d);
         toolbar.setNavigationOnClickListener(listener);
         if (toolbar.getNavigationContentDescription() == null) {
             toolbar.setNavigationContentDescription(android.R.string.cancel);
@@ -67,6 +77,26 @@ public final class MagicToolbar {
     public static void setEndContentDescription(Toolbar toolbar, CharSequence description) {
         View end = toolbar == null ? null : toolbar.findViewById(android.R.id.icon2);
         if (end != null) end.setContentDescription(description);
+    }
+
+    public static void setStartContentDescription(Toolbar toolbar, CharSequence description) {
+        if (toolbar != null && toolbar.getNavigationIcon() != null) toolbar.setNavigationContentDescription(description);
+    }
+
+    /** MagicOS's "done" icon enabled or not (edit screens enable it once there is something to save). */
+    public static void setEditPositiveEnabled(Toolbar toolbar, boolean enabled) {
+        View end = toolbar == null ? null : toolbar.findViewById(android.R.id.icon2);
+        if (end != null) end.setEnabled(enabled);
+    }
+
+    /** MagicOS's toolbar effects (blurred drop-down, split toolbar) have no counterpart: nothing to do. */
+    public static void setDropdownBlurEnabled(Toolbar toolbar, boolean enabled) {
+    }
+
+    public static void setSplitBackgroundDrawable(Toolbar toolbar, Drawable drawable) {
+    }
+
+    public static void setSplitToolbarForce(Toolbar toolbar, boolean force) {
     }
 
     public static void setStartContentDescription(ActionBar bar, CharSequence description) {

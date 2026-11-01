@@ -26,8 +26,18 @@ Xiaomi, whose output is unchanged):
   `ro.build.version.magic`) are empty and the app takes its own defaults.
 - `ActionBarEx.setStartIcon/setEndIcon` (MagicOS's toolbar cancel/done icons, view ids android:id/icon1 and icon2 that
   the app looks up) are drawn by `runtime/MagicToolbar`: the toolbar's navigation button and an end button.
+  Hiding the start icon leaves a navigation icon the app set itself (a back arrow) alone.
 - A known body for a constructor (`Lowner;-><init>(...)V`) is used as is, e.g. the super call to a base class that has
   no constructor of the app's shape (`HwUniversalKeyStoreProvider` -> `java.security.Provider`).
+- `HwExpandedAppbarController` (MagicOS's big collapsing title above a list) -> `runtime/MagicAppbar`: the layout the
+  port adds (`magic_expanded_appbar`, ids `magic_appbar_layout` / `magic_toolbar` / `magic_collapsing_toolbar`), the
+  app's content layout inflated under it and padded to start below it. It does not collapse.
+- `HnIconVectorDrawableUtils.setLayerColor` (MagicOS's layered vector icon, which the app's bundled uikit
+  `HnIconVectorDrawable` wraps): the first layer's colour tints the icon, whose paths carry a grey placeholder fill.
+- `runtime/Magic` also answers what ports redirect to it: `setDecorFitsSystemWindows` (targetSdk 35+ apps are edge to
+  edge on Android 15: pads android:id/content by the bars it overlaps), `getIdentifier` for `androidhnext` names
+  (Theme.Magic styles -> the port's MagicDayNight ones, dimens -> the app's copy, ids -> the app's `magic_<name>`),
+  `themeColor` (a colour attribute the port answered with a plain colour).
 
 ## Use
 
@@ -83,6 +93,9 @@ Then in the patch (`patches/.../honor/`):
   Android id), and Theme.resolveAttribute calls go to the runtime `Magic.resolveAttribute`, which answers a plain
   resource put in place of an attribute with its value. Unknown literals stop the patch, listed.
 - `convertMagicInterpolators()` (`MagicResources.kt`): MagicOS's `<cubicBezierInterpolator>` tag -> `<pathInterpolator>`.
+- `useMagicWidgets(widgets)` (`MagicResources.kt`): MagicOS's LayoutInflater turns plain tags (`<ImageView>`,
+  `<TextView>`, `<Toolbar>`, ...) into its Hw widgets, which the app then casts to; off MagicOS each such tag in the
+  app's layouts is renamed to the stand-in the port names.
 - `followMagicDayNight()` reads Huawei's older `hwc-theme` meta-data as well as `hnc-theme` (Calendar, Files, Notes).
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required Honor `uses-library`.
 - Vendor members on Android classes (none in Honor's own apps so far; YOYO and Honor Health have a few): redirect them
