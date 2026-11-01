@@ -1,3 +1,17 @@
+## [2.8.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.3...v2.8.4) (2026-11-01)
+
+### 🐛 Bug Fixes
+
+* add lg health remove telemetry ([5a09944](https://github.com/bearinmindcat/morphe-patches/commit/5a099440a04f2283330f7d3c9452efe9e66a53a5))
+* add lg quickmemo+ non-lg support ([e6c6d13](https://github.com/bearinmindcat/morphe-patches/commit/e6c6d1392229fa24aa9c4d35483887f02e3e0e74))
+* add redmagic game space non-redmagic support ([432e6f8](https://github.com/bearinmindcat/morphe-patches/commit/432e6f87918c80d89cdc4744e892f94aadcf5320))
+* pdfcraft's icon in the readme and morphe manager is its new red one ([ef3f081](https://github.com/bearinmindcat/morphe-patches/commit/ef3f08151ed5c58453067be4ed773cd97bf4c144))
+* samsung gallery no longer crashes on samsung-only media columns; issue [#97](https://github.com/bearinmindcat/morphe-patches/issues/97) ([c46d1d8](https://github.com/bearinmindcat/morphe-patches/commit/c46d1d8050cbc04c5f8ec82908b8e45cfdc06621))
+* samsung gallery's edit button opens samsung photo editor; issue [#97](https://github.com/bearinmindcat/morphe-patches/issues/97) ([a34836a](https://github.com/bearinmindcat/morphe-patches/commit/a34836a8eed0d9b9be8f25055bf361d141599be6))
+* samsung keyboard's disable telemetry finds the diagnostics agent on every build of a version; issue [#98](https://github.com/bearinmindcat/morphe-patches/issues/98) ([39472c9](https://github.com/bearinmindcat/morphe-patches/commit/39472c9257639615b7a2dea95b9d6bc8fbd947bf))
+* samsung notes installs on android 15 phones that run 32-bit apps when libraries are stripped ([2656466](https://github.com/bearinmindcat/morphe-patches/commit/26564664912558be3493cfba48c54518d00d978b))
+* samsung weather no longer crashes on phones whose search index lacks parent types; issue [#92](https://github.com/bearinmindcat/morphe-patches/issues/92) ([80a942f](https://github.com/bearinmindcat/morphe-patches/commit/80a942fbf31b5ceeaedd1e2baff0327637c00f38))
+
 ## [2.8.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.2...v2.8.3) (2026-11-01)
 
 ### 🐛 Bug Fixes
