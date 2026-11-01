@@ -5,6 +5,7 @@
 # that is not Xiaomi's: international, region = the phone's locale, no MIUI-only hardware.
 
 REGION = 'java.util.Locale.getDefault().getCountry()'
+HEX_LOOP = 'StringBuilder h = new StringBuilder(); for (byte x : d) h.append(String.format("%02x", x & 0xff));'
 
 FIELDS = {
     # miui.os.Build: Global (international) behaviour; e.g. Compass shows China's CTA consent unless this is true.
@@ -23,6 +24,19 @@ FIELDS = {
 }
 
 METHODS = {
+    # MIUI's own utilities in android.*: plain digests and a default sound, which Android can answer for real.
+    'Landroid/os/updater/MD5;->getMd5Digest(Ljava/lang/String;)Ljava/lang/String;':
+        'if (p0 == null) return null; try { byte[] d = java.security.MessageDigest.getInstance("MD5")'
+        '.digest(p0.getBytes(java.nio.charset.StandardCharsets.UTF_8)); ' + HEX_LOOP + ' return h.toString(); }'
+        ' catch (java.security.NoSuchAlgorithmException e) { return null; }',
+    'Landroid/os/updater/DigestUtils;->get(Ljava/io/InputStream;Ljava/lang/String;)[B':
+        'try { java.security.MessageDigest m = java.security.MessageDigest.getInstance(p1); byte[] b = new byte[8192];'
+        ' for (int n; (n = p0.read(b)) > 0; ) m.update(b, 0, n); return m.digest(); }'
+        ' catch (java.io.IOException | java.security.NoSuchAlgorithmException e) { return null; }',
+    'Landroid/os/updater/DigestUtils;->toHexReadable([B)Ljava/lang/String;':
+        'if (p0 == null) return null; byte[] d = p0; ' + HEX_LOOP + ' return h.toString();',
+    'Landroid/media/ExtraRingtoneManager;->getDefaultSoundActualUri(Landroid/content/Context;I)Landroid/net/Uri;':
+        'return android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);',
     'Lmiui/os/Build;->checkRegion(Ljava/lang/String;)Z': f'return p0 != null && p0.equalsIgnoreCase({REGION});',
     'Lmiui/os/Build;->getRegion()Ljava/lang/String;': f'return {REGION};',
     'Lmiui/os/Build;->getCustVariant()Ljava/lang/String;': f'return {REGION}.toLowerCase(java.util.Locale.ROOT);',
@@ -39,4 +53,10 @@ REFLECTED = {
 # where Android instantiates them), when the app's own use doesn't show it.
 SUPERS = {
     'Lmiui/app/backup/FullBackupAgent;': 'Landroid/app/backup/BackupAgent;',
+    # Xiaomi's AI speech SDK (com.xiaomi.miai, HyperOS's AI service client): the event payloads the app passes as
+    # EventPayloads (the ART verifier rejects the whole calling class otherwise).
+    'Lcom/xiaomi/miai/api/SpeechGeneral$RecognizeStreamStarted;': 'Lcom/xiaomi/miai/api/common/EventPayload;',
+    'Lcom/xiaomi/miai/api/SpeechGeneral$RecognizeStreamEnded;': 'Lcom/xiaomi/miai/api/common/EventPayload;',
+    'Lcom/xiaomi/miai/api/SpeechMiAiSpeechAsr$SpeechRecognize;': 'Lcom/xiaomi/miai/api/common/EventPayload;',
+    'Lcom/xiaomi/miai/api/SpeechMiAiSpeechConference$ConferenceServiceInfoUpdate;': 'Lcom/xiaomi/miai/api/common/EventPayload;',
 }

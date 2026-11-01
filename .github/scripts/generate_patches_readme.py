@@ -161,6 +161,10 @@ APP_RENAMES = {
         '<img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder',
         '<img src="docs/icons/xiaomi-recorder.png" width="20" height="20" align="top"> Xiaomi Recorder',
     ),
+    "com.miui.notes": (
+        '<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes',
+        '<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes',
+    ),
 }
 
 
