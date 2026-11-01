@@ -219,6 +219,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-calendar.png" width="20" height="20" align="top"> Honor Calendar',
         '<img src="docs/icons/honor-calendar.png" width="20" height="20" align="top"> Honor Calendar',
     ),
+    "com.hihonor.filemanager": (
+        '<img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files',
+        '<img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files',
+    ),
 }
 
 
