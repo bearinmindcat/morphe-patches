@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;103 patches total
+> **[v2.8.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;111 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -505,6 +505,110 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Recorder installable and usable on non-Nothing OS ROMs. |  |
+
+</details>
+
+</blockquote>
+</details>
+
+<details>
+<summary>📱 Honor Apps&nbsp;&nbsp;•&nbsp;&nbsp;8 apps&nbsp;&nbsp;•&nbsp;&nbsp;8 patches</summary>
+<br>
+<blockquote>
+
+<details>
+<summary><img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.0.1.217
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Calculator usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-calendar.png" width="20" height="20" align="top"> Honor Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-calendar.png" width="20" height="20" align="top"> Honor Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 13.3.0.345
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Calendar usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-clock.png" width="20" height="20" align="top"> Honor Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-clock.png" width="20" height="20" align="top"> Honor Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.0.1.196
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Clock usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-compass.png" width="20" height="20" align="top"> Honor Compass&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-compass.png" width="20" height="20" align="top"> Honor Compass&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.1.174
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Compass usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-files.png" width="20" height="20" align="top"> Honor Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 10.0.0.641
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Files usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.0.4.817
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Notes usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-recorder.png" width="20" height="20" align="top"> Honor Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-recorder.png" width="20" height="20" align="top"> Honor Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.1.197
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Recorder usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 8.0.0.032
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Video Player installable and usable on non-Honor ROMs. |  |
 
 </details>
 

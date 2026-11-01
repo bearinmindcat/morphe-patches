@@ -1,3 +1,16 @@
+## [2.8.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.2...v2.8.3) (2026-11-01)
+
+### 🐛 Bug Fixes
+
+* add honor calculator non-magicos support ([28c5f97](https://github.com/bearinmindcat/morphe-patches/commit/28c5f973327e4d02c941d59ea79ea42d0be570f4))
+* add honor calendar non-magicos support ([566004e](https://github.com/bearinmindcat/morphe-patches/commit/566004e0d0dd1ba86484a0f1cfdae09eb68dfd96))
+* add honor clock non-magicos support ([a2aa94e](https://github.com/bearinmindcat/morphe-patches/commit/a2aa94e2e10077001a124e556cde95fcbefa50b1))
+* add honor compass non-magicos support ([18a61f8](https://github.com/bearinmindcat/morphe-patches/commit/18a61f851a5a814bc61c7618914515c13f65513c))
+* add honor files non-magicos support ([7ddc69a](https://github.com/bearinmindcat/morphe-patches/commit/7ddc69a2017775f6aaa17bc0d800b6f419e2dd60))
+* add honor notes non-magicos support ([4830559](https://github.com/bearinmindcat/morphe-patches/commit/4830559d60fb402e9aef9bd9b897398395c5dccb))
+* add honor recorder non-magicos support ([9b46580](https://github.com/bearinmindcat/morphe-patches/commit/9b46580601a8dd73b8696efd0b27a28e18404392))
+* add honor video player non-magicos support ([d626141](https://github.com/bearinmindcat/morphe-patches/commit/d626141b3b92036994e6c825ef2d86a7777ace05))
+
 ## [2.8.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.1...v2.8.2) (2026-11-01)
 
 ### 🐛 Bug Fixes
