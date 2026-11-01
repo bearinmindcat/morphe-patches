@@ -46,6 +46,9 @@ Apps that bundle miuix and read Xiaomi's region properties (Gallery: `ro.product
 those, `redirectMiuiProperties("Lorg/ungoogled/xiaomi<app>/MiuiProps;")` (`patches/.../xiaomi/MiuiProperties.kt`)
 sends `android.os.SystemProperties` and MiCloud's `miui.cloud.os.SystemProperties` reads to the runtime `MiuiProps`,
 which answers those three as a Global build where the phone has no value.
+Apps (and SDKs) that look the class up by reflection (`Class.forName("android.os.SystemProperties")`, the Gallery
+Editor) also need `redirectReflectedMiuiProperties(...)` (`patches/.../xiaomi/ReflectedProperties.kt`): the looked-up
+name becomes MiuiProps, which has the same static getters.
 
 Things to know:
 - miuix probes the platform with `Class.forName("miui.util.HapticFeedbackUtil")` and reflection; with a stand-in
