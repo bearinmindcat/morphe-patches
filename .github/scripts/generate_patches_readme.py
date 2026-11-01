@@ -45,7 +45,7 @@ def pkg_emoji(pkg):
 # package prefixes, packages without the maker's prefix).
 VENDOR_GROUPS = [
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
-    ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder",)),
+    ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
 ]
 
 
@@ -180,6 +180,10 @@ APP_RENAMES = {
     "com.miui.screenrecorder": (
         '<img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder',
         '<img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder',
+    ),
+    "com.android.calendar": (
+        '<img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar',
+        '<img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar',
     ),
 }
 

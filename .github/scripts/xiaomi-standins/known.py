@@ -41,6 +41,33 @@ METHODS = {
         'if (p0 == null) return null; byte[] d = p0; ' + HEX_LOOP + ' return h.toString();',
     'Landroid/media/ExtraRingtoneManager;->getDefaultSoundActualUri(Landroid/content/Context;I)Landroid/net/Uri;':
         'return android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);',
+    # MIUI's coder for its apps' own server requests (Calendar signs them and decrypts the answers with its own keys):
+    # SHA-1 as hex, and AES/CBC/PKCS5 with the IV every Xiaomi SDK uses ("0102030405060708"), as Base64.
+    'Lmiui/util/CoderUtils;->encodeSHA(Ljava/lang/String;)Ljava/lang/String;':
+        'if (p0 == null) return null; try { byte[] d = java.security.MessageDigest.getInstance("SHA-1")'
+        '.digest(p0.getBytes(java.nio.charset.StandardCharsets.UTF_8)); ' + HEX_LOOP + ' return h.toString(); }'
+        ' catch (java.security.NoSuchAlgorithmException e) { return null; }',
+    'Lmiui/util/CoderUtils;->base64AesEncode(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;':
+        'if (p0 == null || p1 == null) return null; try { javax.crypto.Cipher c = javax.crypto.Cipher.getInstance('
+        '"AES/CBC/PKCS5Padding"); c.init(javax.crypto.Cipher.ENCRYPT_MODE, new javax.crypto.spec.SecretKeySpec('
+        'p1.getBytes(java.nio.charset.StandardCharsets.UTF_8), "AES"), new javax.crypto.spec.IvParameterSpec('
+        '"0102030405060708".getBytes(java.nio.charset.StandardCharsets.UTF_8))); return android.util.Base64.encodeToString('
+        'c.doFinal(p0.getBytes(java.nio.charset.StandardCharsets.UTF_8)), android.util.Base64.NO_WRAP); }'
+        ' catch (java.security.GeneralSecurityException | IllegalArgumentException e) { return null; }',
+    'Lmiui/util/CoderUtils;->base6AesDecode(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;':
+        'if (p0 == null || p1 == null) return null; try { javax.crypto.Cipher c = javax.crypto.Cipher.getInstance('
+        '"AES/CBC/PKCS5Padding"); c.init(javax.crypto.Cipher.DECRYPT_MODE, new javax.crypto.spec.SecretKeySpec('
+        'p1.getBytes(java.nio.charset.StandardCharsets.UTF_8), "AES"), new javax.crypto.spec.IvParameterSpec('
+        '"0102030405060708".getBytes(java.nio.charset.StandardCharsets.UTF_8))); return new String(c.doFinal('
+        'android.util.Base64.decode(p0, android.util.Base64.DEFAULT)), java.nio.charset.StandardCharsets.UTF_8); }'
+        ' catch (java.security.GeneralSecurityException | IllegalArgumentException e) { return null; }',
+    'Lmiui/util/HashUtils;->getHash(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;':
+        'if (p0 == null || p1 == null) return null; try { byte[] d = java.security.MessageDigest.getInstance(p1)'
+        '.digest(p0.getBytes(java.nio.charset.StandardCharsets.UTF_8)); ' + HEX_LOOP + ' return h.toString(); }'
+        ' catch (java.security.NoSuchAlgorithmException e) { return null; }',
+    'Landroid/media/ExtraRingtone;->getRingtoneTitle(Landroid/content/Context;Landroid/net/Uri;Z)Ljava/lang/String;':
+        'if (p0 == null || p1 == null) return ""; android.media.Ringtone r = android.media.RingtoneManager.getRingtone('
+        'p0, p1); return r == null ? "" : r.getTitle(p0);',
     'Lmiui/os/Build;->checkRegion(Ljava/lang/String;)Z': f'return p0 != null && p0.equalsIgnoreCase({REGION});',
     'Lmiui/os/Build;->getRegion()Ljava/lang/String;': f'return {REGION};',
     'Lmiui/os/Build;->getCustVariant()Ljava/lang/String;': f'return {REGION}.toLowerCase(java.util.Locale.ROOT);',
