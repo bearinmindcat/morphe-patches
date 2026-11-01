@@ -93,11 +93,14 @@ internal fun BytecodePatchContext.redirectOneUiMembers(oneUi: String, sem: Strin
 /**
  * The machinery behind redirectOneUiMembers, for any vendor: every call to and field access of a member for which
  * [isMember] (owner class, member name) says yes goes through [helper]'s call/callSuper/get/set, via one generated
- * method per member in [shimClass]. Also used for HyperOS (xiaomi/MiuiMembers).
+ * method per member in [shimClass]. Also used for HyperOS (xiaomi/MiuiMembers). With [keys] ("Lowner;->name(params)
+ * return" / "Lowner;->name:type") only exactly those members move, and [isMember] is not asked (RedMagic: hidden
+ * Android members, whose public overloads must stay as they are).
  */
 internal fun BytecodePatchContext.redirectMembers(
     helper: String,
     shimClass: String,
+    keys: Set<String>? = null,
     isMember: (owner: String, name: String) -> Boolean,
 ): Pair<Int, Int> {
     val oneUi = helper
@@ -166,6 +169,10 @@ internal fun BytecodePatchContext.redirectMembers(
     }
 
     fun oneUi(owner: String, name: String) = isMember(owner, name)
+    fun oneUi(ref: MethodReference) = if (keys == null) oneUi(ref.definingClass, ref.name)
+        else "${ref.definingClass}->${ref.name}(${ref.parameterTypes.joinToString("")})${ref.returnType}" in keys
+    fun oneUi(ref: FieldReference) = if (keys == null) oneUi(ref.definingClass, ref.name)
+        else "${ref.definingClass}->${ref.name}:${ref.type}" in keys
 
     val sites = mutableListOf<Pair<String, Method>>()
     classDefForEach { c ->
@@ -173,8 +180,8 @@ internal fun BytecodePatchContext.redirectMembers(
         for (m in c.methods) {
             val hit = m.implementation?.instructions?.any { insn ->
                 when (val ref = (insn as? ReferenceInstruction)?.reference) {
-                    is MethodReference -> oneUi(ref.definingClass, ref.name)
-                    is FieldReference -> oneUi(ref.definingClass, ref.name)
+                    is MethodReference -> oneUi(ref)
+                    is FieldReference -> oneUi(ref)
                     else -> false
                 }
             } ?: false
@@ -194,7 +201,7 @@ internal fun BytecodePatchContext.redirectMembers(
             val insn = instructions[index]
             when (val ref = (insn as? ReferenceInstruction)?.reference) {
                 is MethodReference -> {
-                    if (!oneUi(ref.definingClass, ref.name)) continue
+                    if (!oneUi(ref)) continue
                     val (receiver, superCall) = when (insn.opcode) {
                         Opcode.INVOKE_STATIC, Opcode.INVOKE_STATIC_RANGE -> false to false
                         Opcode.INVOKE_SUPER, Opcode.INVOKE_SUPER_RANGE -> true to true
@@ -213,7 +220,7 @@ internal fun BytecodePatchContext.redirectMembers(
                     calls++
                 }
                 is FieldReference -> {
-                    if (!oneUi(ref.definingClass, ref.name)) continue
+                    if (!oneUi(ref)) continue
                     when (insn.opcode) {
                         in SGET -> {
                             val a = (insn as OneRegisterInstruction).registerA
