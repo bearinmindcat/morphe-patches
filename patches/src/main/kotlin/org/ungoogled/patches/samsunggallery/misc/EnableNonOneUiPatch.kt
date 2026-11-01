@@ -7,11 +7,14 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import org.ungoogled.patches.samsung.redirectToWrappers
 import org.ungoogled.patches.samsunggallery.SamsungGalleryConstants.COMPATIBILITY_SAMSUNG_GALLERY
 import org.w3c.dom.Element
 
 internal const val SAMSUNG_GALLERY_EXTENSION = "extensions/samsunggallery.mpe"
 private const val MEDIA_MIRROR = "Lorg/ungoogled/samsunggallery/MediaMirror;"
+private const val MEDIA_QUERIES = "Lorg/ungoogled/samsunggallery/MediaQueries;"
 
 /** The URIs Gallery uses off One UI (its "generic device" table), unobfuscated. */
 private const val MEDIA_URI_GED = "Lcom/samsung/android/gallery/support/providers/MediaUriGed;"
@@ -63,6 +66,21 @@ val enableNonOneUiPatch = bytecodePatch(
                 return-object v0
             """,
         )
+
+        // Gallery also queries MediaStore itself with Samsung's columns (media_id, cloud hashes ...), which Google's
+        // MediaStore refuses with an exception Gallery does not catch: the viewer crashed whenever the media changed
+        // under it (finding its photo again asks for "media_id="). Every query goes through MediaQueries, which puts
+        // the ones MediaStore refuses to the media copy.
+        val secFileIdClass = SecFileIdFingerprint.classDef.type
+        val secFileIdName = SecFileIdFingerprint.method.name
+        val queries = redirectToWrappers(MEDIA_QUERIES, setOf("Landroid/content/ContentResolver;"))
+        // Measured against 15.9.01.7: 135 queries.
+        if (queries < 100) throw PatchException("only $queries content queries found")
+        val secFileId = mutableClassDefBy(secFileIdClass).methods.first { it.name == secFileIdName && it.parameterTypes == listOf("J") }
+        if (secFileId.implementation!!.instructions.none { (it as? ReferenceInstruction)?.reference?.toString()?.startsWith(MEDIA_QUERIES) == true }) {
+            throw PatchException("Samsung file id lookup still queries MediaStore directly")
+        }
+        java.util.logging.Logger.getLogger("SamsungGallery").info("Content queries: $queries")
 
         // Off One UI Gallery reads One UI version 0 and keeps to its generic-device paths, which work; but it turns
         // "MX albums" (One UI 5's album model) on only from One UI 5, and this build has the screens only for that
