@@ -55,6 +55,24 @@ Then in the patch (`patches/.../honor/`):
   with, and `Theme.resolveAttribute` goes through the runtime `Magic.resolveAttribute`. List them with
   `baksmali d classes.dex -o out; grep -rhE "const(/high16)? [vp][0-9]+, 0x2[0-9a-f]{6}$" out | sort | uniq -c`
   (0x2000000 is a flag, not a resource).
+  `redirectMagicFrameworkLookups(runtime)` does the same for framework interpolators looked up by name
+  (`getIdentifier(name, "interpolator", "androidhnext")`); other framework lookups keep answering 0, because Honor's
+  libraries (hnanimscene, the UI kit) use them to tell whether they run on MagicOS.
+- `replaceMagicIconDrawables(sources)` (`MagicIcons.kt`): drawables of MagicOS's framework icon class
+  (`com.hihonor.android.widget.HnIconVectorDrawable`, framework icon sources; notification icons above all) become
+  Android `<vector>`s from the app's copies of the sources (the UI kit carries them under MagicOS's names), coloured
+  as the drawable asked; a plain vector also inflates in SystemUI. A source the app's build shrank to `<x/>` stops the
+  patch: draw that one yourself (into that placeholder).
+- `replaceMagicInterpolators()` (`MagicInterpolators.kt`): `<cubicBezierInterpolator>` (MagicOS-only tag) becomes
+  Android's `<pathInterpolator>`.
+- Layouts that SystemUI or a launcher inflates (notification `RemoteViews`) may name only Android's widgets: swap
+  `com.hihonor.android.widget.HwTextView`/`ImageView` for `TextView`/`ImageView` there. App widgets built from the
+  app's own views cannot work on other launchers (Clock turns its providers off).
+- Runtime `Magic` (generated into each extension) also has `toolbarButton` (MagicOS's ActionBarEx start/end buttons,
+  ids android:id/icon1 / icon2), `setNavigationIcon` (tints the UI kit's grey placeholder icons) and `onMagicOs()`
+  (MagicOS framework on the boot class path) for the few places a port swaps a MagicOS-only component.
+- A stand-in whose members name a class the app itself bundles (Recorder ships a stub `HwToolbar`) is skipped by the
+  generator; write it by hand, with a copy of that class in the extension (Morphe merges it into the app's).
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required Honor `uses-library`.
 - Vendor members on Android classes (none in Honor's own apps so far; YOYO and Honor Health have a few): redirect them
   like `xiaomi/MiuiMembers.kt` does, on top of `samsung/OneUiMembers.kt`'s `redirectMembers()`.

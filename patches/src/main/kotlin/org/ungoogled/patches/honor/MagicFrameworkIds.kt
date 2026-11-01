@@ -87,3 +87,16 @@ internal fun BytecodePatchContext.replaceMagicFrameworkIds(runtime: String, answ
     }
     return replaced
 }
+
+/**
+ * Code can also look MagicOS's framework interpolators up by name (`getIdentifier("cubic_bezier_interpolator_type_20_80",
+ * "interpolator", "androidhnext")`): off MagicOS that answers 0, and loading interpolator 0 throws (Clock died opening
+ * its alarm list). Sends the app's Resources.getIdentifier calls through [runtime]'s `getIdentifier` (the
+ * honor-standins Magic class), which answers such a lookup with the app's own interpolator of that name, or Android's
+ * nearest; other framework lookups keep answering 0 (Honor's libraries use them to tell MagicOS apart). Returns the
+ * calls moved.
+ */
+internal fun BytecodePatchContext.redirectMagicFrameworkLookups(runtime: String): Int = redirectCalls(
+    runtime,
+    mapOf("Landroid/content/res/Resources;" to setOf("getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I")),
+)

@@ -39,6 +39,7 @@ for line in dump.splitlines():
     m = re.match(r'\s+resource (0x[0-9a-f]+) (\S+)', line)
     if m: res = m.group(2); continue
     for kind, v in re.findall(r'([?@])0x(02[0-9a-f]{6})', line): uses[(kind, int(v, 16))].add('resources.arsc ' + res)
+    for v in re.findall(r'parent=0x(02[0-9a-f]{6})', line): uses[('@', int(v, 16))].add('resources.arsc ' + res + ' (parent)')
 
 # the framework: names, Theme.Magic's attribute values, default-configuration values
 fdump = subprocess.run(['aapt2', 'dump', 'resources', fw], capture_output=True, text=True).stdout
