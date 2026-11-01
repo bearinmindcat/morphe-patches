@@ -237,6 +237,10 @@ APP_RENAMES = {
         '<img src="docs/icons/lg-quickmemo.png" width="20" height="20" align="top"> LG QuickMemo+',
         '<img src="docs/icons/lg-quickmemo.png" width="20" height="20" align="top"> LG QuickMemo+',
     ),
+    "com.lge.lifetracker": (
+        '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
+        '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
+    ),
 }
 
 
