@@ -47,6 +47,7 @@ VENDOR_GROUPS = [
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
+    ("Honor Apps", "honor ", ("com.hihonor.",), ()),
 ]
 
 
@@ -193,6 +194,10 @@ APP_RENAMES = {
     "com.nothing.soundrecorder": (
         '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
         '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
+    ),
+    "com.hihonor.calculator": (
+        '<img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator',
+        '<img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator',
     ),
 }
 
