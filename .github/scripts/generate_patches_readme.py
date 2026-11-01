@@ -41,9 +41,20 @@ def pkg_emoji(pkg):
     return "📦"
 
 
-def is_samsung(pkg):
-    """Samsung's own apps, listed together under one "Samsung Apps" spoiler."""
-    return pkg.startswith(("com.samsung.", "com.sec."))
+# Phone makers' own apps, each maker's listed together under one spoiler: (title, name prefix dropped when sorting,
+# package prefixes, packages without the maker's prefix).
+VENDOR_GROUPS = [
+    ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
+    ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder",)),
+]
+
+
+def vendor_group(pkg):
+    """The vendor group an app is listed under, or None for a top-level app."""
+    for group in VENDOR_GROUPS:
+        if pkg.startswith(group[2]) or pkg in group[3]:
+            return group
+    return None
 
 
 # Apps this bundle renames, rendered as "<source app>  →  <patched app>" in the
@@ -292,26 +303,29 @@ def build_content(expanded=False):
         return spoiler(pkg_label(pkg, entry), len(patches), entry["targets"], patches_table(patches), expanded,
                        screenshots_row(pkg))
 
-    # One spoiler per app, in the order they appear in the JSON; Samsung's apps are grouped in one spoiler of
-    # their own, by name, after the others.
-    samsung = {pkg: entry for pkg, entry in by_pkg.items() if is_samsung(pkg)}
+    # One spoiler per app, in the order they appear in the JSON; each phone maker's own apps are grouped in one
+    # spoiler of their own (VENDOR_GROUPS), by name, after the others.
     for pkg, entry in by_pkg.items():
-        if pkg not in samsung:
+        if vendor_group(pkg) is None:
             lines.append(app_spoiler(pkg, entry))
             lines.append("")
 
-    if samsung:
+    for title, prefix, _, _ in VENDOR_GROUPS:
+        group = {pkg: entry for pkg, entry in by_pkg.items() if (vendor_group(pkg) or ("",))[0] == title}
+        if not group:
+            continue
+
         def name(pkg):
-            text = re.sub(r"<[^>]+>|&nbsp;", " ", pkg_label(pkg, samsung[pkg])).split("-&gt;")[0].strip().lower()
-            return text.removeprefix("samsung ")
-        names = sorted(samsung, key=name)
-        count = sum(len(samsung[pkg]["patches"]) for pkg in samsung)
-        apps  = "app" if len(samsung) == 1 else "apps"
+            text = re.sub(r"<[^>]+>|&nbsp;", " ", pkg_label(pkg, group[pkg])).split("-&gt;")[0].strip().lower()
+            return text.removeprefix(prefix)
+        names = sorted(group, key=name)
+        count = sum(len(group[pkg]["patches"]) for pkg in group)
+        apps  = "app" if len(group) == 1 else "apps"
         noun  = "patch" if count == 1 else "patches"
-        inner = "\n\n".join(app_spoiler(pkg, samsung[pkg]) for pkg in names)
+        inner = "\n\n".join(app_spoiler(pkg, group[pkg]) for pkg in names)
         tag   = "<details open>" if expanded else "<details>"
         lines.append(f"""{tag}
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;{len(samsung)} {apps}&nbsp;&nbsp;•&nbsp;&nbsp;{count} {noun}</summary>
+<summary>📱 {title}&nbsp;&nbsp;•&nbsp;&nbsp;{len(group)} {apps}&nbsp;&nbsp;•&nbsp;&nbsp;{count} {noun}</summary>
 <br>
 <blockquote>
 
