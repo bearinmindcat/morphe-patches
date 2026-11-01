@@ -49,6 +49,7 @@ VENDOR_GROUPS = [
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
     ("Honor Apps", "honor ", ("com.hihonor.",), ()),
     ("RedMagic Apps", "redmagic ", ("cn.nubia.",), ()),
+    ("LG Apps", "lg ", ("com.lge.",), ()),
 ]
 
 
@@ -231,6 +232,10 @@ APP_RENAMES = {
     "cn.nubia.gamelauncher": (
         '<img src="docs/icons/redmagic-game-space.png" width="20" height="20" align="top"> RedMagic Game Space',
         '<img src="docs/icons/redmagic-game-space.png" width="20" height="20" align="top"> RedMagic Game Space',
+    ),
+    "com.lge.qmemoplus": (
+        '<img src="docs/icons/lg-quickmemo.png" width="20" height="20" align="top"> LG QuickMemo+',
+        '<img src="docs/icons/lg-quickmemo.png" width="20" height="20" align="top"> LG QuickMemo+',
     ),
 }
 
