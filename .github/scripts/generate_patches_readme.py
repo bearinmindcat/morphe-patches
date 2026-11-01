@@ -199,6 +199,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator',
         '<img src="docs/icons/honor-calculator.png" width="20" height="20" align="top"> Honor Calculator',
     ),
+    "com.hihonor.hnvideoplayer": (
+        '<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player',
+        '<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player',
+    ),
 }
 
 

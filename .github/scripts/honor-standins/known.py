@@ -63,3 +63,7 @@ REFLECTED = {}
 
 # Honor framework classes and the Android class each one extends, when neither the app's use nor SUPER_RULES shows it.
 SUPERS = {}
+
+# Added with Honor Video Player: the current user, as Android answers it (UserHandle's id is its hashCode).
+METHODS['Lcom/hihonor/android/content/ContextEx;->getUserId(Landroid/content/Context;)I'] = \
+    'return android.os.Process.myUserHandle().hashCode();'
