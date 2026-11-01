@@ -37,6 +37,8 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
     // activity theme -> whether MagicOS would give it no action bar
     val wanted = mutableMapOf<String, Boolean>()
     var activities = 0
+    // The translucent style is added only for an app that has such an activity.
+    var translucentUsed = false
     document("AndroidManifest.xml").use { manifest ->
         val application = manifest.getElementsByTagName("application").item(0) as Element
         fun meta(element: Element): String? = element.children("meta-data")
@@ -58,6 +60,7 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
                     translucent -> if (theme.isEmpty() || ANDROID_THEME.matches(theme)) {
                         activity.setAttribute("android:theme", "@style/$MAGIC_DAY_NIGHT_TRANSLUCENT")
                         activities++
+                        translucentUsed = true
                     }
                     // No theme at all (Android's default, light with an action bar): as an Android theme named directly.
                     theme.isEmpty() || ANDROID_THEME.matches(theme) -> {
@@ -117,7 +120,7 @@ internal fun ResourcePatchContext.followMagicDayNight(): Pair<Int, Int> {
                     MAGIC_DAY_NIGHT_NO_ACTION_BAR, "@style/$MAGIC_DAY_NIGHT",
                     listOf("android:windowActionBar" to "false", "android:windowNoTitle" to "true"),
                 )
-                add(
+                if (translucentUsed) add(
                     // With an action bar, as MagicOS's (the app hides it itself).
                     MAGIC_DAY_NIGHT_TRANSLUCENT, "@style/$MAGIC_DAY_NIGHT",
                     listOf(
