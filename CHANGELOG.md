@@ -1,3 +1,27 @@
+## [2.8.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.6...v2.8.0) (2026-11-01)
+
+### 🐛 Bug Fixes
+
+* samsung notes no longer crashes when copying, playing voice recordings or checking samsung cloud security ([962f060](https://github.com/bearinmindcat/morphe-patches/commit/962f060171843fdbf166989f0baa49ab6f0c8225))
+
+### ✨ New Features
+
+* add samsung calculator non-one ui support ([0e59924](https://github.com/bearinmindcat/morphe-patches/commit/0e59924967d79a68cafcdece8c1b065b8dea98c9))
+* add samsung calendar non-one ui support ([3f36ac5](https://github.com/bearinmindcat/morphe-patches/commit/3f36ac5c857806080509aec513cc8158f3816392))
+* add samsung clock non-one ui support ([2bdcbf6](https://github.com/bearinmindcat/morphe-patches/commit/2bdcbf6291ff502568e2e9419136a924d10dff7b))
+* add samsung contacts non-one ui support ([32d38dc](https://github.com/bearinmindcat/morphe-patches/commit/32d38dc095f4ede1a35750132eb79ae643a9e06a))
+* add samsung health monitor non-one ui support ([1489385](https://github.com/bearinmindcat/morphe-patches/commit/1489385b0cc2f06195cb5b0f05b377a5061dbe67))
+* add samsung messages non-one ui support ([8cff311](https://github.com/bearinmindcat/morphe-patches/commit/8cff311acae6e95107ca54e371ed7c260867e2a2))
+* add samsung modes and routines non-one ui support ([320a6b3](https://github.com/bearinmindcat/morphe-patches/commit/320a6b3d6ecc09078354900ddc13c9448f72e27c))
+* add samsung music non-one ui support ([4a6c7f3](https://github.com/bearinmindcat/morphe-patches/commit/4a6c7f3754f1f57323d98c1ba42b3c4a37959677))
+* add samsung my files non-one ui support ([85b1c23](https://github.com/bearinmindcat/morphe-patches/commit/85b1c2300ec27b0bd75d4d3ea096f45196ece847))
+* add samsung photo editor non-one ui support ([f6233da](https://github.com/bearinmindcat/morphe-patches/commit/f6233daee2b1bf5ae99864759a8aa798dc26c259))
+* add samsung reminder non-one ui support ([1609746](https://github.com/bearinmindcat/morphe-patches/commit/160974672709de0a933f027a3a1bb68979b49369))
+* add samsung video player non-one ui support ([e771b82](https://github.com/bearinmindcat/morphe-patches/commit/e771b8248a0bd7dcd2083d3dd1c9e50c5900042e))
+* add samsung voice recorder non-one ui support ([e7becb1](https://github.com/bearinmindcat/morphe-patches/commit/e7becb11988e8203e82811223da4e8cf87eb4dcc))
+* add samsung weather non-one ui support ([c5249ac](https://github.com/bearinmindcat/morphe-patches/commit/c5249ac37eb6fa0688585988d52e564a70cfc139))
+* disable telemetry in samsung notes, gallery and sound assistant; stop remote updates in gallery ([6dd8ef7](https://github.com/bearinmindcat/morphe-patches/commit/6dd8ef7fe48032c31a264397eb6775377251d7ae))
+
 ## [2.7.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.7.5...v2.7.6) (2026-10-30)
 
 ### 🐛 Bug Fixes

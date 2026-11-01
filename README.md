@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.7.6](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.7.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;74 patches total
+> **[v2.8.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;92 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -148,38 +148,210 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **Supported version(s):** 15.9.01.7
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Gallery installable and usable on non-One UI ROMs. |  |
+| [Stop remote updates](#stop-remote-updates) | Ignores policies pushed from Samsung's servers. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 4.4.48.15
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports, usage surveys and marketing data. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 8.1.00.6
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Sound Assistant on non-One UI ROMs, where only Individual app volumes work. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.4.00.13
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Calculator usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.8.01.0
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Calendar installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.4.02.38
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Clock installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.3.00.87
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Contacts installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 1.5.3.011
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Health Monitor usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.3.21.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Messages installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.2.45.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Music installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 15.2.03.2
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung My Files installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 3.9.04.6
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Photo Editor installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 12.8.00.62
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Reminder installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 5.1.03.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Modes and Routines installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 7.3.47.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Video Player installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 21.5.91.33
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Voice Recorder usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 1.7.30.50
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Weather usable on non-One UI ROMs. |  |
 
 </details>
 
