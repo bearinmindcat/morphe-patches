@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;98 patches total
+> **[v2.8.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;103 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -364,9 +364,21 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Xiaomi Apps&nbsp;&nbsp;•&nbsp;&nbsp;6 apps&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<summary>📱 Xiaomi Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
 <blockquote>
+
+<details>
+<summary><img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-calendar.png" width="20" height="20" align="top"> Xiaomi Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.0.2.0
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Calendar usable on non-Xiaomi ROMs. |  |
+
+</details>
 
 <details>
 <summary><img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
@@ -389,6 +401,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Gallery installable and usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xiaomi-gallery-editor.png" width="20" height="20" align="top"> Xiaomi Gallery Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-gallery-editor.png" width="20" height="20" align="top"> Xiaomi Gallery Editor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 2.10.40.4.8-global
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Gallery Editor installable and usable on non-Xiaomi ROMs. |  |
 
 </details>
 
@@ -429,6 +453,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
+<summary><img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-screen-recorder.png" width="20" height="20" align="top"> Xiaomi Screen Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.16.2.9.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Screen Recorder installable and usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
 <summary><img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-weather.png" width="20" height="20" align="top"> Xiaomi Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
@@ -437,6 +473,38 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Weather usable on non-Xiaomi ROMs. |  |
+
+</details>
+
+</blockquote>
+</details>
+
+<details>
+<summary>📱 Nothing Apps&nbsp;&nbsp;•&nbsp;&nbsp;2 apps&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+<blockquote>
+
+<details>
+<summary><img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 3.1.3.1019
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Gallery usable on non-Nothing OS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.0.0
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Recorder installable and usable on non-Nothing OS ROMs. |  |
 
 </details>
 

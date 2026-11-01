@@ -1,3 +1,13 @@
+## [2.8.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.1...v2.8.2) (2026-11-01)
+
+### 🐛 Bug Fixes
+
+* add nothing gallery non-nothing os support ([4a8fbf8](https://github.com/bearinmindcat/morphe-patches/commit/4a8fbf8201eb010d4ee24edb051b2765043a4841))
+* add nothing recorder non-nothing os support ([6b9ac34](https://github.com/bearinmindcat/morphe-patches/commit/6b9ac34ceacc0d420058e0a65465373c5426115c))
+* add xiaomi calendar non-hyperos support ([4bed6e3](https://github.com/bearinmindcat/morphe-patches/commit/4bed6e37fce69d67cde34fce24f14a79e38afa17))
+* add xiaomi gallery editor non-hyperos support ([4eecfc5](https://github.com/bearinmindcat/morphe-patches/commit/4eecfc52973e86ef07f0875c19d361815ca4930c))
+* add xiaomi screen recorder non-hyperos support ([b334dd6](https://github.com/bearinmindcat/morphe-patches/commit/b334dd682a0ad538406de49eab59e1147c2598b0))
+
 ## [2.8.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.0...v2.8.1) (2026-11-01)
 
 ### 🐛 Bug Fixes
