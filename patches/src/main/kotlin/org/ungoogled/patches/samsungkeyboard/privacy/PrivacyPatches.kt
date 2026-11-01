@@ -13,12 +13,12 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import org.ungoogled.patches.samsung.hideDiagnosticsAgent
 import org.ungoogled.patches.samsungkeyboard.SamsungKeyboardConstants.COMPATIBILITY_SAMSUNG_KEYBOARD
 import org.w3c.dom.Element
 
 private const val GSIM_LOGGER = "Lcom/samsung/android/sdk/handwriting/GSIMLogger;"
 private const val SCPM_RECEIVER = "Lcom/samsung/android/honeyboard/base/broadcastreceiver/ScpmReceiver;"
-private const val DIAGMON_AGENT = "com.sec.android.diagmonagent"
 
 /** IME_FLAG_NO_PERSONALIZED_LEARNING: the field asks not to be learned from. */
 private const val NO_PERSONALIZED_LEARNING = 0x1000000L
@@ -37,19 +37,11 @@ val disableTelemetryPatch = bytecodePatch(
         AnalyticsTrackerReadyFingerprint.method.returnFirst("const/4 v0, 0x0\nreturn v0")
 
         // DiagMon (crash, ANR and usage reports): the diagnostics agent reads as not installed, the SDK's own
-        // "not supported" case, so no crash handler is set and no report is made. The start-up has the lookup
-        // inlined; it asks for a package name nothing has.
+        // "not supported" case, so no crash handler is set and no report is made. Every lookup of the agent asks for
+        // a package name nothing has, wherever R8 put it (the start-up has one inlined; issue #98: its method differs
+        // between builds of the same version).
         DiagMonAgentVersionFingerprint.method.returnFirst("const/4 v0, 0x0\nreturn v0")
-        TelemetryStartFingerprint.method.let { start ->
-            val instructions = start.implementation!!.instructions
-            val lookups = instructions.withIndex().filter { (_, insn) ->
-                insn.opcode == Opcode.CONST_STRING &&
-                    ((insn as ReferenceInstruction).reference as StringReference).string == DIAGMON_AGENT
-            }
-            if (lookups.size != 1) throw PatchException("expected one diagnostics agent lookup at start-up, found ${lookups.size}")
-            val (index, insn) = lookups.single()
-            start.replaceInstruction(index, "const-string v${(insn as OneRegisterInstruction).registerA}, \"\"")
-        }
+        hideDiagnosticsAgent()
 
         // Handwriting's usage survey to the diagnostics agent.
         mutableClassDefBy(GSIM_LOGGER).methods.single { it.name == "insertLogData" }.returnFirst("return-void")

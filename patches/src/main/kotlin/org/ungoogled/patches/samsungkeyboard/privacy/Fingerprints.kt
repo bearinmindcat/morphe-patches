@@ -16,12 +16,6 @@ internal object DiagMonAgentVersionFingerprint : Fingerprint(
     filters = listOf(string("DMA Client is not exist")),
 )
 
-/** The keyboard's own start-up of Samsung Analytics and DiagMon, with the agent lookup above inlined. */
-internal object TelemetryStartFingerprint : Fingerprint(
-    returnType = "V",
-    parameters = listOf(),
-    filters = listOf(string("SamsungAnalytics setConfiguration"), string("DMA Client is not exist")),
-)
 
 /** Galaxy AI's consent upload (serial number, model, OS) to Samsung's consent server: "can sync now?". */
 internal object ConsentSyncFingerprint : Fingerprint(
