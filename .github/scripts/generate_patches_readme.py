@@ -144,6 +144,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts',
         '<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts',
     ),
+    "com.samsung.android.dialer": (
+        '<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone',
+        '<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone',
+    ),
     "com.sec.android.app.clockpackage": (
         '<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock',
         '<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock',
