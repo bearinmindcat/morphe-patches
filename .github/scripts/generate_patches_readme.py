@@ -268,6 +268,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes',
         '<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes',
     ),
+    # OnePlus Screen Recording (coloros-ports-c)
+    "com.oplus.screenrecorder": (
+        '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
+        '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
+    ),
 }
 
 

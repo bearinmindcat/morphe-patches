@@ -180,3 +180,20 @@ METHODS = {
 SUPERS.update({
     'Lcom/heytap/statistics/event/CustomEvent;': 'Lcom/heytap/statistics/event/BaseEvent;',
 })
+
+# --- Added for OnePlus Screen Recording (coloros-ports-c) ---
+# ColorOS's OplusScreenStatusListener is an IOplusScreenStatusListener (its AIDL stub); apps cast their listener to it
+# to hand it to OplusPowerManager (ClassCastException otherwise). Valid while IOplusScreenStatusListener is generated
+# as a class (no interface calls on it).
+SUPERS.update({
+    'Lcom/oplus/os/OplusScreenStatusListener;': 'Lcom/oplus/os/IOplusScreenStatusListener;',
+    # OplusScreenCapture's display-capture builder is a CaptureArgs builder; its inherited setters hand back the same
+    # builder (null broke the chain: NullPointerException when Screen recording grabs its stop-time frame).
+    'Lcom/oplus/screenshot/OplusScreenCapture$DisplayCaptureArgs$Builder;': 'Lcom/oplus/screenshot/OplusScreenCapture$CaptureArgs$Builder;',
+})
+METHODS.update({
+    'Lcom/oplus/screenshot/OplusScreenCapture$DisplayCaptureArgs$Builder;->setSourceCrop(Landroid/graphics/Rect;)Lcom/oplus/screenshot/OplusScreenCapture$CaptureArgs$Builder;':
+        'return this;',
+    'Lcom/oplus/screenshot/OplusScreenCapture$DisplayCaptureArgs$Builder;->setExcludeLayers([Landroid/view/SurfaceControl;)Lcom/oplus/screenshot/OplusScreenCapture$CaptureArgs$Builder;':
+        'return this;',
+})
