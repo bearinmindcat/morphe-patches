@@ -1,3 +1,17 @@
+## [2.8.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.4...v2.8.5) (2026-11-02)
+
+### 🐛 Bug Fixes
+
+* add coloros calculator non-coloros support ([af42ed7](https://github.com/bearinmindcat/morphe-patches/commit/af42ed70f80f0b24532d1574e48eb8f243881c69))
+* add coloros clock non-coloros support ([f2a40b8](https://github.com/bearinmindcat/morphe-patches/commit/f2a40b86da6552e35696b7aca6fa8a90728b9493))
+* add coloros compass non-coloros support ([29c0ccb](https://github.com/bearinmindcat/morphe-patches/commit/29c0ccbfed5b1f3022cf5a53407a284517865033))
+* add coloros my files non-coloros support ([7886b20](https://github.com/bearinmindcat/morphe-patches/commit/7886b208de8c013313e877e6d3bbb163090dc583))
+* add coloros notes non-coloros support ([29b06e8](https://github.com/bearinmindcat/morphe-patches/commit/29b06e86245bc35d7caac771448c45cbf5bd07af))
+* add coloros photos non-coloros support ([5f9985f](https://github.com/bearinmindcat/morphe-patches/commit/5f9985f13e4500e65e1cc6d1c125a112294c81d5))
+* add coloros recorder non-coloros support ([0090be6](https://github.com/bearinmindcat/morphe-patches/commit/0090be65b34d670dbed1ace1df93a86f3c6df679))
+* add coloros screen recording non-coloros support ([275b850](https://github.com/bearinmindcat/morphe-patches/commit/275b850c6bd7516d2c39818a1fade4b225daa672))
+* add coloros weather non-coloros support ([02e118f](https://github.com/bearinmindcat/morphe-patches/commit/02e118f4aaaf0ae74de9f1932b7a02403c942ad5))
+
 ## [2.8.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.3...v2.8.4) (2026-11-01)
 
 ### 🐛 Bug Fixes
