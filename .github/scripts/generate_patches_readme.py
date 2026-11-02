@@ -263,6 +263,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files',
         '<img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files',
     ),
+    # OnePlus Notes (coloros-ports-c)
+    "com.oneplus.note": (
+        '<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes',
+        '<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes',
+    ),
 }
 
 

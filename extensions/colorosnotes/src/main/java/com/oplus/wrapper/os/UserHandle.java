@@ -1,0 +1,12 @@
+package com.oplus.wrapper.os;
+
+/** Generated stand-in (.github/scripts/coloros-standins): names and signatures OnePlus Notes uses, answering "absent" off ColorOS (no OPPO code). */
+public class UserHandle {
+    public static android.os.UserHandle OWNER = android.os.UserHandle.getUserHandleForUid(0);
+    public static int getUserId(int p0) {
+        return p0 / 100000;
+    }
+    public static int myUserId() {
+        return android.os.Process.myUserHandle().hashCode();
+    }
+}
