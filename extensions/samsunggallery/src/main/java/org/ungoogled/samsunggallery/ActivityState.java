@@ -72,10 +72,10 @@ public final class ActivityState {
         });
     }
 
-    /** The app's screen in front, or null while none is. */
-    static Activity front() {
+    /** The app's screen in front, or null while none is (also for dialogs started from background work). */
+    public static Activity front() {
         Activity activity = front.get();
-        return activity == null || activity.isFinishing() ? null : activity;
+        return activity == null || activity.isFinishing() || activity.isDestroyed() ? null : activity;
     }
 
     public static boolean isResumed(Activity activity) {
