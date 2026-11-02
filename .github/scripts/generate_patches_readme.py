@@ -236,6 +236,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes',
         '<img src="docs/icons/honor-notes.png" width="20" height="20" align="top"> Honor Notes',
     ),
+    "com.hihonor.android.totemweather": (
+        '<img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather',
+        '<img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather',
+    ),
     "cn.nubia.gamelauncher": (
         '<img src="docs/icons/redmagic-game-space.png" width="20" height="20" align="top"> RedMagic Game Space',
         '<img src="docs/icons/redmagic-game-space.png" width="20" height="20" align="top"> RedMagic Game Space',

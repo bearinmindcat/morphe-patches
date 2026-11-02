@@ -70,13 +70,16 @@ Then in the patch (`patches/.../honor/`):
   `baksmali d classes.dex -o out; grep -rhE "const(/high16)? [vp][0-9]+, 0x2[0-9a-f]{6}$" out | sort | uniq -c`
   (0x2000000 is a flag, not a resource).
   `redirectMagicFrameworkLookups(runtime)` does the same for framework interpolators looked up by name
-  (`getIdentifier(name, "interpolator", "androidhnext")`); other framework lookups keep answering 0, because Honor's
-  libraries (hnanimscene, the UI kit) use them to tell whether they run on MagicOS.
+  (`getIdentifier(name, "interpolator", "androidhnext")`) and MagicOS's day/night themes looked up by name
+  (`androidhnext:style/Theme.Magic[.NoActionBar]` -> the app's MagicDayNight styles, not theme 0, which is Android's
+  light default); other framework lookups keep answering 0, because Honor's libraries (hnanimscene, the UI kit) use
+  them to tell whether they run on MagicOS.
 - `replaceMagicIconDrawables(sources)` (`MagicIcons.kt`): drawables of MagicOS's framework icon class
   (`com.hihonor.android.widget.HnIconVectorDrawable`, framework icon sources; notification icons above all) become
   Android `<vector>`s from the app's copies of the sources (the UI kit carries them under MagicOS's names), coloured
-  as the drawable asked; a plain vector also inflates in SystemUI. A source the app's build shrank to `<x/>` stops the
-  patch: draw that one yourself (into that placeholder).
+  as the drawable asked; a plain vector also inflates in SystemUI. One that carries its paths inline (no iconSrc)
+  becomes a `<vector>` of those paths. A source the app's build shrank to `<x/>` stops the patch: draw that one
+  yourself (into that placeholder).
 - `replaceMagicInterpolators()` (`MagicInterpolators.kt`): `<cubicBezierInterpolator>` (MagicOS-only tag) becomes
   Android's `<pathInterpolator>`.
 - Layouts that SystemUI or a launcher inflates (notification `RemoteViews`) may name only Android's widgets: swap

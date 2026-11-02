@@ -261,3 +261,13 @@ SUPERS = {
 # Added with Honor Video Player: the current user, as Android answers it (UserHandle's id is its hashCode).
 METHODS['Lcom/hihonor/android/content/ContextEx;->getUserId(Landroid/content/Context;)I'] = \
     'return android.os.Process.myUserHandle().hashCode();'
+
+# Added with Honor Weather: Android's own answers for the current user, the app's own (credential-encrypted) storage,
+# and the search box inside Android's SearchView (MagicOS's SearchView is Android's under another name).
+METHODS.update({
+    'Lcom/hihonor/android/app/ActivityManagerEx;->getCurrentUser()I': 'return android.os.Process.myUserHandle().hashCode();',
+    'Lcom/hihonor/android/content/ContextEx;->createCredentialProtectedStorageContext(Landroid/content/Context;)Landroid/content/Context;':
+        'return p0;',
+    'Lcom/hihonor/android/widget/SearchView;->getSearchSrcTextView()Landroid/widget/EditText;':
+        'return (android.widget.EditText) findViewById(getContext().getResources().getIdentifier("search_src_text", "id", "android"));',
+})

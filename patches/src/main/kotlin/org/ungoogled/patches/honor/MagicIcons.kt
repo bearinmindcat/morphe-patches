@@ -27,7 +27,8 @@ private fun attribute(attributes: String, name: String) = Regex("""\b$name="([^"
  * drawable into Android's own `<vector>`: the app's copy of the source ([sources]: framework drawable id "@0x0203..." to
  * the app's drawable name), its first and second layer in the colours the drawable gives them. A plain vector
  * inflates anywhere, also in the system's notification views. A source the app's build shrank away (an empty `<x/>`)
- * stops the patch: the port draws that one itself. Returns the drawables rewritten.
+ * stops the patch: the port draws that one itself. Such a drawable with its own paths and no source becomes a
+ * `<vector>` of those paths. Returns the drawables rewritten.
  */
 internal fun ResourcePatchContext.replaceMagicIconDrawables(sources: Map<String, String>): Int {
     fun source(name: String, seen: Set<String> = emptySet()): Pair<String, String> {
@@ -59,10 +60,23 @@ internal fun ResourcePatchContext.replaceMagicIconDrawables(sources: Map<String,
             val id = match.groupValues[1].lowercase()
             (FRAMEWORK_ICON_ATTRIBUTES[id] ?: throw PatchException("$path: MagicOS icon attribute 0x$id unknown")) to match.groupValues[2]
         }
-        val src = magic["iconSrc"] ?: throw PatchException("$path: icon drawable without a source")
+        val own = root.groupValues[2]
+        val src = magic["iconSrc"]
+        if (src == null && root.groupValues[3] != "/") {
+            // The drawable carries its own paths (Weather's weather icons): the same element as a plain <vector>.
+            val end = text.indexOf("</drawable>", root.range.last)
+            if (end < 0) throw PatchException("$path: icon drawable not closed")
+            val attributes = own.replace(Regex("""\s*class="$FRAMEWORK_ICON_DRAWABLE""""), "")
+            file.writeText(
+                text.substring(0, root.range.first) + "<vector$attributes>" + text.substring(root.range.last + 1, end) +
+                    "</vector>" + text.substring(end + "</drawable>".length),
+            )
+            rewritten++
+            continue
+        }
+        src ?: throw PatchException("$path: icon drawable without a source")
         val name = sources[src.lowercase()] ?: throw PatchException("$path: no app icon source for $src")
         val (sourceAttributes, body) = source(name)
-        val own = root.groupValues[2]
         val width = attribute(own, "android:width") ?: magic["width"] ?: "24.0dp"
         val height = attribute(own, "android:height") ?: magic["width"] ?: width
         val vector = buildString {

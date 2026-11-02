@@ -135,8 +135,11 @@ public final class Magic {
      * Resources.getIdentifier for APP_NAME's code (patches/.../honor/MagicFrameworkIds.kt sends its calls here): a
      * lookup of one of MagicOS's framework interpolators by name ("androidhnext" as the package) finds nothing off
      * MagicOS, and loading interpolator 0 throws. It gets the app's own interpolator of that name (the Honor UI kit it
-     * bundles carries some), or Android's nearest curve. Every other framework lookup stays 0, as off MagicOS: Honor's
-     * libraries look up their framework resources to learn whether they run on MagicOS.
+     * bundles carries some), or Android's nearest curve. MagicOS's day/night theme ("androidhnext:style/Theme.Magic",
+     * to wrap a context in or setTheme) gets the app's MagicDayNight style of that kind where it has one
+     * (followMagicDayNight adds them), instead of theme 0, which is Android's light default. Every other framework
+     * lookup stays 0, as off MagicOS: Honor's libraries look up their framework resources to learn whether they run on
+     * MagicOS.
      */
     public static int getIdentifier(Resources resources, String name, String type, String pkg) {
         int id = resources.getIdentifier(name, type, pkg);
@@ -152,9 +155,16 @@ public final class Magic {
             t = n.substring(0, slash);
             n = n.substring(slash + 1);
         }
-        if (!"androidhnext".equals(p) || !"interpolator".equals(t)) return 0;
+        if (!"androidhnext".equals(p)) return 0;
         String app = Application.getProcessName();
         if (app != null && app.indexOf(':') >= 0) app = app.substring(0, app.indexOf(':'));
+        if ("style".equals(t) && n.startsWith("Theme.Magic")) {
+            String variant = n.substring("Theme.Magic".length());
+            String style = variant.isEmpty() || variant.equals(".WithActionBar") ? "MagicDayNight"
+                    : variant.equals(".NoActionBar") || variant.equals(".NoTitleBar") ? "MagicDayNight.NoActionBar" : null;
+            return style == null || app == null ? 0 : resources.getIdentifier(style, "style", app);
+        }
+        if (!"interpolator".equals(t)) return 0;
         id = app == null ? 0 : resources.getIdentifier(n, t, app);
         if (id != 0) return id;
         return n.endsWith("_0_100") ? android.R.interpolator.linear_out_slow_in : android.R.interpolator.fast_out_slow_in;
@@ -198,6 +208,9 @@ public final class Magic {
         Drawable mutable = icon.mutate();
         mutable.setTintList(color);
         return mutable;
+    }
+
+    /**
      * Window.setDecorFitsSystemWindows for APP_NAME: since Android 15 an app built for it is laid out edge to edge and
      * "fits" is ignored, so content the app keeps out of the status and navigation bars this way went under them.
      * Pads the window's content by as much of the bars (and the keyboard, for adjustResize) as it overlaps, after each

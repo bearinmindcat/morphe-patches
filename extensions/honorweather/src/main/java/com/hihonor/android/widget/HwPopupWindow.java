@@ -1,0 +1,24 @@
+package com.hihonor.android.widget;
+
+/** Generated stand-in (.github/scripts/honor-standins): names and signatures Honor Weather uses, answering "absent" off MagicOS (no Honor code). */
+public class HwPopupWindow extends android.widget.PopupWindow {
+    public HwPopupWindow(android.view.View p0, int p1, int p2, boolean p3) {
+        super(p0, p1, p2, p3);
+    }
+    public HwPopupWindow(android.content.Context p0) {
+        super(p0);
+    }
+    public HwPopupWindow(android.content.Context p0, android.util.AttributeSet p1) {
+        super(p0, p1);
+    }
+    public HwPopupWindow(android.content.Context p0, android.util.AttributeSet p1, int p2) {
+        super(p0, p1, p2);
+    }
+    public HwPopupWindow(android.content.Context p0, android.util.AttributeSet p1, int p2, int p3) {
+        super(p0, p1, p2, p3);
+    }
+    public void setBlurEnabled(boolean p0, int p1) {
+    }
+    public void setBlurStyle(int p0) {
+    }
+}
