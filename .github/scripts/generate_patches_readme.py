@@ -253,6 +253,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather',
         '<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather',
     ),
+    # OnePlus Photos (ColorOS port, coloros-ports-d)
+    "com.oneplus.gallery": (
+        '<img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos',
+        '<img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos',
+    ),
 }
 
 
