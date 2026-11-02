@@ -273,6 +273,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
         '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
     ),
+    # ColorOS ports (coloros-ports-b): OnePlus Compass
+    "com.coloros.compass2": (
+        '<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass',
+        '<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass',
+    ),
 }
 
 
