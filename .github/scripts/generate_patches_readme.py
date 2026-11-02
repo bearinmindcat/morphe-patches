@@ -273,7 +273,7 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
         '<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording',
     ),
-    # ColorOS ports (coloros-ports-b): OnePlus Compass, OnePlus Clock
+    # ColorOS ports (coloros-ports-b): OnePlus Compass, OnePlus Clock, OnePlus Recorder
     "com.coloros.compass2": (
         '<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass',
         '<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass',
@@ -281,6 +281,10 @@ APP_RENAMES = {
     "com.oneplus.deskclock": (
         '<img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock',
         '<img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock',
+    ),
+    "com.oneplus.soundrecorder": (
+        '<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder',
+        '<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder',
     ),
 }
 
