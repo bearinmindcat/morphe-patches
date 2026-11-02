@@ -173,3 +173,10 @@ METHODS = {
         'getExternalSdDirectory(Landroid/content/Context;)Ljava/io/File;': 'return null;',
     }.items()},
 }
+
+# --- Added for OnePlus My Files (coloros-ports-c) ---
+# HeyTap statistics: apps pass a CustomEvent where a BaseEvent is expected (NearMeStatistics.onCommon); without the base
+# the ART verifier rejects the caller.
+SUPERS.update({
+    'Lcom/heytap/statistics/event/CustomEvent;': 'Lcom/heytap/statistics/event/BaseEvent;',
+})
