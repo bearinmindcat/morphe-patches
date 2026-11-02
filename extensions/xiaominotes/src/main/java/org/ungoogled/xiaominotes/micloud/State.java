@@ -29,7 +29,15 @@ final class State extends SQLiteOpenHelper {
         String entry;
     }
 
-    State(Context context) {
+    private static State instance;
+
+    /** One instance per process, so the screen and a sync never write through two connections. */
+    static synchronized State get(Context context) {
+        if (instance == null) instance = new State(context.getApplicationContext());
+        return instance;
+    }
+
+    private State(Context context) {
         super(context, "ungoogled_micloud.db", null, 1);
     }
 

@@ -84,6 +84,23 @@ class CloudImporter {
     /** "" for the website's original format, "/v2" for accounts it shows in the new (Markdown) format. */
     String format = "";
     volatile boolean cancelled;
+    /** Sync: a note deleted here but changed in the cloud comes back (the edit wins over the deletion). */
+    boolean syncMode;
+
+    /** One import or sync at a time. */
+    private static final java.util.concurrent.atomic.AtomicReference<CloudImporter> ACTIVE = new java.util.concurrent.atomic.AtomicReference<>();
+
+    static CloudImporter active() {
+        return ACTIVE.get();
+    }
+
+    static boolean claim(CloudImporter job) {
+        return ACTIVE.compareAndSet(null, job);
+    }
+
+    static void release(CloudImporter job) {
+        ACTIVE.compareAndSet(job, null);
+    }
 
     CloudImporter(Context context, MiCloudApi api, State state, NotesStore store, Listener listener) {
         this.context = context.getApplicationContext();
@@ -101,7 +118,13 @@ class CloudImporter {
         Listing listing = listAll();
         importFolders(listing.folders);
         List<JSONObject> notes = new ArrayList<>();
-        for (JSONObject e : listing.entries) if (isNote(e)) notes.add(e);
+        boolean anyEncrypted = false;
+        for (JSONObject e : listing.entries) {
+            if (isNote(e)) notes.add(e);
+            if (encrypted(e)) anyEncrypted = true;
+        }
+        // An end-to-end encrypted account: sync must never upload plain text to it.
+        state.flag("e2ee", anyEncrypted);
         int done = 0;
         for (JSONObject e : notes) {
             if (cancelled) throw new IOException("cancelled");
@@ -265,7 +288,7 @@ class CloudImporter {
             result.unchanged++;
             return;
         }
-        if (local != null && local[NotesStore.DELETED] != null && known != null) {
+        if (!syncMode && local != null && local[NotesStore.DELETED] != null && known != null) {
             // Deleted on this phone (in Recently deleted): leave it there.
             known.tag = str(listed, "tag");
             known.modify = listed.optLong("modifyDate", known.modify);
@@ -284,7 +307,7 @@ class CloudImporter {
             result.unsupported++;
             return;
         }
-        writeLocal(entry, content, known, local);
+        writeLocal(entry, content, known, local, false);
     }
 
     /** The full note (/note/note/<id>/), merged over what the list said. */
@@ -530,7 +553,7 @@ class CloudImporter {
     }
 
     /** Writes a cloud note into Notes: new, in place (not edited here since), or as a "(conflict)" copy. */
-    long writeLocal(JSONObject entry, Content c, State.Note known, Object[] local) throws IOException {
+    long writeLocal(JSONObject entry, Content c, State.Note known, Object[] local, boolean asConflict) throws IOException {
         String id = str(entry, "id");
         String cloudFolder = str(entry, "folderId");
         Long folder = localFolder(cloudFolder, null, System.currentTimeMillis(), null);
@@ -551,15 +574,15 @@ class CloudImporter {
                 localId = store.putNote(local);
                 result.updated++;
             } else {
-                boolean conflict = local != null && local[NotesStore.DELETED] == null;
+                boolean conflict = asConflict || (local != null && local[NotesStore.DELETED] == null);
                 if (conflict) title = conflictTitle(title, c.markdown);
                 Object[] v = NotesStore.newNote(title, c.markdown, created, modified);
                 v[NotesStore.FOLDER] = folder;
                 v[NotesStore.STICK] = sticky;
                 v[NotesStore.EXTERNAL] = EXTERNAL_PREFIX + id;
                 localId = store.putNote(v);
-                if (conflict) result.conflicts++;
-                else result.imported++;
+                if (!conflict) result.imported++;
+                else if (!asConflict) result.conflicts++;
             }
         } catch (IOException e) {
             throw e;

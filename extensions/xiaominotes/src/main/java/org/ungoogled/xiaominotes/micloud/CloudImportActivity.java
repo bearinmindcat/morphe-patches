@@ -47,8 +47,6 @@ public final class CloudImportActivity extends Activity {
     /** Xiaomi Cloud's notes site: i.mi.com and its regional hosts (us.i.mi.com, ...). */
     private static final Pattern NOTES_HOST = Pattern.compile("(?i)^([a-z0-9-]+\\.)?i\\.mi\\.com$");
 
-    /** One import at a time, also across screens. */
-    private static volatile CloudImporter running;
     /** The screen on show, which gets an import's progress and result even if it was reopened meanwhile. */
     private static java.lang.ref.WeakReference<CloudImportActivity> current = new java.lang.ref.WeakReference<>(null);
 
@@ -72,6 +70,8 @@ public final class CloudImportActivity extends Activity {
     private boolean probing;
     private String probedCookie;
     private boolean finished;
+    /** "Sync now" was tapped: after signing in, sync instead of importing. */
+    private boolean syncRequested;
     private String debugBase;
 
     // ---- debug override (adb only)
@@ -95,7 +95,7 @@ public final class CloudImportActivity extends Activity {
         night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         setTheme(night ? android.R.style.Theme_DeviceDefault_NoActionBar : android.R.style.Theme_DeviceDefault_Light_NoActionBar);
         super.onCreate(savedInstanceState);
-        state = new State(this);
+        state = State.get(this);
         debugBase = debugBase();
         root = new FrameLayout(this);
         root.setBackgroundColor(background());
@@ -116,7 +116,7 @@ public final class CloudImportActivity extends Activity {
             getWindow().getInsetsController().setSystemBarsAppearance(light, light);
         }
         current = new java.lang.ref.WeakReference<>(this);
-        if (running != null) showWork("Importing notes…", 0, 0);
+        if (CloudImporter.active() != null) showWork(CloudImporter.active() instanceof CloudSync ? "Syncing…" : "Importing notes…", 0, 0);
         else showIntro();
     }
 
@@ -138,7 +138,7 @@ public final class CloudImportActivity extends Activity {
             }
             return;
         }
-        CloudImporter job = running;
+        CloudImporter job = CloudImporter.active();
         if (job != null) {
             job.cancelled = true;
             return;
@@ -236,8 +236,44 @@ public final class CloudImportActivity extends Activity {
         lp.topMargin = dp(12);
         column.addView(stay, lp);
         if (debugBase != null) text(column, "Debug: using " + debugBase, 12, true);
-        button(column, "Continue", true, v -> start());
+        button(column, "Continue", true, v -> {
+            syncRequested = false;
+            start();
+        });
         button(column, "Cancel", v -> finish());
+        syncSection(column);
+    }
+
+    /** "Sync with Xiaomi Cloud (experimental)": off by default; while on, Notes syncs when it opens and on "Sync now". */
+    private void syncSection(LinearLayout column) {
+        TextView header = text(column, "Two-way sync", 14, true);
+        header.setPadding(0, dp(32), 0, dp(4));
+        android.widget.Switch toggle = new android.widget.Switch(this);
+        toggle.setText("Sync with Xiaomi Cloud (experimental)");
+        toggle.setTextColor(foreground());
+        toggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        toggle.setChecked(state.flag("syncEnabled"));
+        toggle.setThumbTintList(android.content.res.ColorStateList.valueOf(state.flag("syncEnabled") ? ACCENT : 0xFFBDBDBD));
+        column.addView(toggle, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        text(column, "Untested with real accounts: edits, new notes and deletions on this phone change your notes in Xiaomi Cloud.", 13, true);
+        toggle.setOnCheckedChangeListener((v, on) -> {
+            state.flag("syncEnabled", on);
+            if (!on && !state.flag("staySignedIn")) forgetSession();
+            showIntro();
+        });
+        if (!state.flag("syncEnabled")) return;
+        String status;
+        String last = state.get("lastSync");
+        if (state.flag("needsSignIn")) status = "Sign in again to keep syncing.";
+        else if (last == null) status = "Not synced yet.";
+        else status = "Last sync: " + DateFormat.getDateFormat(this).format(Long.parseLong(last)) + " "
+            + DateFormat.getTimeFormat(this).format(Long.parseLong(last)) + ".";
+        if (state.flag("e2ee")) status += " This account uses end-to-end encryption, so sync only downloads.";
+        text(column, status, 14, false);
+        button(column, "Sync now", v -> {
+            syncRequested = true;
+            start();
+        });
     }
 
     private void showWork(String what, int done, int total) {
@@ -255,7 +291,7 @@ public final class CloudImportActivity extends Activity {
             bar.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(ACCENT));
             column.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             button(column, "Cancel", v -> {
-                CloudImporter job = running;
+                CloudImporter job = CloudImporter.active();
                 if (job != null) job.cancelled = true;
             });
         }
@@ -297,7 +333,7 @@ public final class CloudImportActivity extends Activity {
 
     /** With "Stay signed in", the kept session is tried first; otherwise (or if it has expired) Xiaomi's sign-in page. */
     private void start() {
-        String cookie = state.flag("staySignedIn") ? state.get("session") : null;
+        String cookie = keepSession() ? state.get("session") : null;
         String base = state.get("sessionBase");
         if (cookie == null || base == null || !notesSite(Uri.parse(base + "/note"))) {
             showWeb();
@@ -381,7 +417,7 @@ public final class CloudImportActivity extends Activity {
     /** On Xiaomi's notes site with a session cookie: check the session works, then import from that host. */
     private void checkSignedIn(String url) {
         Uri u = Uri.parse(url);
-        if (probing || running != null || !notesSite(u) || u.getPath() == null || !u.getPath().startsWith("/note")) return;
+        if (probing || CloudImporter.active() != null || !notesSite(u) || u.getPath() == null || !u.getPath().startsWith("/note")) return;
         String base = u.getScheme() + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
         String cookie = CookieManager.getInstance().getCookie(base);
         if (MiCloudApi.cookieValue(cookie, "serviceToken") == null || MiCloudApi.cookieValue(cookie, "userId") == null) return;
@@ -389,7 +425,7 @@ public final class CloudImportActivity extends Activity {
         probing = true;
         probedCookie = cookie;
         String userAgent = WebSettings.getDefaultUserAgent(this);
-        boolean keep = state.flag("staySignedIn");
+        boolean keep = keepSession();
         MiCloudApi api = new MiCloudApi(base, cookie, userAgent, debugBase != null, keep);
         new Thread(() -> {
             boolean ok;
@@ -413,29 +449,35 @@ public final class CloudImportActivity extends Activity {
     }
 
     private void startImport(MiCloudApi api, String userId) {
-        if (running != null) return;
+        if (CloudImporter.active() != null) return;
+        boolean sync = syncRequested;
         destroyWeb();
         showWork("Connecting…", 0, 0);
         Context app = getApplicationContext();
         new Thread(() -> {
             String summary = null, error = null;
+            CloudImporter job = null;
             try (NotesStore store = new NotesStore(app)) {
                 accountCheck(userId);
-                CloudImporter job = new CloudImporter(app, api, state, store,
-                    (what, done, total) -> ui(a -> a.showWork(what, done, total)));
-                running = job;
-                summary = job.run().summary();
+                CloudImporter.Listener progress = (what, done, total) -> ui(a -> a.showWork(what, done, total));
+                job = sync ? new CloudSync(app, api, state, store, progress) : new CloudImporter(app, api, state, store, progress);
+                if (!CloudImporter.claim(job)) {
+                    job = null;
+                    throw new IOException("Notes is already syncing with Xiaomi Cloud; try again in a moment.");
+                }
+                summary = sync ? summaryOf((CloudSync) job) : job.run().summary();
             } catch (MiCloudApi.SessionExpired e) {
-                error = "Xiaomi Cloud ended the session. Sign in again to continue the import.";
+                if (sync) state.set("needsSignIn", "1");
+                error = "Xiaomi Cloud ended the session. Sign in again to continue.";
             } catch (Throwable e) {
-                Log.w(MiCloudApi.TAG, "import failed", e);
-                CloudImporter job = running;
-                error = job != null && job.cancelled ? "Import stopped. Notes imported so far are kept; importing again continues."
-                    : "Couldn't import: " + e.getMessage();
+                Log.w(MiCloudApi.TAG, sync ? "sync failed" : "import failed", e);
+                error = job != null && job.cancelled ? "Stopped. Notes copied so far are kept; running it again continues."
+                    : (sync ? "Couldn't sync: " : "Couldn't import: ") + e.getMessage();
+                if (sync) state.set("lastSyncError", String.valueOf(e.getMessage()));
             } finally {
-                running = null;
-                // Keep the session (as the site last renewed it) only if the user asked to stay signed in.
-                if (state.flag("staySignedIn")) {
+                if (job != null) CloudImporter.release(job);
+                // Keep the session (as the site last renewed it) only if the user asked to stay signed in or syncs.
+                if (keepSession()) {
                     state.set("session", api.cookie());
                     state.set("sessionBase", api.base);
                 }
@@ -446,7 +488,12 @@ public final class CloudImportActivity extends Activity {
                 if (s != null) a.showDone(s);
                 else a.showError(err);
             });
-        }, "micloud-import").start();
+        }, sync ? "micloud-sync" : "micloud-import").start();
+    }
+
+    private static String summaryOf(CloudSync job) throws IOException {
+        job.sync();
+        return job.syncSummary();
     }
 
     /** Another account than last time: its notes have other ids, so the record of the old one does not apply. */
@@ -463,7 +510,17 @@ public final class CloudImportActivity extends Activity {
 
     /** Forgets the session unless the user asked to stay signed in. */
     private void endSession() {
-        if (!state.flag("staySignedIn")) forgetSession();
+        if (!keepSession()) forgetSession();
+    }
+
+    /** The session is kept when the user asked to stay signed in, and while sync is on (it needs it). */
+    private boolean keepSession() {
+        return state.flag("staySignedIn") || state.flag("syncEnabled");
+    }
+
+    /** Plain-HTTP test servers are allowed only with the adb-only debug property set. */
+    static boolean debugAllowed(String base) {
+        return Log.isLoggable(MiCloudApi.TAG, Log.DEBUG);
     }
 
     private void forgetSession() {
@@ -485,7 +542,7 @@ public final class CloudImportActivity extends Activity {
         ViewGroup parent = (ViewGroup) w.getParent();
         if (parent != null) parent.removeView(w);
         w.stopLoading();
-        if (!state.flag("staySignedIn")) {
+        if (!keepSession()) {
             w.clearCache(true);
             w.clearFormData();
             w.clearHistory();

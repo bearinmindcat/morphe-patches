@@ -1,5 +1,6 @@
 package org.ungoogled.patches.xiaominotes.micloud
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
@@ -347,6 +348,35 @@ private fun BytecodePatchContext.converterMethod(): Method {
     return found ?: throw PatchException("Notes' note converter (SchemaToMd) not found")
 }
 
+private const val NOTE_LIST = "Lcom/miui/notes/notesui/feature/note/presentation/list/AINoteListActivity;"
+
+/**
+ * The note list's onResume tells CloudSync that Notes came to the front: if the user turned on the experimental sync,
+ * it syncs in the background (at most every few minutes); otherwise it returns at once.
+ */
+private val cloudSyncOnOpenPatch = bytecodePatch(
+    description = "Lets the experimental Xiaomi Cloud sync run when Notes opens.",
+) {
+    extendWith(XIAOMI_NOTES_EXTENSION)
+
+    execute {
+        val onResume = mutableClassDefByOrNull(NOTE_LIST)?.methods?.firstOrNull {
+            it.name == "onResume" && it.parameterTypes.isEmpty() && it.returnType == "V"
+        } ?: throw PatchException("AINoteListActivity.onResume not found")
+        onResume.addInstruction(
+            0,
+            "invoke-static { p0 }, Lorg/ungoogled/xiaominotes/micloud/CloudSync;->onAppOpen(Landroid/app/Activity;)V",
+        )
+    }
+}
+
+/**
+ * Settings > Xiaomi Cloud > Import from Xiaomi Cloud (extension package org.ungoogled.xiaominotes.micloud): the user
+ * signs in on Xiaomi's own notes website (i.mi.com) in a WebView; the notes are then read with that session the way the
+ * website reads them, converted with Notes' own converter and written through Notes' own DAO, with their dates,
+ * folders, checklists, pictures and recordings. Re-runnable without duplicates; encrypted and hidden notes are counted,
+ * not imported. The same screen has an experimental two-way sync, off by default.
+ */
 @Suppress("unused")
 val importFromXiaomiCloudPatch = bytecodePatch(
     name = "Import from Xiaomi Cloud",
@@ -354,6 +384,6 @@ val importFromXiaomiCloudPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_XIAOMI_NOTES)
-    dependsOn(cloudImportResourcesPatch, cloudImportBridgePatch)
+    dependsOn(cloudImportResourcesPatch, cloudImportBridgePatch, cloudSyncOnOpenPatch)
     extendWith(XIAOMI_NOTES_EXTENSION)
 }
