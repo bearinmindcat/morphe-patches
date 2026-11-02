@@ -248,6 +248,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',
         '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',
     ),
+    # OnePlus Weather (ColorOS port, coloros-ports-d)
+    "net.oneplus.weather": (
+        '<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather',
+        '<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather',
+    ),
 }
 
 

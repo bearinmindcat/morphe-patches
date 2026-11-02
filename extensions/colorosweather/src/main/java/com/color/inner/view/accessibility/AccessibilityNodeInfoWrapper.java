@@ -1,0 +1,8 @@
+package com.color.inner.view.accessibility;
+
+/** Generated stand-in (.github/scripts/coloros-standins): names and signatures OnePlus Weather uses, answering "absent" off ColorOS (no OPPO code). */
+public class AccessibilityNodeInfoWrapper {
+    public static java.lang.CharSequence getRealClassName(android.view.accessibility.AccessibilityNodeInfo p0) {
+        return "";
+    }
+}
