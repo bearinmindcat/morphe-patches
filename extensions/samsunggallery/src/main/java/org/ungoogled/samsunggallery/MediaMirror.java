@@ -38,14 +38,40 @@ public final class MediaMirror extends ContentProvider {
     private String syncedVersion;
 
     private static volatile String authority;
+    private static volatile MediaMirror instance;
 
     /** Where Gallery's raw SQL goes; providers start before the app, so the authority is known by then. */
     public static Uri rawQueryUri() {
         return Uri.parse("content://" + authority + "/raw_sql");
     }
 
+    /** The app's context; the provider starts with the app's process. */
+    public static Context context() {
+        MediaMirror mirror = instance;
+        return mirror == null ? null : mirror.getContext();
+    }
+
+    /**
+     * Sets favourites in the copy at once: Gallery reloads right after its heart is tapped, while Android applies the
+     * change to MediaStore a moment later (the copy then follows MediaStore again).
+     */
+    static void markFavorite(long[] ids, boolean favorite) {
+        MediaMirror mirror = instance;
+        if (mirror == null || ids.length == 0) return;
+        StringBuilder in = new StringBuilder();
+        for (long id : ids) in.append(in.length() == 0 ? "" : ",").append(id);
+        synchronized (mirror) {
+            try {
+                mirror.db().execSQL("UPDATE files SET is_favorite = " + (favorite ? 1 : 0) + " WHERE _id IN (" + in + ")");
+            } catch (SQLiteException e) {
+                Log.w(TAG, "mirror: favourite not marked: " + e.getMessage());
+            }
+        }
+    }
+
     @Override
     public boolean onCreate() {
+        instance = this;
         authority = getContext().getPackageName() + ".mediamirror";
         // Providers start with the app's process, before any of its screens.
         ActivityState.track(getContext());
@@ -103,6 +129,15 @@ public final class MediaMirror extends ContentProvider {
                     rows++;
                 }
                 fillSamsungColumns(d);
+                // Gallery decides whether its lists changed from a stamp that includes One UI's
+                // local_metadata.generation_modified; without the table the whole stamp was NULL, always "the same",
+                // and lists did not refresh after a delete or a new photo.
+                d.execSQL("CREATE TABLE IF NOT EXISTS local_metadata (_id INTEGER PRIMARY KEY)");
+                if (!columns(d, "local_metadata").contains("generation_modified")) {
+                    d.execSQL("ALTER TABLE local_metadata ADD COLUMN generation_modified NUMERIC");
+                }
+                d.execSQL("DELETE FROM local_metadata");
+                d.execSQL("INSERT INTO local_metadata (generation_modified) VALUES (" + generation + ")");
                 d.setTransactionSuccessful();
             } finally {
                 d.endTransaction();

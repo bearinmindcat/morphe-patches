@@ -5,6 +5,7 @@ import android.app.Application;
 import android.content.Context;
 import android.os.Bundle;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
@@ -18,6 +19,7 @@ import java.util.WeakHashMap;
  */
 public final class ActivityState {
     private static final Set<Activity> RESUMED = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+    private static volatile WeakReference<Activity> front = new WeakReference<>(null);
     private static volatile boolean tracking;
     private static volatile Method isResumed;
     private static volatile boolean refused;
@@ -33,16 +35,19 @@ public final class ActivityState {
             @Override
             public void onActivityPreResumed(Activity activity) {
                 RESUMED.add(activity);
+                front = new WeakReference<>(activity);
             }
 
             @Override
             public void onActivityPaused(Activity activity) {
                 RESUMED.remove(activity);
+                if (front.get() == activity) front = new WeakReference<>(null);
             }
 
             @Override
             public void onActivityDestroyed(Activity activity) {
                 RESUMED.remove(activity);
+                if (front.get() == activity) front = new WeakReference<>(null);
             }
 
             @Override
@@ -65,6 +70,12 @@ public final class ActivityState {
             public void onActivitySaveInstanceState(Activity activity, Bundle state) {
             }
         });
+    }
+
+    /** The app's screen in front, or null while none is. */
+    static Activity front() {
+        Activity activity = front.get();
+        return activity == null || activity.isFinishing() ? null : activity;
     }
 
     public static boolean isResumed(Activity activity) {

@@ -16,3 +16,14 @@ internal object SecFileIdFingerprint : Fingerprint(
         methodCall(definingClass = "Landroid/content/ContentResolver;", name = "query"),
     ),
 )
+
+/**
+ * The SUPPORT_TRASH constant of Gallery's Features (an enum constant with its own getEnabling(), so a class of its
+ * own): the Recycle bin, on from One UI's first version (SEM P) up, so never off One UI.
+ */
+internal object SupportTrashFeatureFingerprint : Fingerprint(
+    name = "<init>",
+    parameters = listOf(),
+    filters = listOf(string("SUPPORT_TRASH")),
+    custom = { _, classDef -> classDef.superclass == "Lcom/samsung/android/gallery/support/utils/Features;" },
+)
