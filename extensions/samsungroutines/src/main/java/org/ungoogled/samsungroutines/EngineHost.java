@@ -22,9 +22,12 @@ import android.util.Log;
 public final class EngineHost extends Service {
     private static final String TAG = "UA";
     private static final String CHANNEL = "ua_routines_engine";
+    /** The app, for helpers called where the app's code has no Context at hand (see Toggles). */
+    static volatile Context app;
 
     /** From the app's onCreate, in each of its processes. The engine process also brings back its event watches. */
     public static void start(Context context) {
+        app = context.getApplicationContext() != null ? context.getApplicationContext() : context;
         if (EventDelegation.isEngine(context)) EventDelegation.sync(context);
         try {
             context.startForegroundService(new Intent(context, EngineHost.class));

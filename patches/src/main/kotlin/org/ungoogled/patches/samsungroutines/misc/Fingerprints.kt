@@ -29,3 +29,9 @@ internal object MainScreenOnCreateFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf("Landroid/os/Bundle;"),
 )
+
+/** The "Wi-Fi network" condition's check: is the phone on (or off) one of the chosen networks. */
+internal object WifiNetworkConditionFingerprint : Fingerprint(
+    returnType = "V",
+    filters = listOf(string("getActiveNetworkWifiInfo: WiFi manager connection info is null")),
+)

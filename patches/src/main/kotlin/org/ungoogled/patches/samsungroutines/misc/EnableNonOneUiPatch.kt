@@ -1,9 +1,14 @@
 package org.ungoogled.patches.samsungroutines.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -67,6 +72,22 @@ private val manifestPatch = resourcePatch {
                         manifest.createElement("property").apply {
                             setAttribute("android:name", "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE")
                             setAttribute("android:value", "Keeps the routine engine running to watch conditions and run routines")
+                        },
+                    )
+                },
+            )
+            // Picks the "Wi-Fi network" condition's networks (see WifiPicker and wifiPatch). Android 14+ delivers the
+            // app's own implicit intent only to an exported activity; the picker answers only the app itself.
+            application.appendChild(
+                manifest.createElement("activity").apply {
+                    setAttribute("android:name", "org.ungoogled.samsungroutines.WifiPicker")
+                    setAttribute("android:exported", "true")
+                    setAttribute("android:excludeFromRecents", "true")
+                    setAttribute("android:theme", "@android:style/Theme.Translucent.NoTitleBar")
+                    appendChild(
+                        manifest.createElement("intent-filter").apply {
+                            appendChild(manifest.createElement("action").apply { setAttribute("android:name", WIFI_PICKER_ACTION) })
+                            appendChild(manifest.createElement("category").apply { setAttribute("android:name", "android.intent.category.DEFAULT") })
                         },
                     )
                 },
@@ -251,6 +272,52 @@ private val activityStartsPatch = bytecodePatch(
     }
 }
 
+private const val WIFI_PICKER_ACTION = "org.ungoogled.samsungroutines.PICK_WIFI_NETWORK"
+
+/**
+ * Wi-Fi and mobile data. The "Wi-Fi network" condition (and a place's Wi-Fi network) picks networks in a screen of
+ * Samsung's Settings, which other phones lack: adding one crashed the app. Its intent now opens the extension's picker
+ * (see WifiPicker). The condition's check reads the network name, which Android hides without location (all the time,
+ * from the engine): it asks for that (see Access.needLocation). The Wi-Fi and Mobile data actions switched nothing:
+ * Android lets only system apps do that, so they open Android's Wi-Fi / Internet panel or notify (see Toggles).
+ */
+private val wifiPatch = bytecodePatch(
+    description = "Picks Wi-Fi networks in the app and asks for Wi-Fi and mobile data changes.",
+) {
+    extendWith(SAMSUNG_ROUTINES_EXTENSION)
+
+    execute {
+        val pickers = rewriteStringLiterals { s ->
+            if (s == "com.samsung.android.net.wifi.PICK_WIFI_NETWORK_RESULT") WIFI_PICKER_ACTION else null
+        }
+        // Measured against 5.1.03.1: the condition's picker and two in the place condition.
+        if (pickers < 2) throw PatchException("only $pickers Wi-Fi picker intents found")
+
+        val check = WifiNetworkConditionFingerprint.method
+        val instructions = check.implementation!!.instructions
+        val index = instructions.indexOfFirst {
+            val r = (it as? ReferenceInstruction)?.reference as? MethodReference
+            it.opcode == Opcode.INVOKE_VIRTUAL && r?.definingClass == "Landroid/net/wifi/WifiManager;" && r.name == "getConnectionInfo"
+        }
+        if (index < 0) throw PatchException("the Wi-Fi network condition reads no WifiInfo")
+        val receiver = (instructions[index] as FiveRegisterInstruction).registerC
+        check.replaceInstruction(
+            index,
+            "invoke-static { v$receiver }, Lorg/ungoogled/samsungroutines/Wifi;->connectionInfo(Landroid/net/wifi/WifiManager;)Landroid/net/wifi/WifiInfo;",
+        )
+
+        val toggles = redirectCalls(
+            "Lorg/ungoogled/samsungroutines/Toggles;",
+            mapOf(
+                "Landroid/net/wifi/WifiManager;" to setOf("setWifiEnabled(Z)Z"),
+                "Landroid/telephony/TelephonyManager;" to setOf("setDataEnabled(Z)V"),
+            ),
+        )
+        // Measured against 5.1.03.1: the Wi-Fi action (run and reverse) and the Mobile data action.
+        if (toggles < 3) throw PatchException("only $toggles Wi-Fi / mobile data switch calls found")
+    }
+}
+
 /** One UI grants its own apps notifications; elsewhere the main screen asks for them (see Access.onMainScreen). */
 private val notificationsPatch = bytecodePatch(
     description = "Asks for the notification permission on the main screen.",
@@ -336,6 +403,7 @@ private val sprDrawablesPatch = resourcePatch(
  * condition change: One UI's event delegation service, which watches broadcasts for it, does not exist, and Android
  * freezes the app in the background. The extension stands in for the event delegation service in the app's own
  * engine process, kept running by a foreground service, and carries stand-ins for the One UI classes it calls.
+ * Wi-Fi and mobile data cannot be switched by an app: those actions open Android's panel or notify instead.
  * Actions provided by Samsung's other apps (Settings' sound mode and volume, Edge, DeX, S Pen, Bixby, ...) are not
  * offered; "App opened" needs Samsung's usage watcher and stays inert.
  */
@@ -349,6 +417,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         manifestPatch, launcherIconPatch, foregroundPatch, engineHostPatch, pendingIntentsPatch, batteryEventPatch, zenPatch,
         settingsPatch, activityStartsPatch, notificationsPatch, oneUiMembersPatch, systemServicesPatch, sprDrawablesPatch,
+        wifiPatch,
     )
     extendWith(SAMSUNG_ROUTINES_EXTENSION)
 }
