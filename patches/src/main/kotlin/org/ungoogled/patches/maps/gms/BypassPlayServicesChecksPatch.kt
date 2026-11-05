@@ -68,5 +68,42 @@ val bypassPlayServicesChecksPatch = bytecodePatch(
             """,
             ExternalLabel("cronet_flag", cronet.implementation!!.instructions.first()),
         )
+
+        // Android's Cronet is part of every Android 14+ build; Maps also wants SDK extension 7, read from the
+        // phone's module versions, before it enables it or ranks it above the fallback. With no other Cronet, it is
+        // enabled and preferred whenever it exists.
+        val httpEngine = mutableClassDefBy("Lorg/chromium/net/impl/HttpEngineNativeProvider;").methods.singleOrNull {
+            it.name == "isEnabled" && it.returnType == "Z" && it.parameterTypes.isEmpty()
+        } ?: throw PatchException("Android's Cronet provider no longer has isEnabled()")
+        httpEngine.addInstructionsWithLabels(
+            0,
+            """
+                iget-object v0, p0, Lorg/chromium/net/CronetProvider;->mContext:Landroid/content/Context;
+                invoke-static { v0 }, Lorg/ungoogled/ui/CronetChoice;->httpEngine(Landroid/content/Context;)Z
+                move-result v0
+                if-eqz v0, :engine_check
+                const/4 v0, 0x1
+                return v0
+            """,
+            ExternalLabel("engine_check", httpEngine.implementation!!.instructions.first()),
+        )
+        val score = mutableClassDefBy("Lorg/chromium/net/CronetProvider;").methods.singleOrNull {
+            it.name == "calculateHttpEngineNativeProviderScoreInternal" && it.returnType == "I" &&
+                it.parameterTypes.firstOrNull()?.toString() == "Landroid/content/Context;"
+        } ?: throw PatchException("Cronet's ranking of Android's Cronet not found")
+        if (score.implementation!!.registerCount - score.parameterTypes.size < 1) {
+            throw PatchException("Cronet's ranking of Android's Cronet has no register to spare")
+        }
+        score.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static { p0 }, Lorg/ungoogled/ui/CronetChoice;->httpEngine(Landroid/content/Context;)Z
+                move-result v0
+                if-eqz v0, :engine_score
+                const/4 v0, 0x4
+                return v0
+            """,
+            ExternalLabel("engine_score", score.implementation!!.instructions.first()),
+        )
     }
 }
