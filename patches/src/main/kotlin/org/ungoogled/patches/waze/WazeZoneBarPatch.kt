@@ -8,28 +8,38 @@ import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 /** org.ungoogled.waze.ZoneBar, the runtime half (extensions/waze). */
 private const val ZONE_BAR = "Lorg/ungoogled/waze/ZoneBar;"
 
-/** Waze's older zone display: the share of an average speed zone driven and the metres left. A JNI class. */
+/**
+ * Waze's older zone display: the share of an average speed zone driven and the metres left -- the one
+ * NavigationInfoNativeManager method taking an AverageSpeedCameraZoneUpdate (onAverageSpeedCamZoneUpdate in 5.24;
+ * renamed in 5.26, where the JNI half parses the bytes and posts it to the main thread). A JNI proto, so its name stays.
+ */
 private object AverageSpeedZoneUpdateFingerprint : Fingerprint(
     definingClass = "Lcom/waze/navigate/NavigationInfoNativeManager;",
-    name = "onAverageSpeedCamZoneUpdate",
     returnType = "V",
     parameters = listOf("Lcom/waze/jni/protos/navigate/AverageSpeedCameraZoneUpdate;"),
 )
 
-/** ... and the zone's end. */
+/**
+ * ... and the zone's end: onAverageSpeedCamZoneClear (5.24), or the JNI method onAverageSpeedCamZoneClearJNI of
+ * NavigationInfoNativeManagerBase (5.26), which runs on Waze's native thread; ZoneBar moves it to the main thread.
+ */
 private object AverageSpeedZoneClearFingerprint : Fingerprint(
-    definingClass = "Lcom/waze/navigate/NavigationInfoNativeManager;",
-    name = "onAverageSpeedCamZoneClear",
     returnType = "V",
     parameters = listOf(),
+    custom = { method, classDef ->
+        classDef.type.startsWith("Lcom/waze/navigate/NavigationInfoNativeManager") &&
+            (method.name == "onAverageSpeedCamZoneClear" || method.name == "onAverageSpeedCamZoneClearJNI")
+    },
 )
 
-/** Waze's newer one ("insights"): every segment ahead or under way, an average speed zone among them. */
+/**
+ * Waze's newer one ("insights"): every segment ahead or under way, an average speed zone among them -- the one
+ * InsightsInfraNativeManager method taking a SegmentInsightUpdate (onSegmentInsightUpdated in 5.24, renamed in 5.26).
+ */
 private object SegmentInsightUpdatedFingerprint : Fingerprint(
     definingClass = "Lcom/waze/insights_infra/InsightsInfraNativeManager;",
     returnType = "V",
     parameters = listOf("Lcom/waze/jni/protos/insights_infra/SegmentInsightUpdate;"),
-    custom = { method, _ -> method.name.startsWith("onSegmentInsightUpdated") },
 )
 
 /** The speedometer taking its state (speed, units, the road's limit); its "Not shown." log is unique to it. */

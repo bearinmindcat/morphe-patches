@@ -11,6 +11,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -86,6 +87,15 @@ public final class Bridge {
     }
 
     /** From AlerterNativeManager.updateAlertersRepository: [update] is Waze's NativeAlertRepositoryUpdate. */
+    /** The patched method's instance, for the self-test's `real` path (Waze 5.26 has no getInstance()). */
+    private static volatile java.lang.ref.WeakReference<Object> manager = new java.lang.ref.WeakReference<>(null);
+
+    /** From AlerterNativeManager's repository update: [self] is the manager, [update] the repository. */
+    public static void alerts(Object self, Object update) {
+        if (self != null && manager.get() != self) manager = new java.lang.ref.WeakReference<>(self);
+        alerts(update);
+    }
+
     public static void alerts(Object update) {
         try {
             if (update == null || !Customization.on("shareAlerts")) return;
@@ -267,7 +277,7 @@ public final class Bridge {
     /**
      * Builds a repository update with Waze's own proto builders -- the same classes alerts() reads --
      * from a test broadcast's lat, lng, type, count and title, and hands it to alerts(), or with
-     * `real` to AlerterNativeManager.updateAlertersRepository itself, the patched method.
+     * `real` to AlerterNativeManager.updateAlertersRepository itself (renamed in 5.26), the patched method.
      */
     private static final class SelfTest extends BroadcastReceiver {
         @Override
@@ -303,12 +313,40 @@ public final class Bridge {
                 }
                 Object built = build(update);
                 if (in.getBooleanExtra("real", false)) {
-                    Class<?> manager = Class.forName("com.waze.alerters.AlerterNativeManager");
-                    Object instance = manager.getMethod("getInstance").invoke(null);
-                    Method m = manager.getDeclaredMethod("updateAlertersRepository", updateClass);
+                    // The patched method: AlerterNativeManager's one method taking the update (renamed in 5.26).
+                    Class<?> cls = Class.forName("com.waze.alerters.AlerterNativeManager");
+                    Object instance = manager.get();
+                    boolean bare = false;
+                    if (instance == null) {
+                        try {
+                            instance = cls.getMethod("getInstance").invoke(null);
+                        } catch (NoSuchMethodException e) {
+                            // 5.26 keeps its manager in its dependency graph, out of reach until Waze sends an update:
+                            // an empty one reaches the patched method's start, where the bridge is; Waze's own half
+                            // then fails on the empty instance, which is expected here.
+                            Field f = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+                            f.setAccessible(true);
+                            Object unsafe = f.get(null);
+                            instance = unsafe.getClass().getMethod("allocateInstance", Class.class).invoke(unsafe, cls);
+                            bare = true;
+                        }
+                    }
+                    Method m = null;
+                    for (Method x : cls.getDeclaredMethods()) {
+                        Class<?>[] p = x.getParameterTypes();
+                        if (p.length == 1 && p[0] == updateClass && x.getReturnType() == void.class) m = x;
+                    }
+                    if (m == null) throw new NoSuchMethodException("AlerterNativeManager(" + updateClass.getName() + ")");
                     m.setAccessible(true);
-                    m.invoke(instance, built);
-                    Log.d("UA", "Waze alerts bridge: self-test through AlerterNativeManager, " + count + " alerts");
+                    try {
+                        m.invoke(instance, built);
+                    } catch (java.lang.reflect.InvocationTargetException e) {
+                        if (!bare) throw e;
+                        Log.d("UA", "Waze alerts bridge: self-test on a bare manager, Waze's half failed as expected: " + e.getCause());
+                    } finally {
+                        if (bare && manager.get() == instance) manager = new java.lang.ref.WeakReference<>(null);
+                    }
+                    Log.d("UA", "Waze alerts bridge: self-test through AlerterNativeManager." + m.getName() + ", " + count + " alerts");
                 } else {
                     synchronized (Bridge.class) {
                         lastKey = "";   // so the same test list goes out again at once

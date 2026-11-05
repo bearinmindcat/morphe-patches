@@ -7,11 +7,12 @@ import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 import org.w3c.dom.Element
 
 /**
- * Waze's launcher, app-switcher and Android Auto labels all point at @string/app_name_regular ("Waze").
+ * Waze's launcher, app-switcher and Android Auto labels all point at @string/app_name_regular ("Waze"), or at
+ * @string/app_name_beta ("Waze β") in Waze's beta builds (5.26.90.901 is one).
  * As in Maps' Change app name, every such label is repointed at a NEW string only the base module
  * defines, so no language split can shadow it. In-app copy that says "Waze" is untouched.
  */
-private const val STOCK_LABEL = "@string/app_name_regular"
+private val STOCK_LABELS = setOf("@string/app_name_regular", "@string/app_name_beta")
 private const val NEW_LABEL = "@string/dewaze_app_name"
 private const val DEWAZE_NAME = "De-Waze"
 
@@ -37,13 +38,13 @@ val wazeChangeAppNamePatch = resourcePatch(
             val elements = manifest.getElementsByTagName("*")
             for (i in 0 until elements.length) {
                 val element = elements.item(i) as Element
-                if (element.getAttribute("android:label") == STOCK_LABEL) {
+                if (element.getAttribute("android:label") in STOCK_LABELS) {
                     element.setAttribute("android:label", NEW_LABEL)
                     relabeled++
                 }
             }
         }
-        if (relabeled == 0) throw PatchException("no manifest labels reference $STOCK_LABEL")
+        if (relabeled == 0) throw PatchException("no manifest labels reference ${STOCK_LABELS.joinToString(" or ")}")
 
         document("res/values/strings.xml").use { strings ->
             val resources = strings.getElementsByTagName("resources").item(0) as Element

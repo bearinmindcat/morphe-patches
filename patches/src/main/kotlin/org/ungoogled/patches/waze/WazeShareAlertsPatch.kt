@@ -11,16 +11,14 @@ private const val BRIDGE = "Lorg/ungoogled/waze/Bridge;"
 
 /**
  * AlerterNativeManager.updateAlertersRepository(NativeAlertRepositoryUpdate): the native side's
- * list of the alerts Waze is about to warn about, each time it changes. A JNI class and a JNI
- * proto, so the names survive from one Waze build to the next.
+ * list of the alerts Waze is about to warn about, each time it changes -- AlerterNativeManager's one
+ * method taking that JNI proto (renamed in Waze 5.26, where the JNI half parses the bytes first).
  */
 private object UpdateAlertersRepositoryFingerprint : Fingerprint(
     definingClass = "Lcom/waze/alerters/AlerterNativeManager;",
-    name = "updateAlertersRepository",
     returnType = "V",
     parameters = listOf("Lcom/waze/jni/protos/alerters/NativeAlertRepositoryUpdate;"),
 )
-
 
 @Suppress("unused")
 val wazeShareAlertsPatch = bytecodePatch(
@@ -32,10 +30,10 @@ val wazeShareAlertsPatch = bytecodePatch(
     dependsOn(wazeCustomizationPatch)
 
     execute {
-        // p1 is the update; the Bridge takes it as an Object and reads it by name.
+        // p0 is the manager, p1 the update; the Bridge takes them as Objects and reads the update by name.
         UpdateAlertersRepositoryFingerprint.method.addInstruction(
             0,
-            "invoke-static { p1 }, $BRIDGE->alerts(Ljava/lang/Object;)V",
+            "invoke-static/range { p0 .. p1 }, $BRIDGE->alerts(Ljava/lang/Object;Ljava/lang/Object;)V",
         )
         WazeApplicationCreateFingerprint.method.addInstruction(
             0,

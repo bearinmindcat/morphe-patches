@@ -37,13 +37,17 @@ private object ConfigSyncedFromServerFingerprint : Fingerprint(
 /**
  * PreferencesConfigNativeManager.onPreferencesConfigSynced: the native side calls it once the
  * server's preferences -- the values these patches change -- have synced. Unlike
- * onConfigSyncedFromServer it also runs before anyone has signed in.
+ * onConfigSyncedFromServer it also runs before anyone has signed in. Waze 5.26 moved the JNI half
+ * to PreferencesConfigNativeManagerBase.onPreferencesConfigSyncedJNI, which posts the rest to the
+ * main thread; the hook stays on the native thread, at the JNI method.
  */
 private object PreferencesConfigSyncedFingerprint : Fingerprint(
-    definingClass = "Lcom/waze/config/PreferencesConfigNativeManager;",
-    name = "onPreferencesConfigSynced",
     returnType = "V",
     parameters = emptyList(),
+    custom = { method, classDef ->
+        classDef.type.startsWith("Lcom/waze/config/PreferencesConfigNativeManager") &&
+            (method.name == "onPreferencesConfigSynced" || method.name == "onPreferencesConfigSyncedJNI")
+    },
 )
 
 /**

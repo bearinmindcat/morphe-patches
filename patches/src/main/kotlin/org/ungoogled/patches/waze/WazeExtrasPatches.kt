@@ -105,10 +105,12 @@ val wazeNoAiReportingPatch = bytecodePatch(
     }
 }
 
-/** MoodManager.canSetMood(Context, String): whether the user has earned a mood. A JNI class, so the names survive. */
+/**
+ * MoodManager.canSetMood(Context, String): whether the user has earned a mood -- MoodManager's only method
+ * taking a Context and a mood name and answering yes or no. Waze 5.26 renamed it.
+ */
 private object CanSetMoodFingerprint : Fingerprint(
     definingClass = "Lcom/waze/MoodManager;",
-    name = "canSetMood",
     returnType = "Z",
     parameters = listOf("Landroid/content/Context;", "Ljava/lang/String;"),
 )

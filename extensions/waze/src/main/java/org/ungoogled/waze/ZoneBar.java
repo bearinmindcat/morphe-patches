@@ -88,11 +88,19 @@ public final class ZoneBar {
 
     /** NavigationInfoNativeManager.onAverageSpeedCamZoneUpdate: Waze's AverageSpeedCameraZoneUpdate. Main thread. */
     public static void legacy(Object update) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            MAIN.post(() -> legacy(update));
+            return;
+        }
         try {
             if (update == null || !Customization.on("zoneBar")) return;
             int p = (Integer) call(update, "getPercent"), l = (Integer) call(update, "getLeftDistance");
             long now = now();
-            if (!inZone) start(l, p > 0 && p < 100 ? Math.round(l / (1f - p / 100f)) : l, now);
+            if (inZone && byInsights) return;
+            if (!inZone) {
+                start(l, p > 0 && p < 100 ? Math.round(l / (1f - p / 100f)) : l, now);
+                byInsights = false;
+            }
             progress(Math.max(0, Math.min(100, p)), l, now);
         } catch (Throwable t) {
             Log.w(TAG, "zone bar: legacy", t);
@@ -101,11 +109,20 @@ public final class ZoneBar {
 
     /** NavigationInfoNativeManager.onAverageSpeedCamZoneClear. Main thread. */
     public static void legacyClear() {
-        end("cleared");
+        // Waze 5.26 calls it from its JNI method, on Waze's native thread.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            MAIN.post(ZoneBar::legacyClear);
+            return;
+        }
+        if (!byInsights) end("cleared");
     }
 
     /** InsightsInfraNativeManager.onSegmentInsightUpdated: Waze's SegmentInsightUpdate. Main thread. */
     public static void insights(Object update) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            MAIN.post(() -> insights(update));
+            return;
+        }
         try {
             if (update == null || !Customization.on("zoneBar")) return;
             Object infos = call(update, "getInfoList");
@@ -120,11 +137,15 @@ public final class ZoneBar {
                 }
             }
             if (remaining == null) {
-                if (inZone) end("no zone in Waze's update");
+                if (inZone && byInsights) end("no zone in Waze's update");
                 return;
             }
+            if (inZone && !byInsights) return;
             long now = now();
-            if (!inZone) start(remaining, remaining, now);
+            if (!inZone) {
+                start(remaining, remaining, now);
+                byInsights = true;
+            }
             int p = length > 0 ? Math.round(100f * (length - remaining) / length) : 0;
             progress(Math.max(0, Math.min(100, p)), remaining, now);
         } catch (Throwable t) {
@@ -184,6 +205,12 @@ public final class ZoneBar {
     }
 
     private static final Runnable STALE = () -> end("nothing from Waze for 90 s");
+
+    /**
+     * Which of Waze's two displays the zone under way came from. Each ends only its own: Waze 5.26 sends an insights
+     * update about once a second while it has a location, every one without a zone when the older display has it.
+     */
+    private static boolean byInsights;
 
     private static void end(String why) {
         MAIN.removeCallbacks(STALE);
@@ -454,8 +481,30 @@ public final class ZoneBar {
         private static void callReal(String name, Object update) {
             try {
                 Class<?> nav = Class.forName("com.waze.navigate.NavigationInfoNativeManager");
-                Object instance = nav.getMethod("getInstance").invoke(null);
-                Method m = update == null ? nav.getDeclaredMethod(name) : nav.getDeclaredMethod(name, update.getClass());
+                // Its singleton: getInstance() in 5.24, renamed in 5.26 -- the static no-argument method returning it.
+                Object instance = null;
+                for (Method x : nav.getDeclaredMethods()) {
+                    if (java.lang.reflect.Modifier.isStatic(x.getModifiers()) && x.getParameterTypes().length == 0 && x.getReturnType() == nav) {
+                        x.setAccessible(true);
+                        instance = x.invoke(null);
+                        break;
+                    }
+                }
+                if (instance == null) throw new NoSuchMethodException("NavigationInfoNativeManager singleton");
+                // The patched methods: the one taking the update (renamed in 5.26), and the clear by its name's start
+                // (onAverageSpeedCamZoneClearJNI in 5.26, in the manager's superclass).
+                Method m = null;
+                for (Class<?> c = nav; c != null && m == null; c = c.getSuperclass()) {
+                    for (Method x : c.getDeclaredMethods()) {
+                        Class<?>[] p = x.getParameterTypes();
+                        if (update != null ? p.length == 1 && p[0] == update.getClass() && x.getReturnType() == void.class
+                                : p.length == 0 && x.getName().startsWith(name)) {
+                            m = x;
+                            break;
+                        }
+                    }
+                }
+                if (m == null) throw new NoSuchMethodException(name);
                 m.setAccessible(true);
                 if (update == null) m.invoke(instance);
                 else m.invoke(instance, update);

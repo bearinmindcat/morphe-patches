@@ -8,6 +8,7 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.string
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.AccessFlags
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 import org.w3c.dom.Element
 
@@ -79,7 +80,9 @@ val wazeRemoveTelemetryPatch = bytecodePatch(
         stats.methods.filter { it.returnType == "V" && it.parameterTypes.firstOrNull()?.toString() == CLIENT_ENG_STATS }
             .ifEmpty { throw PatchException("client engineering stats not found in ${stats.type}") }
             .forEach { it.skipWhileOn("client engineering stats") }
-        mutableClassDefBy(METRICS_REPORTER).methods.filter { it.name.startsWith("reportMetric") && it.returnType == "V" }
+        // Waze 5.26 moved the JNI entry (reportMetricJNI) to MetricsReporterNativeManagerBase.
+        listOfNotNull(mutableClassDefBy(METRICS_REPORTER), mutableClassDefByOrNull("${METRICS_REPORTER.removeSuffix(";")}Base;"))
+            .flatMap { c -> c.methods.filter { it.name.startsWith("reportMetric") && it.returnType == "V" && !AccessFlags.ABSTRACT.isSet(it.accessFlags) } }
             .ifEmpty { throw PatchException("metrics reporter not found") }
             .forEach { it.skipWhileOn("metrics reporter") }
 
