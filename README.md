@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.5](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;123 patches total
+> **[v2.8.6](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;126 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -130,7 +130,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;18 apps&nbsp;&nbsp;•&nbsp;&nbsp;28 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;19 apps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
 <blockquote>
 
@@ -183,7 +183,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
 
 **Supported version(s):** 15.9.01.7
@@ -192,6 +192,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Gallery installable and usable on non-One UI ROMs. |  |
+| [Extract text](#extract-text) | Brings back Extract text with an on-device text recognizer. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores policies pushed from Samsung's servers. |  |
 
 </details>
@@ -284,6 +285,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports, usage surveys and marketing data. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.3.52.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Samsung Phone on non-One UI ROMs; your default phone app still handles calls. |  |
 
 </details>
 
@@ -512,7 +525,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Honor Apps&nbsp;&nbsp;•&nbsp;&nbsp;8 apps&nbsp;&nbsp;•&nbsp;&nbsp;8 patches</summary>
+<summary>📱 Honor Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
 <blockquote>
 
@@ -609,6 +622,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Video Player installable and usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.1.2.311
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Runs Honor Weather on non-Honor phones with forecasts from Open-Meteo. |  |
 
 </details>
 

@@ -1,3 +1,12 @@
+## [2.8.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.5...v2.8.6) (2026-11-05)
+
+### 🐛 Bug Fixes
+
+* add extract text to samsung gallery ([15a6a7f](https://github.com/bearinmindcat/morphe-patches/commit/15a6a7f6a49b18b166fe828003a9635fe8d36081))
+* add honor weather non-magicos support (open-meteo) ([918f0fd](https://github.com/bearinmindcat/morphe-patches/commit/918f0fd707b42c49d043daef9758ac8448b1188a))
+* add samsung phone non-one ui support ([9bc955f](https://github.com/bearinmindcat/morphe-patches/commit/9bc955faf1432946b345060811376b8cc9224a3a))
+* samsung gallery's favourite, delete and trash work on non-one ui roms ([be7ef0b](https://github.com/bearinmindcat/morphe-patches/commit/be7ef0b4d34dc452aef48afc2520000e65a59be5))
+
 ## [2.8.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.4...v2.8.5) (2026-11-02)
 
 ### 🐛 Bug Fixes
