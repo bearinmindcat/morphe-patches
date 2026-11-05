@@ -1,0 +1,16 @@
+package com.oplus.inner.content.pm;
+
+/** Generated stand-in (.github/scripts/coloros-standins): names and signatures OnePlus Launcher uses, answering "absent" off ColorOS (no OPPO code). */
+public class ApplicationInfoWrapper {
+    public static int getOplusFreezeState(android.content.pm.ApplicationInfo p0) {
+        return 0;
+    }
+    public static int getVersionCode(android.content.pm.ApplicationInfo p0) {
+        return 0;
+    }
+    public static boolean isSystemApp(android.content.pm.ApplicationInfo p0) {
+        return false;
+    }
+    public static void setOplusFreezeState(android.content.pm.ApplicationInfo p0, int p1) {
+    }
+}

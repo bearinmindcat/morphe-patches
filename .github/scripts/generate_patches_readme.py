@@ -314,6 +314,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',
         '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',
     ),
+    # The old OxygenOS 11 launcher (2021), not ColorOS's System Launcher.
+    "net.oneplus.launcher": (
+        '<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)',
+        '<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)',
+    ),
 }
 
 
