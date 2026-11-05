@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
@@ -221,5 +222,51 @@ val followPlayingMediaPatch = bytecodePatch(
             """,
             ExternalLabel("browse", buttonImpl.instructions[0]),
         )
+
+        // 5. The panel follows its app while connected (issue #78): it connects with the connection's connect method
+        //    (the one asking for suggested media) and disconnects with the one disconnecting the MediaBrowser; the
+        //    extension reconnects it when the app plays in a session other than the one the panel controls.
+        val connection = classDefBy(connectionField.type)
+        val connect = connection.methods.singleOrNull { m ->
+            m.returnType == "V" && m.parameterTypes.size == 1 && m.implementation?.instructions?.any {
+                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "android.service.media.extra.SUGGESTED"
+            } == true
+        } ?: throw PatchException("media browser connection's connect method not found")
+        val disconnect = connection.methods.singleOrNull { m ->
+            m.returnType == "V" && m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                    r.definingClass == "Landroid/media/browse/MediaBrowser;" && r.name == "disconnect"
+                } == true
+            } == true
+        } ?: throw PatchException("media browser connection's disconnect method not found")
+        fun panelCalling(target: Method) = classDefBy(panel).methods.filter { m ->
+            m.returnType == "V" && m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                    r.definingClass == connection.type && r.name == target.name && r.parameterTypes == target.parameterTypes
+                } == true
+            } == true
+        }
+        val panelConnect = mutable(panelCalling(connect).singleOrNull() ?: throw PatchException("media panel's connect: found ${panelCalling(connect).size}"))
+        val panelDisconnect = mutable(panelCalling(disconnect).singleOrNull() ?: throw PatchException("media panel's disconnect: found ${panelCalling(disconnect).size}"))
+        if (panelConnect.implementation!!.registerCount - 1 < 1) throw PatchException("media panel's connect has no register to spare")
+        panelConnect.addInstructions(
+            0,
+            """
+                iget-object v0, p0, $panel->${panelConnection.name}:${panelConnection.type}
+                invoke-static { p0, v0 }, $PLAYING_MEDIA->panel(Ljava/lang/Object;Ljava/lang/Object;)V
+            """,
+        )
+        panelDisconnect.addInstructions(0, "invoke-static { p0 }, $PLAYING_MEDIA->panelGone(Ljava/lang/Object;)V")
+
+        fun answer(name: String, value: String) {
+            val getter = mutableClassDefBy(PLAYING_MEDIA).methods.singleOrNull {
+                it.name == name && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;"
+            } ?: throw PatchException("$PLAYING_MEDIA->$name() not found")
+            val first = getter.implementation!!.instructions.first()
+            if (first.opcode != Opcode.CONST_STRING) throw PatchException("$name() no longer starts with const-string")
+            getter.replaceInstruction(0, "const-string v${(first as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA}, \"$value\"")
+        }
+        answer("connectMethod", panelConnect.name)
+        answer("disconnectMethod", panelDisconnect.name)
     }
 }
