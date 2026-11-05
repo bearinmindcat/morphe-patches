@@ -119,6 +119,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor',
         '<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor',
     ),
+    "com.sec.android.app.shealth": (
+        '<img src="docs/icons/samsung-health.png" width="20" height="20" align="top"> Samsung Health',
+        '<img src="docs/icons/samsung-health.png" width="20" height="20" align="top"> Samsung Health',
+    ),
     "com.samsung.android.video": (
         '<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player',
         '<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player',
