@@ -93,6 +93,7 @@ public final class ZoneBar {
             MAIN.post(() -> legacy(update));
             return;
         }
+        if (SelfTest.running && !SelfTest.injecting) return;
         try {
             if (update == null || !Customization.on("zoneBar")) return;
             int p = (Integer) call(update, "getPercent"), l = (Integer) call(update, "getLeftDistance");
@@ -115,6 +116,7 @@ public final class ZoneBar {
             MAIN.post(ZoneBar::legacyClear);
             return;
         }
+        if (SelfTest.running && !SelfTest.injecting) return;
         if (!byInsights) end("cleared");
     }
 
@@ -124,6 +126,7 @@ public final class ZoneBar {
             MAIN.post(() -> insights(update));
             return;
         }
+        if (SelfTest.running && !SelfTest.injecting) return;
         try {
             if (update == null || !Customization.on("zoneBar")) return;
             Object infos = call(update, "getInfoList");
@@ -567,7 +570,15 @@ public final class ZoneBar {
         }
 
         /** Quarter k ends at (k+1)/(n+1) of the zone, reached after driving that far at averages[k]. */
+        /**
+         * While a test runs, Waze's own updates are left out (signed out, Waze still sends an insights update without a
+         * zone about once a second, which would end the made-up zone); only the test's own reach the bar.
+         */
+        static volatile boolean running;
+        static boolean injecting;
+
         private static void run(String path, int len, int[] averages, int hold, boolean milesPerHour) {
+            running = true;
             final long base = SystemClock.elapsedRealtime();
             int steps = hold * 2, n = averages.length;
             float prevDriven = 0;
@@ -587,9 +598,13 @@ public final class ZoneBar {
             }
             MAIN.postDelayed(() -> {
                 virtualNow = -1;
+                injecting = true;
                 if ("legacy".equals(path)) legacyClear();
                 else if ("real".equals(path)) callReal("onAverageSpeedCamZoneClear", null);
                 else insights(insightsUpdate(-1, len));
+                injecting = false;
+                // The real path's clear reaches the bar through the main thread (5.26): let it land first.
+                MAIN.post(() -> running = false);
                 Log.i(TAG, "zone bar self-test: done");
                 if (standIn != null && standIn.getParent() instanceof ViewGroup) ((ViewGroup) standIn.getParent()).removeView(standIn);
                 standIn = null;
@@ -649,6 +664,7 @@ public final class ZoneBar {
 
         private static void inject(String path, int p, int remaining, int len, long virtual) {
             virtualNow = virtual;
+            injecting = true;
             try {
                 if ("insights".equals(path)) {
                     insights(insightsUpdate(remaining, len));
@@ -666,6 +682,7 @@ public final class ZoneBar {
                 Log.w(TAG, "zone bar self-test: inject", t);
             } finally {
                 virtualNow = -1;
+                injecting = false;
             }
         }
 
