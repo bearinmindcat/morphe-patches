@@ -51,12 +51,12 @@ public class SemSoundAssistantManager {
         AppVolumes.prefs(context).edit().putBoolean("volume_mode_" + mode, on).apply();
     }
 
+    // Letting one app keep playing when another takes audio focus is One UI's AudioService: elsewhere none is.
     public int getUidIgnoredAudioFocus() {
-        return AppVolumes.prefs(context).getInt("ignored_focus_uid", -1);
+        return -1;
     }
 
     public void ignoreAudioFocusForApp(int uid, boolean ignore) {
-        AppVolumes.prefs(context).edit().putInt("ignored_focus_uid", ignore ? uid : -1).apply();
     }
 
     public boolean isMultiSoundOn() {
