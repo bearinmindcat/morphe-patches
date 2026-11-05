@@ -2,7 +2,11 @@ package org.ungoogled.patches.waze
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import org.ungoogled.patches.shared.addInstructionsAtLabel
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 
 /** org.ungoogled.waze.ZoneBar, the runtime half (extensions/waze). */
@@ -42,16 +46,31 @@ private object SegmentInsightUpdatedFingerprint : Fingerprint(
     parameters = listOf("Lcom/waze/jni/protos/insights_infra/SegmentInsightUpdate;"),
 )
 
-/** The speedometer taking its state (speed, units, the road's limit); its "Not shown." log is unique to it. */
-private object SpeedometerStateFingerprint : Fingerprint(
+/**
+ * The speedometer's state (speed, units, the road's limit), a data class whose toString() names its fields. Waze makes
+ * one for every change, for the phone's speedometer and the car screen's alike.
+ */
+private object SpeedometerStateToStringFingerprint : Fingerprint(
+    name = "toString",
+    returnType = "Ljava/lang/String;",
+    parameters = listOf(),
+    strings = listOf("State(speed=", ", maxSpeedRoad="),
+)
+
+/**
+ * Android Auto: the class that turns the car screen's bottom pill (current street, traffic, Waze's own zone countdown)
+ * into the one picture Waze draws on the car's map; its constructor names its four picture makers.
+ */
+private object CarPillBitmapsFingerprint : Fingerprint(
+    name = "<init>",
     returnType = "V",
-    strings = listOf("SpeedometerView: Not shown. (speed == "),
+    strings = listOf("averageSpeedCamBitmapGenerator", "insightBitmapGenerator"),
 )
 
 @Suppress("unused")
 val wazeZoneBarPatch = bytecodePatch(
     name = "Average speed zone bar",
-    description = "Bar with progress and your average speed in an average speed zone. Off until switched on.",
+    description = "Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeCustomizationPatch)
@@ -60,8 +79,39 @@ val wazeZoneBarPatch = bytecodePatch(
         AverageSpeedZoneUpdateFingerprint.method.addInstruction(0, "invoke-static/range { p1 .. p1 }, $ZONE_BAR->legacy(Ljava/lang/Object;)V")
         AverageSpeedZoneClearFingerprint.method.addInstruction(0, "invoke-static {}, $ZONE_BAR->legacyClear()V")
         SegmentInsightUpdatedFingerprint.method.addInstruction(0, "invoke-static/range { p1 .. p1 }, $ZONE_BAR->insights(Ljava/lang/Object;)V")
-        SpeedometerStateFingerprint.method.addInstruction(0, "invoke-static/range { p1 .. p1 }, $ZONE_BAR->speedometer(Ljava/lang/Object;)V")
         WazeApplicationCreateFingerprint.method.addInstruction(0, "invoke-static { p0 }, $ZONE_BAR->init(Landroid/app/Application;)V")
+
+        // The limit: each speedometer state as it is made (every constructor, at its end).
+        val state = mutableClassDefBy(SpeedometerStateToStringFingerprint.originalClassDef.type)
+        val constructors = state.methods.filter { it.name == "<init>" }.ifEmpty { throw PatchException("${state.type} has no constructor") }
+        for (constructor in constructors) {
+            val code = constructor.implementation!!.instructions
+            val returns = code.indices.filter { code[it].opcode == Opcode.RETURN_VOID }.ifEmpty { throw PatchException("${state.type} constructor without return") }
+            for (at in returns.reversed()) constructor.addInstructionsAtLabel(at, "invoke-static/range { p0 .. p0 }, $ZONE_BAR->speedometer(Ljava/lang/Object;)V")
+        }
+
+        // Android Auto (issue #99): the car pill's picture method -- Context, night, pill -- returning a holder of one
+        // Bitmap. Its arguments are kept as it starts; whatever it returns goes through ZoneBar.carPill on its way out.
+        val pills = mutableClassDefBy(CarPillBitmapsFingerprint.originalClassDef.type)
+        val picture = pills.methods.singleOrNull { m ->
+            m.parameterTypes.size == 3 && m.parameterTypes[0].toString() == "Landroid/content/Context;" &&
+                m.parameterTypes[1].toString() == "Z" && m.returnType.startsWith("L")
+        } ?: throw PatchException("the car pill's picture method not found in ${pills.type}")
+        val code = picture.implementation!!.instructions
+        val returns = code.indices.filter { code[it].opcode == Opcode.RETURN_OBJECT }.ifEmpty { throw PatchException("the car pill's picture method never returns") }
+        for (at in returns.reversed()) {
+            val register = (code[at] as OneRegisterInstruction).registerA
+            picture.addInstructionsAtLabel(
+                at,
+                """
+                    invoke-static/range { v$register .. v$register }, $ZONE_BAR->carPill(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$register
+                    check-cast v$register, ${picture.returnType}
+                """,
+            )
+        }
+        picture.addInstructionsAtLabel(0, "invoke-static/range { p1 .. p2 }, $ZONE_BAR->carPillStart(Ljava/lang/Object;Z)V")
+
         declareWazeToggle("zoneBar")
         // Belgium's rule: 6 km/h up to 100 km/h, 6% above it.
         declareWazeValue("zoneBar", "ZONE_TOLERANCE_PERCENT", 6)
