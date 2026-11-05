@@ -52,7 +52,7 @@ VENDOR_GROUPS = [
     ("LG Apps", "lg ", ("com.lge.",), ()),
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
-     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ()),
+     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ("com.android.launcher",)),
 ]
 
 
@@ -301,6 +301,11 @@ APP_RENAMES = {
     "com.oneplus.soundrecorder": (
         '<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder',
         '<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder',
+    ),
+    # OnePlus System Launcher (ColorOS / OxygenOS 16 home screen, coloros-launcher)
+    "com.android.launcher": (
+        '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',
+        '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',
     ),
 }
 

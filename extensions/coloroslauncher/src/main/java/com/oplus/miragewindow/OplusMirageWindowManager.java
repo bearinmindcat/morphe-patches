@@ -1,0 +1,13 @@
+package com.oplus.miragewindow;
+
+/** Generated stand-in (.github/scripts/coloros-launcher): names and signatures OnePlus System Launcher uses, answering "absent" off ColorOS and on Android versions without them (no OPPO or Google code). */
+public class OplusMirageWindowManager {
+    public OplusMirageWindowManager() {
+    }
+    public static com.oplus.miragewindow.OplusMirageWindowManager getInstance() {
+        return new com.oplus.miragewindow.OplusMirageWindowManager();
+    }
+    public boolean isMirageWindowShow() {
+        return false;
+    }
+}
