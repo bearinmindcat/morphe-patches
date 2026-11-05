@@ -54,12 +54,16 @@ public final class Toggles {
         } catch (SecurityException e) {
             // Unknown: ask anyway.
         }
+        // Needs MODIFY_PHONE_STATE, which only system apps hold. TelephonyManager swallows the refusal (it only logs
+        // it), so read the state back instead of waiting for an exception.
+        boolean now = !on;
         try {
             phone.setDataEnabled(on);
-            return;
+            now = phone.isDataEnabled();
         } catch (SecurityException e) {
-            // Needs MODIFY_PHONE_STATE, which only system apps hold.
+            // Refused.
         }
+        if (now == on) return;
         Context c = EngineHost.app;
         if (c != null) {
             ask(c, Settings.Panel.ACTION_INTERNET_CONNECTIVITY, DATA, on ? "Turn on mobile data" : "Turn off mobile data",
