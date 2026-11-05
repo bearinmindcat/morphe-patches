@@ -1,3 +1,36 @@
+## [2.8.7](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.6...v2.8.7) (2026-11-05)
+
+### 🐛 Bug Fixes
+
+* add experimental xiaomi cloud sync to xiaomi notes ([02eb2fa](https://github.com/bearinmindcat/morphe-patches/commit/02eb2fa37bbdaa25b85741332aa533c3b94145fe))
+* add honor home non-magicos support ([a0c01c9](https://github.com/bearinmindcat/morphe-patches/commit/a0c01c9e92788817f9a0163162b657c43add6197))
+* add import from miui backup to xiaomi notes ([3e96342](https://github.com/bearinmindcat/morphe-patches/commit/3e96342e22a3308c031ab620041f1d120b820cf2))
+* add import from xiaomi cloud to xiaomi notes ([268b627](https://github.com/bearinmindcat/morphe-patches/commit/268b627ca3f739227432fd092df27a91e7210b38))
+* add nothing launcher non-nothing os support ([8eb5a5a](https://github.com/bearinmindcat/morphe-patches/commit/8eb5a5a542c907bb88fd833b765d22d9119da0c3))
+* add oneplus launcher non-coloros support ([7b1afcb](https://github.com/bearinmindcat/morphe-patches/commit/7b1afcbfb222c007c2cd4a36c6e4cf536b87bf81))
+* add oneplus launcher non-oxygenos support ([55831f7](https://github.com/bearinmindcat/morphe-patches/commit/55831f7437d5ca0f5d821b0f61cfdb7c915c2dff))
+* add samsung one ui home non-one ui support ([de805e1](https://github.com/bearinmindcat/morphe-patches/commit/de805e1b8c59b053120bd6d6d2430086e6684982))
+* any media app shows tidal and pocket casts and controls what's playing; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([c55a03a](https://github.com/bearinmindcat/morphe-patches/commit/c55a03a55b142664eff43adc645de9b4f9aff4d1))
+* average speed zone bar position option; issue [#91](https://github.com/bearinmindcat/morphe-patches/issues/91) ([6d014f9](https://github.com/bearinmindcat/morphe-patches/commit/6d014f9ebf33e1b708d34db8f82b26ba072a7e78))
+* average speed zone bar shows in android auto; issue [#99](https://github.com/bearinmindcat/morphe-patches/issues/99) ([c0d67d6](https://github.com/bearinmindcat/morphe-patches/commit/c0d67d63056ad558899b51b33ffb62e511593443))
+* follow playing media is on by default and asks once for notification access; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([029d26c](https://github.com/bearinmindcat/morphe-patches/commit/029d26c212a2bd865fc82adaa0d0f00ab8df0c42))
+* more reliable map loading without google services; issue [#69](https://github.com/bearinmindcat/morphe-patches/issues/69) ([9f47b1a](https://github.com/bearinmindcat/morphe-patches/commit/9f47b1a5f6ff55b3a84ce485d59f77b55b7b2cfb))
+* oneplus my files starts on realme and oppo phones; issue [#113](https://github.com/bearinmindcat/morphe-patches/issues/113) ([9706a07](https://github.com/bearinmindcat/morphe-patches/commit/9706a077873e1cc482ee2ddbe73642bf715b5fa5))
+* samsung calendar supports 12.5.06.5; issue [#92](https://github.com/bearinmindcat/morphe-patches/issues/92) ([6ba77c8](https://github.com/bearinmindcat/morphe-patches/commit/6ba77c8f275afc7bf8de61975b3a82e8742b4f22))
+* samsung clock opens on phones in dark mode; issue [#118](https://github.com/bearinmindcat/morphe-patches/issues/118) ([e424e6b](https://github.com/bearinmindcat/morphe-patches/commit/e424e6be0b0950f1e1131267bd9fd18ece02b10e))
+* samsung contacts and phone open in dark mode ([a524e24](https://github.com/bearinmindcat/morphe-patches/commit/a524e24a1a33d056ec06f01de5e8a8ef57d402b8))
+* samsung gallery selfies no longer flash mirrored; issue [#104](https://github.com/bearinmindcat/morphe-patches/issues/104) ([86bd081](https://github.com/bearinmindcat/morphe-patches/commit/86bd08199f7c59d36d87346e399fe8bb0a78b3aa))
+* samsung gallery tags save and are found by search; issue [#119](https://github.com/bearinmindcat/morphe-patches/issues/119) ([5e05bd9](https://github.com/bearinmindcat/morphe-patches/commit/5e05bd92feeab865eb9f6d28076639361011f880))
+* samsung health sharing opens on non-samsung phones (experimental); issue [#95](https://github.com/bearinmindcat/morphe-patches/issues/95) ([edde12a](https://github.com/bearinmindcat/morphe-patches/commit/edde12a037ff0a3d72338934abe43ec4e6f14be0))
+* samsung keyboard supports 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95 and 5.9.30.90; issue [#102](https://github.com/bearinmindcat/morphe-patches/issues/102) ([b8af139](https://github.com/bearinmindcat/morphe-patches/commit/b8af139aefb81b4d15e5f8b3d03c88354057838b))
+* samsung keyboard's disable telemetry works on every build of a version; issue [#98](https://github.com/bearinmindcat/morphe-patches/issues/98) ([d7fd18b](https://github.com/bearinmindcat/morphe-patches/commit/d7fd18b3a3ab1219df1ca20afd90df227a6d9d2c))
+* samsung modes and routines asks for mobile data changes android refuses ([ba46983](https://github.com/bearinmindcat/morphe-patches/commit/ba46983e5e8698dd3ea11dc0c9cabcc0b47c6a34))
+* samsung modes and routines wi-fi and mobile data routines work off one ui ([29eba0f](https://github.com/bearinmindcat/morphe-patches/commit/29eba0fb5e4a6f911aa5f5728565dacbdbb16829))
+* samsung notes no longer stops after saving a note or recording voice; issue [#116](https://github.com/bearinmindcat/morphe-patches/issues/116) ([e6ff5dd](https://github.com/bearinmindcat/morphe-patches/commit/e6ff5dd9e5207f2abc35ccc84a1151ee0bf6010f))
+* sound assistant hides settings that only work on one ui ([200cda9](https://github.com/bearinmindcat/morphe-patches/commit/200cda9c2bbe1e80073f0b45d09270c4ef79a774))
+* waze patches support 5.26.90.901; issue [#105](https://github.com/bearinmindcat/morphe-patches/issues/105) ([dc39976](https://github.com/bearinmindcat/morphe-patches/commit/dc3997692dfa63471cc810489cd8b587e991333e))
+* waze patches support 5.27.0.1 and 5.26.5.0; issue [#105](https://github.com/bearinmindcat/morphe-patches/issues/105) ([b67c9ee](https://github.com/bearinmindcat/morphe-patches/commit/b67c9ee7595e9c2d6f8ac1c1efcc5ac538885321))
+
 ## [2.8.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.5...v2.8.6) (2026-11-05)
 
 ### 🐛 Bug Fixes

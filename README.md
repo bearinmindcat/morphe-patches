@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.6](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;126 patches total
+> **[v2.8.7](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.7)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;134 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
 <br>
@@ -45,7 +45,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy. | • Package name |
 | [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet, with switches for the patches here that can be turned back off inside the app. |  |
 | [Flock cameras](#flock-cameras) | Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the ones near you from an OpenStreetMap server, over the same area as the speed cameras. |  |
-| [Follow playing media](#follow-playing-media) | Navigation's media controls show what an app is playing, also apps that refuse Maps such as Pocket Casts and TIDAL. Needs notification access (Customization), not on root mount installs. |  |
+| [Follow playing media](#follow-playing-media) | Navigation's media controls show what any app is playing (needs notification access). |  |
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG-RE support, microG's C sits in the pin's circle. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG-RE's or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
@@ -87,13 +87,13 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;24 patches</summary>
 <br>
 
-**Supported version(s):** 5.24.5.0
+**Supported version(s):** 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Speed cameras on streets<br>• Speed cameras on highways<br>• Speed cameras on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
 | [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
-| [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone. Off until switched on. |  |
+| [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on. | • Position |
 | [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
 | [Bigger speedometer](#bigger-speedometer) | Bigger speedometer and speed limit digits. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |
 | [Change app name](#change-app-name) | Renames Waze. | • App name |
@@ -130,7 +130,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;19 apps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;20 apps&nbsp;&nbsp;•&nbsp;&nbsp;31 patches</summary>
 <br>
 <blockquote>
 
@@ -150,7 +150,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.8.01.0
+**Supported version(s):** 12.8.01.0, 12.5.06.5
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -198,6 +198,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
+<summary><img src="docs/icons/samsung-health.png" width="20" height="20" align="top"> Samsung Health&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-health.png" width="20" height="20" align="top"> Samsung Health&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 7.1.3.001, 7.00.6.011
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Health sharing on non-Samsung phones](#health-sharing-on-non-samsung-phones) | Lets Health data sharing open on non-Samsung phones (experimental, untested with real accounts). |  |
+
+</details>
+
+<details>
 <summary><img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
@@ -213,7 +225,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
 
-**Supported version(s):** 5.9.40.75
+**Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -377,7 +389,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Xiaomi Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary>📱 Xiaomi Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
 <br>
 <blockquote>
 
@@ -430,7 +442,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xiaomi-notes.png" width="20" height="20" align="top"> Xiaomi Notes&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **Supported version(s):** 3.2.7.9
@@ -438,6 +450,8 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes Xiaomi Notes installable and usable on non-Xiaomi ROMs. |  |
+| [Import MIUI backup](#import-miui-backup) | Adds Import MIUI backup to Settings, for notes from a Xiaomi phone's local backup. |  |
+| [Import from Xiaomi Cloud](#import-from-xiaomi-cloud) | Copies your notes from Xiaomi Cloud (i.mi.com) into the app. |  |
 
 </details>
 
@@ -802,6 +816,74 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Weather installable and usable on non-ColorOS ROMs. |  |
+
+</details>
+
+</blockquote>
+</details>
+
+<details>
+<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;5 apps&nbsp;&nbsp;•&nbsp;&nbsp;5 patches</summary>
+<br>
+<blockquote>
+
+<details>
+<summary><img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.0.210
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Home usable as a home screen on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.0.20
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Launcher usable as a home screen on non-Nothing OS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.0.07.59
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes One UI Home usable as a home screen on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 5.2.66
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-OxygenOS ROM support](#enable-non-oxygenos-rom-support) | Makes the old OxygenOS 11 OnePlus Launcher usable as a home screen on non-OxygenOS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.4.30
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus System Launcher usable as a home screen on non-ColorOS ROMs. |  |
 
 </details>
 
