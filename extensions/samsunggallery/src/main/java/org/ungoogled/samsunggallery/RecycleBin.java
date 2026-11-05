@@ -26,6 +26,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -236,6 +237,8 @@ public final class RecycleBin implements InvocationHandler {
         String[] projection = {"_id", "_data", "_display_name", "media_type", "width", "height", "orientation",
                 "date_expires", "mime_type", "_size", "datetaken", "duration", "volume_name"};
         Set<Long> present = new HashSet<>();
+        // A mirrored photo (EXIF orientation 2, 4, 5, 7) shows mirrored in the bin too.
+        Map<Long, Integer> mirrored = MediaMirror.mirroredPhotos();
         table.beginTransaction();
         try (Cursor c = context.getContentResolver().query(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL), projection, args, null)) {
             table.execSQL("DELETE FROM trash");
@@ -259,7 +262,8 @@ public final class RecycleBin implements InvocationHandler {
                 v.put("__height", c.getInt(5));
                 // A video's preview frame comes out of MediaMetadataRetriever already turned upright.
                 v.put("__orientation", video ? 0 : c.getInt(6));
-                v.put("__orientationTag", 0);
+                Integer tag = video ? null : mirrored.get(id);
+                v.put("__orientationTag", tag == null ? 0 : tag);
                 v.put("__originPath", parent == null ? name : new File(parent, name).getPath());
                 v.put("__originTitle", name);
                 v.put("__deleteTime", expires - KEEP_DAYS * DAY);

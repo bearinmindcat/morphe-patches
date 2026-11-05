@@ -129,6 +129,7 @@ public final class MediaMirror extends ContentProvider {
         d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".usertag (_id INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "sec_media_id INTEGER, tag TEXT, server_id TEXT, _data TEXT, UNIQUE (sec_media_id, tag) ON CONFLICT IGNORE)");
         d.execSQL("CREATE INDEX IF NOT EXISTS " + SAVED + ".usertag_media ON usertag (sec_media_id)");
+        ExifOrientation.createTable(d, SAVED);
         // One UI's view puts every kind of tag together; tag_type 0 = the user's own. Gallery orders by its rowid.
         d.execSQL("CREATE TEMP VIEW IF NOT EXISTS tag_view AS SELECT _id AS rowid, _id, sec_media_id, tag AS tag_data, "
                 + "0 AS tag_type FROM " + SAVED + ".usertag");
@@ -142,6 +143,26 @@ public final class MediaMirror extends ContentProvider {
         attachSaved(db());
         Log.i(TAG, "mirror: saved tables attached again");
         return true;
+    }
+
+    /** Photos read as mirrored (id to EXIF orientation value), for photos that are not in the copy (in the trash). */
+    static Map<Long, Integer> mirroredPhotos() {
+        MediaMirror mirror = instance;
+        Map<Long, Integer> mirrored = new HashMap<>();
+        if (mirror == null) return mirrored;
+        synchronized (mirror) {
+            try (Cursor c = mirror.db().rawQuery("SELECT _id, tag FROM " + SAVED + ".exif_orientation WHERE tag IN (2, 4, 5, 7)", null)) {
+                while (c.moveToNext()) mirrored.put(c.getLong(0), c.getInt(1));
+            } catch (SQLiteException e) {
+                Log.w(TAG, "mirror: " + e.getMessage());
+            }
+        }
+        return mirrored;
+    }
+
+    /** The copy's database, for work that runs outside a query (lock the provider around its use). */
+    synchronized SQLiteDatabase database() {
+        return db();
     }
 
     /** Copies MediaStore's photos and videos when its contents changed since the last copy. */
@@ -181,6 +202,10 @@ public final class MediaMirror extends ContentProvider {
                     rows++;
                 }
                 fillSamsungColumns(d);
+                if (!columns(d, "files").contains("orientation_tag")) {
+                    d.execSQL("ALTER TABLE files ADD COLUMN orientation_tag NUMERIC");
+                }
+                ExifOrientation.fill(this, d, SAVED);
                 // Gallery decides whether its lists changed from a stamp that includes One UI's
                 // local_metadata.generation_modified; without the table the whole stamp was NULL, always "the same",
                 // and lists did not refresh after a delete or a new photo.

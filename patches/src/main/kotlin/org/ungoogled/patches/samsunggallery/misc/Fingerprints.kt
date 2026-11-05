@@ -27,3 +27,14 @@ internal object SupportTrashFeatureFingerprint : Fingerprint(
     filters = listOf(string("SUPPORT_TRASH")),
     custom = { _, classDef -> classDef.superclass == "Lcom/samsung/android/gallery/support/utils/Features;" },
 )
+
+/**
+ * The SUPPORT_SEC_MP_ORIENTATION_TAG constant of Gallery's Features: whether Samsung's media provider gives each photo's
+ * EXIF orientation value, which Gallery needs to show mirrored photos mirrored. On only with Samsung's provider.
+ */
+internal object OrientationTagFeatureFingerprint : Fingerprint(
+    name = "<init>",
+    parameters = listOf(),
+    filters = listOf(string("SUPPORT_SEC_MP_ORIENTATION_TAG")),
+    custom = { _, classDef -> classDef.superclass == "Lcom/samsung/android/gallery/support/utils/Features;" },
+)

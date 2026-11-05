@@ -89,6 +89,19 @@ val enableNonOneUiPatch = bytecodePatch(
             ) ?: throw PatchException("no $name in Gallery's generic-device URI table")
         }
 
+        // Mirrored photos (selfies saved as previewed: EXIF orientation 2, 4, 5 or 7) showed unmirrored: Gallery mirrors
+        // only by One UI's orientation_tag column, which it reads only with Samsung's media provider. The media copy
+        // now has that column, read from the photos.
+        mutableClassDefBy(OrientationTagFeatureFingerprint.classDef.type).methods.firstOrNull {
+            it.name == "getEnabling" && it.parameterTypes.isEmpty() && it.returnType == "Z"
+        }?.addInstructions(
+            0,
+            """
+                const/4 v0, 0x1
+                return v0
+            """,
+        ) ?: throw PatchException("Gallery's SUPPORT_SEC_MP_ORIENTATION_TAG feature has no getEnabling()")
+
         // Gallery also queries MediaStore itself with Samsung's columns (media_id, cloud hashes ...), which Google's
         // MediaStore refuses with an exception Gallery does not catch: the viewer crashed whenever the media changed
         // under it (finding its photo again asks for "media_id="). Every query goes through MediaQueries, which puts
