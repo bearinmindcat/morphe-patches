@@ -57,7 +57,7 @@ public final class CustomizationActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         if (proxySub != null) proxySub.setText(proxySummary());
-        if (playingMediaSub != null) playingMediaSub.setText(playingMediaSummary(true));
+        if (playingMediaSub != null) playingMediaSub.setText(playingMediaSummary(Screens.declared(this, MediaListener.class)));
     }
 
     private int bg() { return black ? 0xFF000000 : dark ? BG_D : BG; }
@@ -309,7 +309,7 @@ public final class CustomizationActivity extends Activity {
             boolean declared = Screens.declared(this, MediaListener.class);
             LinearLayout mediaRow = rowBase("Follow playing media", playingMediaSummary(declared));
             playingMediaSub = (TextView) ((LinearLayout) mediaRow.getChildAt(0)).getChildAt(1);
-            if (declared) mediaRow.setOnClickListener(v -> openNotificationAccess());
+            if (declared) mediaRow.setOnClickListener(v -> PlayingMedia.openAccess(this));
             body.addView(mediaRow);
         }
     }
@@ -604,16 +604,6 @@ public final class CustomizationActivity extends Activity {
     private String playingMediaSummary(boolean declared) {
         if (!declared) return "Not on a root mount install";
         return PlayingMedia.allowed(this) ? "On" : "Needs notification access";
-    }
-
-    private void openNotificationAccess() {
-        android.content.ComponentName listener = new android.content.ComponentName(this, MediaListener.class);
-        try {
-            startActivity(new android.content.Intent("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS")
-                    .putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", listener.flattenToString()));
-        } catch (Throwable t) {
-            startActivity(new android.content.Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
-        }
     }
 
     private LinearLayout rowBase(String label, String sub) {

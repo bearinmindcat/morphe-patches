@@ -10,7 +10,10 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -22,6 +25,11 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
 
 private const val PLAYING_MEDIA = "Lorg/ungoogled/ui/PlayingMedia;"
+// string/EXPAND_ and MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION: the media button's two labels.
+private const val EXPAND_MEDIA_CONTROLS = 0x7f140c75
+private const val MINIMIZE_MEDIA_CONTROLS = 0x7f14136e
+// string/DEFAULT_MEDIA_APP_DIALOG_TITLE: the Default media app list (also shown by Show media playback controls).
+private const val DEFAULT_MEDIA_APP_TITLE = 0x7f140981
 private const val COMPAT_TOKEN = "Landroid/support/v4/media/session/MediaSessionCompat\$Token;"
 
 /**
@@ -55,9 +63,8 @@ private val mediaListenerManifestPatch = resourcePatch(description = "Declares t
 @Suppress("unused")
 val followPlayingMediaPatch = bytecodePatch(
     name = "Follow playing media",
-    description = "Navigation's media controls show what an app is playing, also apps that refuse Maps such as " +
-        "Pocket Casts and TIDAL. Needs notification access (Customization), not on root mount installs.",
-    default = false,
+    description = "Navigation's media controls show what any app is playing (needs notification access).",
+    default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     dependsOn(sharedExtensionPatch, mediaListenerManifestPatch)
@@ -268,5 +275,59 @@ val followPlayingMediaPatch = bytecodePatch(
         }
         answer("connectMethod", panelConnect.name)
         answer("disconnectMethod", panelDisconnect.name)
+
+        // 6. Notification access has no runtime prompt: ask once, where it matters -- when the media panel opens
+        //    (its button's click, right after it toggles the panel) and when the Default media app list opens (the
+        //    dialog, as it is handed back to be shown).
+        fun Method.hasLiteral(id: Int) = implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == id.toLong() } == true
+        val buttons = mutableListOf<String>()
+        val lists = mutableListOf<Method>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            if (c.methods.any { it.hasLiteral(EXPAND_MEDIA_CONTROLS) } && c.methods.any { it.hasLiteral(MINIMIZE_MEDIA_CONTROLS) }) buttons += c.type
+            c.methods.filterTo(lists) { it.returnType.startsWith("L") && it.hasLiteral(DEFAULT_MEDIA_APP_TITLE) }
+        }
+        val button = classDefBy(buttons.singleOrNull() ?: throw PatchException("media button: found ${buttons.size}"))
+        val relabel = button.methods.singleOrNull { it.name != "<init>" && it.hasLiteral(MINIMIZE_MEDIA_CONTROLS) }
+            ?: throw PatchException("media button's relabelling method not found")
+        val context = button.fields.singleOrNull { it.type == "Landroid/content/Context;" && !AccessFlags.STATIC.isSet(it.accessFlags) }
+            ?: throw PatchException("media button keeps no Context")
+        fun Method.relabelAt() = implementation?.instructions?.indexOfFirst {
+            ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                r.definingClass == button.type && r.name == relabel.name && r.parameterTypes.isEmpty()
+            } == true
+        } ?: -1
+        val click = mutable(
+            button.methods.singleOrNull { m ->
+                !AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes.size == 1 && m.returnType != "V" && m.relabelAt() >= 0
+            } ?: throw PatchException("media button's click not found"),
+        )
+        val clickIns = click.refs()
+        val toggled = click.relabelAt()
+        // The register the toggled state went through is free once the panel has been relabelled.
+        val toggle = clickIns.getOrNull(toggled - 1)
+        if (toggle?.opcode != Opcode.IPUT_BOOLEAN) throw PatchException("media button's click no longer toggles the panel right before relabelling")
+        val free = (toggle as TwoRegisterInstruction).registerA
+        if (free > 15) throw PatchException("media button's toggle in v$free, out of invoke range")
+        if (clickIns.drop(toggled + 1).any { it.opcode !in setOf(Opcode.SGET_OBJECT, Opcode.RETURN_OBJECT) }) {
+            throw PatchException("media button's click does more after relabelling")
+        }
+        click.addInstructions(
+            toggled + 1,
+            """
+                iget-object v$free, p0, $context
+                invoke-static { v$free }, $PLAYING_MEDIA->askAccess(Ljava/lang/Object;)V
+            """,
+        )
+
+        val list = mutable(lists.singleOrNull() ?: throw PatchException("Default media app list: found ${lists.size}"))
+        val returned = list.refs().withIndex().filter { it.value.opcode == Opcode.RETURN_OBJECT }
+        val dialog = returned.singleOrNull() ?: throw PatchException("Default media app list returns its dialog ${returned.size} times")
+        val dialogReg = (dialog.value as OneRegisterInstruction).registerA
+        if (dialogReg > 15) throw PatchException("Default media app dialog in v$dialogReg, out of invoke range")
+        list.addInstructions(
+            dialog.index,
+            "invoke-static { v$dialogReg }, $PLAYING_MEDIA->askAccess(Ljava/lang/Object;)V",
+        )
     }
 }

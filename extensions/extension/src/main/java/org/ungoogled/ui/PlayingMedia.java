@@ -1,8 +1,14 @@
 package org.ungoogled.ui;
 
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.ContextWrapper;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.browse.MediaBrowser;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
@@ -56,6 +62,84 @@ public final class PlayingMedia {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    private static final String KEY_ASKED = "media_access_asked";
+    private static boolean asking;
+
+    /**
+     * Navigation's media panel opening (with its button's Context) or the Default media app list (with its dialog):
+     * once, while notification access is missing, ask for it. Android has no runtime prompt for it, only its own
+     * settings page; "Not now" never asks again, Customization's row still leads there. A root mount install has no
+     * listener to give it to, so it is never asked there.
+     */
+    public static void askAccess(Object from) {
+        try {
+            Dialog over = from instanceof Dialog ? (Dialog) from : null;
+            Activity a = activityOf(over != null ? over.getContext() : (Context) from);
+            if (a == null || asking || allowed(a) || !Screens.declared(a, MediaListener.class)) return;
+            SharedPreferences prefs = a.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE);
+            if (prefs.getBoolean(KEY_ASKED, false)) return;
+            asking = true;
+            MAIN.postDelayed(() -> ask(a, over, prefs, 0), 300);
+        } catch (Throwable t) {
+            asking = false;
+            android.util.Log.w("UA", "media access", t);
+        }
+    }
+
+    /** Over Maps' own dialog, once that shows (it is shown right after it is made). */
+    private static void ask(Activity a, Dialog over, SharedPreferences prefs, int tries) {
+        try {
+            if (a.isFinishing() || a.isDestroyed() || (over != null && !over.isShowing() && tries >= 10)) {
+                asking = false;
+                return;
+            }
+            if (over != null && !over.isShowing()) {
+                MAIN.postDelayed(() -> ask(a, over, prefs, tries + 1), 200);
+                return;
+            }
+            AlertDialog d = new AlertDialog.Builder(a)
+                    .setMessage("Allow notification access so the media panel can show what any app is playing")
+                    .setPositiveButton("Allow", (x, w) -> {
+                        prefs.edit().putBoolean(KEY_ASKED, true).apply();
+                        openAccess(a);
+                    })
+                    .setNegativeButton("Not now", (x, w) -> prefs.edit().putBoolean(KEY_ASKED, true).apply())
+                    .setOnCancelListener(x -> prefs.edit().putBoolean(KEY_ASKED, true).apply())
+                    .setOnDismissListener(x -> asking = false)
+                    .create();
+            d.setCanceledOnTouchOutside(false);
+            d.show();
+            android.util.Log.i("UA", "media: asked for notification access");
+        } catch (Throwable t) {
+            asking = false;
+            android.util.Log.w("UA", "media access", t);
+        }
+    }
+
+    /** Android's notification access page for Maps' listener, else the page listing every app's. */
+    static void openAccess(Context c) {
+        ComponentName listener = new ComponentName(c, MediaListener.class);
+        int flags = c instanceof Activity ? 0 : Intent.FLAG_ACTIVITY_NEW_TASK;
+        try {
+            c.startActivity(new Intent("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS")
+                    .putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", listener.flattenToString())
+                    .addFlags(flags));
+        } catch (Throwable t) {
+            try {
+                c.startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").addFlags(flags));
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static Activity activityOf(Context c) {
+        while (c instanceof ContextWrapper) {
+            if (c instanceof Activity) return (Activity) c;
+            c = ((ContextWrapper) c).getBaseContext();
+        }
+        return null;
     }
 
     /** Called when Maps has an app's session from its media browser: the app's playing session, when that is another. */
