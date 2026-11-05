@@ -13,10 +13,14 @@ import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 
+import org.ungoogled.samsunggallery.search.SearchByContent;
+import org.ungoogled.samsunggallery.search.SearchIndex;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,8 +29,8 @@ import java.util.regex.Pattern;
  * stories, people, places ...); Google's does not. Gallery's queries are answered here instead, from a copy of
  * the phone's photos and videos in Samsung's shape: the files table, refreshed from MediaStore whenever it
  * changes. A table or column the copy does not know yet is added empty, so features built on Samsung's
- * analysis (stories, people, places) find nothing rather than failing. What the user adds (tags) is kept in a
- * database of its own that the copy attaches.
+ * analysis (stories, people, places) find nothing rather than failing. What the user adds (tags) and what Search by
+ * content finds in the photos are kept in a database of their own that the copy attaches.
  */
 public final class MediaMirror extends ContentProvider {
     private static final String TAG = "UA";
@@ -93,6 +97,17 @@ public final class MediaMirror extends ContentProvider {
         authority = getContext().getPackageName() + ".mediamirror";
         // Providers start with the app's process, before any of its screens.
         ActivityState.track(getContext());
+        SearchByContent.start(getContext());
+        return true;
+    }
+
+    /** Runs work on the copy's database (the saved tables are "saved.") with the provider locked; false without one. */
+    public static boolean withDatabase(Consumer<SQLiteDatabase> work) {
+        MediaMirror mirror = instance;
+        if (mirror == null) return false;
+        synchronized (mirror) {
+            work.accept(mirror.db());
+        }
         return true;
     }
 
@@ -114,7 +129,8 @@ public final class MediaMirror extends ContentProvider {
     /**
      * What the user adds to Gallery lives in a database of its own, attached to the copy (which is rebuilt from
      * MediaStore on every start) so that Gallery's statements find it under One UI's names: the user's tags (One UI's
-     * usertag table) and the tag view over them that Gallery searches.
+     * usertag table), what Search by content found (One UI's scene table) and the tag view over both that Gallery
+     * searches.
      */
     private void attachSaved(SQLiteDatabase d) {
         boolean attached = false;
@@ -130,16 +146,18 @@ public final class MediaMirror extends ContentProvider {
                 + "sec_media_id INTEGER, tag TEXT, server_id TEXT, _data TEXT, UNIQUE (sec_media_id, tag) ON CONFLICT IGNORE)");
         d.execSQL("CREATE INDEX IF NOT EXISTS " + SAVED + ".usertag_media ON usertag (sec_media_id)");
         ExifOrientation.createTable(d, SAVED);
-        // One UI's view puts every kind of tag together; tag_type 0 = the user's own. Gallery orders by its rowid.
+        SearchIndex.createTables(d, SAVED);
+        // One UI's view puts every kind of tag together; tag_type 0 = the user's own, 4 and 5 what the photo shows.
+        // Gallery orders by its rowid.
         d.execSQL("CREATE TEMP VIEW IF NOT EXISTS tag_view AS SELECT _id AS rowid, _id, sec_media_id, tag AS tag_data, "
-                + "0 AS tag_type FROM " + SAVED + ".usertag");
+                + "0 AS tag_type FROM " + SAVED + ".usertag UNION ALL " + SearchIndex.tagViewPart(SAVED));
     }
 
     /** The saved tables are gone from the connection (SQLite reopened it): attach them again. */
     private synchronized boolean reattach(SQLiteException e) {
         String msg = String.valueOf(e.getMessage());
         if (!msg.contains("no such table: usertag") && !msg.contains("no such table: tag_view")
-                && !msg.contains("no such table: " + SAVED + ".")) return false;
+                && !msg.contains("no such table: scene") && !msg.contains("no such table: " + SAVED + ".")) return false;
         attachSaved(db());
         Log.i(TAG, "mirror: saved tables attached again");
         return true;
@@ -329,6 +347,11 @@ public final class MediaMirror extends ContentProvider {
         }
         if (!"raw_sql".equals(path) || selection == null) return null;
         selection = INDEX_HINT.matcher(selection).replaceAll(" ");
+        // The search page lists its scene categories (Things/Scenery, Documents).
+        if (selection.contains("JOIN scene AS T") && selection.contains("GROUP BY LOWER(T.scene_name)")) {
+            SearchByContent.categoriesShown();
+        }
+        selection = SearchByContent.query(selection);
         sync();
         for (int attempt = 0; attempt < 40; attempt++) {
             try {

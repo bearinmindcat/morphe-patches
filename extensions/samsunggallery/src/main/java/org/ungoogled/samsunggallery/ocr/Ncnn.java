@@ -2,13 +2,13 @@ package org.ungoogled.samsunggallery.ocr;
 
 import android.graphics.Bitmap;
 
-/** The two PP-OCRv5 networks, run by ncnn in libgalleryocr.so (native/galleryocr.cpp), which the patch adds. */
+/** The two PP-OCRv5 networks, run by ncnn in libgallerynn.so (native/galleryocr.cpp), which the patch adds. */
 final class Ncnn {
     private Ncnn() {
     }
 
     static {
-        System.loadLibrary("galleryocr");
+        System.loadLibrary("gallerynn");
     }
 
     /** Loads both networks; 0 when they did not load. threads <= 0: one per big core. */

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds libgalleryocr.so (galleryocr.cpp + the ncnn release, statically) for Samsung Gallery's "Extract text" and
-# puts it where the patch picks it up: patches/src/main/resources/samsunggallery/lib/<abi>/.
+# Builds libgallerynn.so (gallerynn.cpp + galleryocr.cpp + gallerysearch.cpp + the ncnn release, statically) for Samsung Gallery's
+# "Extract text" and "Search by content" and puts it where the patches pick it up:
+# patches/src/main/resources/samsunggallery/lib/<abi>/.
 #
 #   ANDROID_NDK=~/android-sdk/ndk/27.2.12479018 extensions/samsunggallery/native/build.sh [abi ...]
 #
@@ -42,10 +43,10 @@ for abi in "${abis[@]}"; do
     mkdir -p "$out"
     "$toolchain/$target-clang++" -std=c++17 -O2 -fPIC -shared -fno-rtti -fno-exceptions \
         -ffunction-sections -fdata-sections -fvisibility=hidden \
-        -I"$ncnn/include/ncnn" "$here/galleryocr.cpp" -L"$ncnn/lib" -lncnn \
+        -I"$ncnn/include/ncnn" "$here/gallerynn.cpp" "$here/galleryocr.cpp" "$here/gallerysearch.cpp" -L"$ncnn/lib" -lncnn \
         -fopenmp -static-openmp -static-libstdc++ -ljnigraphics -llog -landroid \
         -Wl,--gc-sections -Wl,--exclude-libs,ALL -Wl,-z,max-page-size=16384 -Wl,--build-id=none \
-        -o "$out/libgalleryocr.so"
-    "$toolchain/llvm-strip" --strip-unneeded "$out/libgalleryocr.so"
-    ls -l "$out/libgalleryocr.so"
+        -o "$out/libgallerynn.so"
+    "$toolchain/llvm-strip" --strip-unneeded "$out/libgallerynn.so"
+    ls -l "$out/libgallerynn.so"
 done

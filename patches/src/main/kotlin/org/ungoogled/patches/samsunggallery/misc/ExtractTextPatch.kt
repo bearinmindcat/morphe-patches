@@ -4,11 +4,9 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import org.ungoogled.patches.samsunggallery.SamsungGalleryConstants.COMPATIBILITY_SAMSUNG_GALLERY
-import org.w3c.dom.Element
 
 /** Samsung's OCR SDK, bundled in Gallery with its names kept. */
 private const val RECOGNIZER = "Lcom/samsung/android/sdk/ocr/Recognizer;"
@@ -21,37 +19,6 @@ private const val TEXT_EXTRACTION_RUNE = "Lcom/samsung/android/app/sdk/deepsky/t
 private const val EXTRACT_TEXT = "Lorg/ungoogled/samsunggallery/ocr/ExtractText;"
 /** The selection's haptic feedback, names kept. */
 private const val VIBRATION_HELPER = "Lcom/samsung/android/app/sdk/deepsky/textextraction/selectionui/helper/VibrationHelper;"
-
-private const val ABI = "arm64-v8a"
-private const val LIBRARY = "libgalleryocr.so"
-
-/**
- * The text recognizer's runtime (ncnn and the two networks' glue, extensions/samsunggallery/native) goes into the APK
- * as a native library; Gallery itself is 64-bit ARM only. The models are not in it: they are downloaded on first use.
- * Gallery keeps its libraries uncompressed in the APK (extractNativeLibs false); an added file is compressed, so the
- * libraries are now unpacked at install instead.
- */
-private val nativeLibraryPatch = resourcePatch(
-    description = "Adds the text recognizer's runtime to Samsung Gallery.",
-) {
-    execute {
-        if (listApkEntries("lib/").none { it.startsWith("lib/$ABI/") }) {
-            throw PatchException("Samsung Gallery has no $ABI libraries")
-        }
-        val library = ExtractTextResources::class.java.classLoader.getResourceAsStream("samsunggallery/lib/$ABI/$LIBRARY")
-            ?: throw PatchException("$LIBRARY is missing from the patches")
-        get("lib/$ABI/$LIBRARY").apply {
-            parentFile.mkdirs()
-            outputStream().use { out -> library.use { it.copyTo(out) } }
-        }
-        document("AndroidManifest.xml").use { manifest ->
-            val application = manifest.getElementsByTagName("application").item(0) as Element
-            application.setAttribute("android:extractNativeLibs", "true")
-        }
-    }
-}
-
-private object ExtractTextResources
 
 @Suppress("unused")
 val extractTextPatch = bytecodePatch(
