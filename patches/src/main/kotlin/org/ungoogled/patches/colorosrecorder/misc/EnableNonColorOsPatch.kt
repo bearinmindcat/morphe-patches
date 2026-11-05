@@ -11,6 +11,7 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosrecorder.ColorOsRecorderConstants.COMPATIBILITY_COLOROS_RECORDER
 
 internal const val COLOROS_RECORDER_EXTENSION = "extensions/colorosrecorder.mpe"
@@ -77,5 +78,9 @@ val enableNonColorOsPatch = bytecodePatch(
                 "invoke-static { v${call.registerC}, v${call.registerD} }, $FORMATS->formatRowVisible(Ljava/lang/Object;Z)V",
             )
         }
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        log.info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

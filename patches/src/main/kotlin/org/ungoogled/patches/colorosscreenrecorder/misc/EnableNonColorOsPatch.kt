@@ -20,6 +20,7 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosscreenrecorder.ColorOsScreenRecorderConstants.COMPATIBILITY_COLOROS_SCREEN_RECORDER
 import org.ungoogled.patches.samsung.redirectCalls
 import org.w3c.dom.Element
@@ -387,5 +388,9 @@ val enableNonColorOsPatch = bytecodePatch(
         log.info("registerReceiver calls through ColorOS: $receivers")
         // Measured against 16.5.12: 18 calls.
         if (receivers < 12) throw PatchException("only $receivers registerReceiver calls found")
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        log.info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

@@ -3,6 +3,7 @@ package org.ungoogled.patches.coloroscalculator.misc
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.coloroscalculator.ColorOsCalculatorConstants.COMPATIBILITY_COLOROS_CALCULATOR
 
 internal const val COLOROS_CALCULATOR_EXTENSION = "extensions/coloroscalculator.mpe"
@@ -30,5 +31,9 @@ val enableNonColorOsPatch = bytecodePatch(
         java.util.logging.Logger.getLogger("OnePlusCalculator").info("registerReceiver calls through ColorOS: $receivers")
         // Measured against 17.0.0: 11 calls, 3 without flags (COUI's status-bar receiver, NearX Track, the app's own).
         if (receivers < 11) throw PatchException("only $receivers registerReceiver calls found")
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        java.util.logging.Logger.getLogger("OnePlusCalculator").info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

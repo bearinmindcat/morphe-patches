@@ -14,6 +14,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.w3c.dom.Element
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosclock.ColorOsClockConstants.COMPATIBILITY_COLOROS_CLOCK
 
 internal const val COLOROS_CLOCK_EXTENSION = "extensions/colorosclock.mpe"
@@ -208,5 +209,9 @@ val enableNonColorOsPatch = bytecodePatch(
             .firstOrNull { it.name == "onDestroy" && it.parameterTypes.isEmpty() }
             ?: throw PatchException("TimerKlaxon.onDestroy not found")
         klaxon.addInstructions(0, "invoke-static {p0}, $ALERTS->timerStopped(Landroid/content/Context;)V")
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        log.info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

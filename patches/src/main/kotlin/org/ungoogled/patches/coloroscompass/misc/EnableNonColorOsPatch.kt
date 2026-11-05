@@ -9,6 +9,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.coloroscompass.ColorOsCompassConstants.COMPATIBILITY_COLOROS_COMPASS
 
 internal const val COLOROS_COMPASS_EXTENSION = "extensions/coloroscompass.mpe"
@@ -67,5 +68,9 @@ val enableNonColorOsPatch = bytecodePatch(
         }
         log.info("Permission checks of manifest permissions: $checks")
         if (checks != 1) throw PatchException("expected 1 checkSelfPermission in the permission list, found $checks")
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        log.info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

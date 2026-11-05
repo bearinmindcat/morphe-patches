@@ -9,6 +9,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosnotes.ColorOsNotesConstants.COMPATIBILITY_COLOROS_NOTES
 
 internal const val COLOROS_NOTES_EXTENSION = "extensions/colorosnotes.mpe"
@@ -172,5 +173,9 @@ val enableNonColorOsPatch = bytecodePatch(
                 ExternalLabel("check", getInstruction(0)),
             )
         }
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        log.info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

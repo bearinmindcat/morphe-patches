@@ -101,6 +101,355 @@ public final class ColorOS {
         return (flags & either) == 0 ? flags | android.content.Context.RECEIVER_EXPORTED : flags;
     }
 
+    /*
+     * Another app's service or provider that refuses the app. On an OPPO / OnePlus / realme phone the ColorOS apps it
+     * talks to (phone manager, account, cloud, ...) are installed but refuse an app OPPO didn't sign, with a
+     * SecurityException the app doesn't expect from them; elsewhere they are missing, which it handles. A refusal from
+     * another app's service, or from a provider under OPPO's names, answers as Android answers for a missing one
+     * (patches/.../coloros/ColorOsServices.kt sends the calls here). The app's own components never refuse it.
+     */
+
+    private static final String[] OPPO_NAMES = { "com.coloros.", "com.oplus.", "com.oplusos.", "com.heytap.",
+            "com.nearme.", "com.oppo.", "com.realme.", "com.oneplus.", "com.opos.", "com.color.", "oplus.", "oppo.",
+            "heytap." };
+
+    /** The service is another app's: the refusal reads as "not installed". */
+    private static boolean foreign(android.content.Context context, android.content.Intent intent, SecurityException e) {
+        String target = intent == null ? null : intent.getPackage();
+        if (target == null && intent != null && intent.getComponent() != null) target = intent.getComponent().getPackageName();
+        if (target == null || target.equals(context.getPackageName())) return false;
+        android.util.Log.w("ColorOS", "refused, treated as missing: " + intent + ": " + e.getMessage());
+        return true;
+    }
+
+    /** The provider has one of OPPO's names: the refusal reads as "no such provider". */
+    private static boolean oppo(String authority, SecurityException e) {
+        if (authority == null) return false;
+        for (String name : OPPO_NAMES) {
+            if (authority.startsWith(name)) {
+                android.util.Log.w("ColorOS", "refused, treated as missing: " + authority + ": " + e.getMessage());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean oppo(android.net.Uri uri, SecurityException e) {
+        return uri != null && oppo(uri.getAuthority(), e);
+    }
+
+    public static boolean bindService(android.content.Context context, android.content.Intent service,
+            android.content.ServiceConnection connection, int flags) {
+        try {
+            return context.bindService(service, connection, flags);
+        } catch (SecurityException e) {
+            if (foreign(context, service, e)) return false;
+            throw e;
+        }
+    }
+
+    public static boolean bindService(android.content.Context context, android.content.Intent service, int flags,
+            java.util.concurrent.Executor executor, android.content.ServiceConnection connection) {
+        try {
+            return context.bindService(service, flags, executor, connection);
+        } catch (SecurityException e) {
+            if (foreign(context, service, e)) return false;
+            throw e;
+        }
+    }
+
+    public static android.content.ComponentName startService(android.content.Context context,
+            android.content.Intent service) {
+        try {
+            return context.startService(service);
+        } catch (SecurityException e) {
+            if (foreign(context, service, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.content.ComponentName startForegroundService(android.content.Context context,
+            android.content.Intent service) {
+        try {
+            return context.startForegroundService(service);
+        } catch (SecurityException e) {
+            if (foreign(context, service, e)) return null;
+            throw e;
+        }
+    }
+
+    public static boolean stopService(android.content.Context context, android.content.Intent service) {
+        try {
+            return context.stopService(service);
+        } catch (SecurityException e) {
+            if (foreign(context, service, e)) return false;
+            throw e;
+        }
+    }
+
+    public static android.database.Cursor query(android.content.ContentResolver resolver, android.net.Uri uri,
+            String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+        try {
+            return resolver.query(uri, projection, selection, selectionArgs, sortOrder);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.database.Cursor query(android.content.ContentResolver resolver, android.net.Uri uri,
+            String[] projection, String selection, String[] selectionArgs, String sortOrder,
+            android.os.CancellationSignal cancellationSignal) {
+        try {
+            return resolver.query(uri, projection, selection, selectionArgs, sortOrder, cancellationSignal);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.database.Cursor query(android.content.ContentResolver resolver, android.net.Uri uri,
+            String[] projection, android.os.Bundle queryArgs, android.os.CancellationSignal cancellationSignal) {
+        try {
+            return resolver.query(uri, projection, queryArgs, cancellationSignal);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static String getType(android.content.ContentResolver resolver, android.net.Uri uri) {
+        try {
+            return resolver.getType(uri);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.net.Uri insert(android.content.ContentResolver resolver, android.net.Uri uri,
+            android.content.ContentValues values) {
+        try {
+            return resolver.insert(uri, values);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
+            throw e;
+        }
+    }
+
+    public static android.net.Uri insert(android.content.ContentResolver resolver, android.net.Uri uri,
+            android.content.ContentValues values, android.os.Bundle extras) {
+        try {
+            return resolver.insert(uri, values, extras);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
+            throw e;
+        }
+    }
+
+    public static int bulkInsert(android.content.ContentResolver resolver, android.net.Uri uri,
+            android.content.ContentValues[] values) {
+        try {
+            return resolver.bulkInsert(uri, values);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
+            throw e;
+        }
+    }
+
+    public static int update(android.content.ContentResolver resolver, android.net.Uri uri,
+            android.content.ContentValues values, String where, String[] selectionArgs) {
+        try {
+            return resolver.update(uri, values, where, selectionArgs);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
+            throw e;
+        }
+    }
+
+    public static int update(android.content.ContentResolver resolver, android.net.Uri uri,
+            android.content.ContentValues values, android.os.Bundle extras) {
+        try {
+            return resolver.update(uri, values, extras);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
+            throw e;
+        }
+    }
+
+    public static int delete(android.content.ContentResolver resolver, android.net.Uri uri, String where,
+            String[] selectionArgs) {
+        try {
+            return resolver.delete(uri, where, selectionArgs);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
+            throw e;
+        }
+    }
+
+    public static int delete(android.content.ContentResolver resolver, android.net.Uri uri, android.os.Bundle extras) {
+        try {
+            return resolver.delete(uri, extras);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
+            throw e;
+        }
+    }
+
+    public static android.os.Bundle call(android.content.ContentResolver resolver, android.net.Uri uri, String method,
+            String arg, android.os.Bundle extras) {
+        try {
+            return resolver.call(uri, method, arg, extras);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
+            throw e;
+        }
+    }
+
+    public static android.os.Bundle call(android.content.ContentResolver resolver, String authority, String method,
+            String arg, android.os.Bundle extras) {
+        try {
+            return resolver.call(authority, method, arg, extras);
+        } catch (SecurityException e) {
+            if (oppo(authority, e)) throw new IllegalArgumentException("Unknown authority " + authority);
+            throw e;
+        }
+    }
+
+    public static android.content.ContentProviderResult[] applyBatch(android.content.ContentResolver resolver,
+            String authority, java.util.ArrayList<android.content.ContentProviderOperation> operations)
+            throws android.os.RemoteException, android.content.OperationApplicationException {
+        try {
+            return resolver.applyBatch(authority, operations);
+        } catch (SecurityException e) {
+            if (oppo(authority, e)) throw new IllegalArgumentException("Unknown authority " + authority);
+            throw e;
+        }
+    }
+
+    public static android.content.ContentProviderClient acquireContentProviderClient(
+            android.content.ContentResolver resolver, android.net.Uri uri) {
+        try {
+            return resolver.acquireContentProviderClient(uri);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.content.ContentProviderClient acquireContentProviderClient(
+            android.content.ContentResolver resolver, String name) {
+        try {
+            return resolver.acquireContentProviderClient(name);
+        } catch (SecurityException e) {
+            if (oppo(name, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.content.ContentProviderClient acquireUnstableContentProviderClient(
+            android.content.ContentResolver resolver, android.net.Uri uri) {
+        try {
+            return resolver.acquireUnstableContentProviderClient(uri);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static android.content.ContentProviderClient acquireUnstableContentProviderClient(
+            android.content.ContentResolver resolver, String name) {
+        try {
+            return resolver.acquireUnstableContentProviderClient(name);
+        } catch (SecurityException e) {
+            if (oppo(name, e)) return null;
+            throw e;
+        }
+    }
+
+    public static java.io.InputStream openInputStream(android.content.ContentResolver resolver, android.net.Uri uri)
+            throws java.io.FileNotFoundException {
+        try {
+            return resolver.openInputStream(uri);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static java.io.OutputStream openOutputStream(android.content.ContentResolver resolver, android.net.Uri uri)
+            throws java.io.FileNotFoundException {
+        try {
+            return resolver.openOutputStream(uri);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static java.io.OutputStream openOutputStream(android.content.ContentResolver resolver, android.net.Uri uri,
+            String mode) throws java.io.FileNotFoundException {
+        try {
+            return resolver.openOutputStream(uri, mode);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static android.os.ParcelFileDescriptor openFileDescriptor(android.content.ContentResolver resolver,
+            android.net.Uri uri, String mode) throws java.io.FileNotFoundException {
+        try {
+            return resolver.openFileDescriptor(uri, mode);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static android.os.ParcelFileDescriptor openFileDescriptor(android.content.ContentResolver resolver,
+            android.net.Uri uri, String mode, android.os.CancellationSignal signal) throws java.io.FileNotFoundException {
+        try {
+            return resolver.openFileDescriptor(uri, mode, signal);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static android.content.res.AssetFileDescriptor openAssetFileDescriptor(
+            android.content.ContentResolver resolver, android.net.Uri uri, String mode)
+            throws java.io.FileNotFoundException {
+        try {
+            return resolver.openAssetFileDescriptor(uri, mode);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static android.content.res.AssetFileDescriptor openAssetFileDescriptor(
+            android.content.ContentResolver resolver, android.net.Uri uri, String mode,
+            android.os.CancellationSignal signal) throws java.io.FileNotFoundException {
+        try {
+            return resolver.openAssetFileDescriptor(uri, mode, signal);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
+    public static android.content.res.AssetFileDescriptor openTypedAssetFileDescriptor(
+            android.content.ContentResolver resolver, android.net.Uri uri, String mimeType, android.os.Bundle opts)
+            throws java.io.FileNotFoundException {
+        try {
+            return resolver.openTypedAssetFileDescriptor(uri, mimeType, opts);
+        } catch (SecurityException e) {
+            if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
+            throw e;
+        }
+    }
+
     /**
      * A stand-in of a ColorOS interface (a system service's binder interface, ...) whose calls answer "absent"
      * (false / 0 / null), with Android's own answers for the few that have one.

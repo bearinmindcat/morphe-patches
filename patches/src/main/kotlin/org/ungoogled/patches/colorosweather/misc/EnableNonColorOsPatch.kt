@@ -11,6 +11,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosweather.ColorOsWeatherConstants.COMPATIBILITY_COLOROS_WEATHER
 
 internal const val COLOROS_WEATHER_EXTENSION = "extensions/colorosweather.mpe"
@@ -195,5 +196,9 @@ val enableNonColorOsPatch = bytecodePatch(
         java.util.logging.Logger.getLogger("OnePlusWeather").info("registerReceiver calls through ColorOS: $receivers")
         // Measured against 17.6.30: 22 calls.
         if (receivers < 22) throw PatchException("only $receivers registerReceiver calls found")
+
+        // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
+        val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
+        java.util.logging.Logger.getLogger("OnePlusWeather").info("Service calls: $services, provider calls: $providers through ColorOS")
     }
 }

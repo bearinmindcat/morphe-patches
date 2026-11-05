@@ -61,6 +61,13 @@ needs from the shared helpers:
   an installed app targeting Android 14+ gets a SecurityException for that (OnePlus Photos dies on it at start; COUI's
   status-bar "tap to scroll up" receiver and the NearX Track SDK have such calls in every app). The calls go to the
   runtime `ColorOS.registerReceiver(Context, ...)`, which registers them as exported, as Android did before Android 14.
+- `treatRefusedComponentsAsMissing(runtime)` (`patches/.../coloros/ColorOsServices.kt`, every ColorOS port calls it):
+  on an OPPO / OnePlus / realme phone the ColorOS apps a port talks to are installed but refuse an app OPPO didn't
+  sign -- OnePlus My Files died at start on a realme 3 Pro binding `com.coloros.phonemanager`'s cleanup scan
+  (SecurityException, issue #113). Every bindService / startService / startForegroundService / stopService and
+  ContentResolver provider call goes through the runtime, which answers a refusal from another app's service, or from a
+  provider under OPPO's names (`com.coloros.`, `com.oplus.`, `com.heytap.`, ...), as Android answers for a missing one
+  (false / null / "Unknown URL" / FileNotFoundException). Android's own providers keep their SecurityExceptions.
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required `uses-library` / `uses-native-library`
   (OnePlus Photos requires `libOpenCL.so`: most phones' vendor partitions have it, the emulator does not).
 

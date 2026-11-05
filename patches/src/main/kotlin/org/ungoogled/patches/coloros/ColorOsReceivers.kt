@@ -47,19 +47,27 @@ private val VIRTUAL = setOf(Opcode.INVOKE_VIRTUAL, Opcode.INVOKE_VIRTUAL_RANGE)
  * registers a receiver whose flags say neither as exported, as Android did before Android 14 and as ColorOS does for
  * its system apps; flags that say either are kept. Returns the calls moved.
  */
-internal fun BytecodePatchContext.exportDynamicReceivers(runtime: String): Int {
+internal fun BytecodePatchContext.exportDynamicReceivers(runtime: String): Int =
+    redirectContextCalls(runtime, SHAPES.mapKeys { (shape, _) -> "registerReceiver$shape" }.mapValues { (_, to) -> "registerReceiver$to" })
+
+/**
+ * Sends every call in the app (not in our extensions) to one of [shapes]' keys ("name(params)return" of a Context
+ * method, on any Context: Android's own and the app's Activity/Service/Application subclasses) to [runtime]'s method
+ * of the value's "name(params)return", which takes the Context first. Same registers, only the target changes.
+ * Returns the calls moved.
+ */
+internal fun BytecodePatchContext.redirectContextCalls(runtime: String, shapes: Map<String, String>): Int {
     val contexts = mutableMapOf<String, Boolean>()
     fun isContext(type: String): Boolean = contexts.getOrPut(type) {
         if (type in FRAMEWORK_CONTEXTS) return@getOrPut true
         val superclass = classDefByOrNull(type)?.superclass ?: return@getOrPut false
         isContext(superclass)
     }
+    fun MethodReference.shape() = "$name(${parameterTypes.joinToString("")})$returnType"
     fun Any.match(): MethodReference? {
         if (this !is ReferenceInstruction || opcode !in VIRTUAL) return null
         val r = reference as? MethodReference ?: return null
-        if (r.name != "registerReceiver") return null
-        val shape = "(${r.parameterTypes.joinToString("")})${r.returnType}"
-        return if (shape in SHAPES && isContext(r.definingClass)) r else null
+        return if (r.shape() in shapes && isContext(r.definingClass)) r else null
     }
 
     val sites = mutableListOf<Pair<String, Method>>()
@@ -78,7 +86,7 @@ internal fun BytecodePatchContext.exportDynamicReceivers(runtime: String): Int {
         for (index in instructions.indices) {
             val insn = instructions[index]
             val r = insn.match() ?: continue
-            val to = "$runtime->registerReceiver" + SHAPES.getValue("(${r.parameterTypes.joinToString("")})${r.returnType}")
+            val to = "$runtime->" + shapes.getValue(r.shape())
             val call = when (insn) {
                 is FiveRegisterInstruction ->
                     listOf(insn.registerC, insn.registerD, insn.registerE, insn.registerF, insn.registerG)
