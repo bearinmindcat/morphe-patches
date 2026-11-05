@@ -2,6 +2,8 @@ package org.ungoogled.patches.samsungkeyboard.privacy
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
@@ -25,6 +27,46 @@ private const val NO_PERSONALIZED_LEARNING = 0x1000000L
 
 private fun MutableMethod.returnFirst(smali: String) = addInstructions(0, smali)
 
+/** Returns at once with nothing: void, false / 0, or null. */
+private fun MutableMethod.returnNothing() = returnFirst(
+    when (returnType.first()) {
+        'V' -> "return-void"
+        'L', '[' -> "const/4 v0, 0x0\nreturn-object v0"
+        'J', 'D' -> "const-wide/16 v0, 0x0\nreturn-wide v0"
+        else -> "const/4 v0, 0x0\nreturn v0"
+    },
+)
+
+private val log = java.util.logging.Logger.getLogger("SamsungKeyboard")
+
+private fun Method.strings() = implementation?.instructions?.mapNotNull {
+    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string
+}.orEmpty()
+
+private fun BytecodePatchContext.mutable(method: Method): MutableMethod =
+    mutableClassDefBy(method.definingClass).methods.single {
+        it.name == method.name && it.returnType == method.returnType &&
+            it.parameterTypes.map(CharSequence::toString) == method.parameterTypes.map(CharSequence::toString)
+    }
+
+/** Every method [predicate] accepts (read-only pass). */
+private fun BytecodePatchContext.methodsWhere(predicate: (Method) -> Boolean): List<Method> {
+    val found = mutableListOf<Method>()
+    classDefForEach { c -> c.methods.filterTo(found) { it.implementation != null && predicate(it) } }
+    return found
+}
+
+/**
+ * Patches [fingerprint]'s method, or -- when this build has no [marker] string anywhere, i.e. the feature isn't in it --
+ * logs that and skips it. A build that has the feature in a shape the fingerprint misses still fails.
+ */
+private fun BytecodePatchContext.whereBuilt(what: String, marker: String, fingerprint: Fingerprint, patch: MutableMethod.() -> Unit) {
+    val method = fingerprint.methodOrNull
+    if (method != null) return method.patch()
+    if (methodsWhere { marker in it.strings() }.isNotEmpty()) throw PatchException("$what: not found where this build has it ($marker)")
+    log.info("$what: not in this build, nothing to turn off")
+}
+
 @Suppress("unused")
 val disableTelemetryPatch = bytecodePatch(
     name = "Disable telemetry",
@@ -38,19 +80,28 @@ val disableTelemetryPatch = bytecodePatch(
 
         // DiagMon (crash, ANR and usage reports): the diagnostics agent reads as not installed, the SDK's own
         // "not supported" case, so no crash handler is set and no report is made. Every lookup of the agent asks for
-        // a package name nothing has, wherever R8 put it (the start-up has one inlined; issue #98: its method differs
-        // between builds of the same version).
-        DiagMonAgentVersionFingerprint.method.returnFirst("const/4 v0, 0x0\nreturn v0")
-        hideDiagnosticsAgent()
+        // a package name nothing has, wherever R8 put it (issue #98: the start-up method and the SDKs' version checks
+        // differ between builds of the same version); the version checks also answer 0 themselves.
+        val agentLookups = hideDiagnosticsAgent()
+        val versionChecks = methodsWhere {
+            it.returnType == "I" && it.parameterTypes.map(CharSequence::toString) == listOf("Landroid/content/Context;") &&
+                "DMA Client is not exist" in it.strings()
+        }
+        versionChecks.forEach { mutable(it).returnFirst("const/4 v0, 0x0\nreturn v0") }
+        log.info("DiagMon: $agentLookups agent lookups, ${versionChecks.size} version checks")
 
         // Handwriting's usage survey to the diagnostics agent.
         mutableClassDefBy(GSIM_LOGGER).methods.single { it.name == "insertLogData" }.returnFirst("return-void")
 
-        // Galaxy AI's consent upload.
-        ConsentSyncFingerprint.method.returnFirst("const/4 v0, 0x0\nreturn v0")
+        // Galaxy AI's consent upload (not in every build).
+        whereBuilt("Galaxy AI consent upload", "canSyncNow=false isSamsungAccountLoggedIn=", ConsentSyncFingerprint) {
+            returnFirst("const/4 v0, 0x0\nreturn v0")
+        }
 
         // Search-box text to Samsung's on-device data collector.
-        TypedTextCollectionFingerprint.method.returnFirst("return-void")
+        whereBuilt("Typed-text collection", "[[AiWriter]_DATA_COLLECTION]", TypedTextCollectionFingerprint) {
+            returnFirst("return-void")
+        }
     }
 }
 
@@ -62,10 +113,11 @@ val noGifTrackingPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
 
     execute {
-        // Samsung's GIF revenue share: GIPHY sessions stay queued (the queue keeps its last 10), Tenor's
-        // register URL is never opened -- what each already does with nothing to send.
-        GiphyPingbackFingerprint.method.returnFirst("return-void")
-        TenorRegisterFingerprint.method.returnFirst("const/4 v0, 0x0\nreturn-object v0")
+        // Samsung's GIF revenue share: GIPHY's sessions are never sent (the queue's sender returns, or each session's
+        // request is never made -- its Future is unused), Tenor's register URL is never opened -- what each already
+        // does with nothing to send.
+        whereBuilt("GIPHY pingbacks", "pingback_id", GiphyPingbackFingerprint) { returnNothing() }
+        whereBuilt("Tenor register", "GRS_TenorRegisterManager", TenorRegisterFingerprint) { returnNothing() }
     }
 }
 
@@ -83,6 +135,14 @@ val stopRemoteUpdatesPatch = bytecodePatch(
     }
 }
 
+private const val SECURE_FOLDER_ID = "Lcom/samsung/android/knox/SemPersonaManager;->isSecureFolderId(I)Z"
+private const val INPUT_BINDING_UID = "Landroid/view/inputmethod/InputBinding;->getUid()I"
+
+private fun MethodReference.key() = "$definingClass->$name(${parameterTypes.joinToString("")})$returnType"
+private fun Method.calls() = implementation?.instructions?.mapNotNull {
+    ((it as? ReferenceInstruction)?.reference as? MethodReference)?.key()
+}.orEmpty()
+
 @Suppress("unused")
 val alwaysIncognitoPatch = bytecodePatch(
     name = "Always incognito",
@@ -93,33 +153,25 @@ val alwaysIncognitoPatch = bytecodePatch(
 
     execute {
         // The keyboard's incognito check -- true in a field that asks not to be learned from, a private field or
-        // the Secure Folder -- answers yes everywhere. It is the no-argument boolean that tests that flag and
-        // that the "is learning off?" checks (the ones reading a field's disableLearning option) call.
-        fun Method.strings() = implementation?.instructions?.mapNotNull {
-            ((it as? ReferenceInstruction)?.reference as? StringReference)?.string
-        }.orEmpty()
-
-        val flagTests = mutableSetOf<Triple<String, String, String>>()
-        val learningChecks = mutableSetOf<Triple<String, String, String>>()
+        // the Secure Folder -- answers yes everywhere. It is the no-argument boolean that asks the Secure Folder test
+        // (the input binding's user is a Secure Folder) and tests that flag, itself or through the no-argument
+        // booleans it calls (R8 inlines them in some builds, not in others).
+        val booleans = mutableMapOf<String, Method>()
+        val secureFolderTests = mutableSetOf<String>()
         classDefForEach { c ->
             for (m in c.methods) {
-                if (m.returnType == "Z" && m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
-                        (it as? WideLiteralInstruction)?.wideLiteral == NO_PERSONALIZED_LEARNING
-                    } == true
-                ) flagTests += Triple(c.type, m.name, "()Z")
-                if ("disableLearning" in m.strings()) {
-                    m.implementation!!.instructions.forEach { insn ->
-                        val r = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: return@forEach
-                        if (r.returnType == "Z" && r.parameterTypes.isEmpty()) learningChecks += Triple(r.definingClass, r.name, "()Z")
-                    }
-                }
+                if (m.implementation == null) continue
+                if (m.returnType == "Z" && m.parameterTypes.isEmpty()) booleans[m.key()] = m
+                val calls = m.calls()
+                if (SECURE_FOLDER_ID in calls && INPUT_BINDING_UID in calls) secureFolderTests += m.key()
             }
         }
-        val incognito = (flagTests intersect learningChecks).singleOrNull()
-            ?: throw PatchException("incognito check not found: ${flagTests intersect learningChecks}")
-        mutableClassDefBy(incognito.first).methods
-            .single { it.name == incognito.second && it.returnType == "Z" && it.parameterTypes.isEmpty() }
-            .returnFirst("const/4 v0, 0x1\nreturn v0")
+        fun testsFlag(m: Method, depth: Int): Boolean =
+            m.implementation!!.instructions.any { (it as? WideLiteralInstruction)?.wideLiteral == NO_PERSONALIZED_LEARNING } ||
+                depth > 0 && m.calls().any { key -> booleans[key]?.let { testsFlag(it, depth - 1) } == true }
+        val incognito = booleans.values.filter { m -> m.calls().any { it in secureFolderTests } && testsFlag(m, 2) }
+            .singleOrNull() ?: throw PatchException("incognito check not found (Secure Folder tests: $secureFolderTests)")
+        mutable(incognito).returnFirst("const/4 v0, 0x1\nreturn v0")
     }
 }
 

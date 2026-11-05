@@ -3,19 +3,17 @@ package org.ungoogled.patches.samsungkeyboard.privacy
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.string
 
+/*
+ * Samsung ships different builds under one version name (versionCode ...300 and ...400 builds of 5.9.40.x differ in how
+ * R8 laid them out: inlined or not, static or instance, other parameters), so these match by the strings each piece logs
+ * or sends, and by return type only where every build agrees.
+ */
+
 /** Samsung Analytics' "may the tracker send?" check, read before it starts and before every log it sends. */
 internal object AnalyticsTrackerReadyFingerprint : Fingerprint(
     returnType = "Z",
     filters = listOf(string("Tracker is not initialized, status : ")),
 )
-
-/** The DiagMon SDK's version of Samsung's diagnostics agent; 0 when none is installed. */
-internal object DiagMonAgentVersionFingerprint : Fingerprint(
-    returnType = "I",
-    parameters = listOf("Landroid/content/Context;"),
-    filters = listOf(string("DMA Client is not exist")),
-)
-
 
 /** Galaxy AI's consent upload (serial number, model, OS) to Samsung's consent server: "can sync now?". */
 internal object ConsentSyncFingerprint : Fingerprint(
@@ -27,19 +25,15 @@ internal object ConsentSyncFingerprint : Fingerprint(
 /** Hands the text of a search box to Samsung's on-device data collector (Moneta). */
 internal object TypedTextCollectionFingerprint : Fingerprint(
     returnType = "V",
-    parameters = listOf("I", "Ljava/lang/String;"),
-    filters = listOf(string("[[AiWriter]_DATA_COLLECTION]")),
+    strings = listOf("[[AiWriter]_DATA_COLLECTION]", "send data : "),
 )
 
-/** Sends GIPHY's queued view and share sessions ("pingbacks"). */
+/** Sends GIPHY's view and share sessions ("pingbacks"): the queue's sender, or the per-session request where R8 kept it. */
 internal object GiphyPingbackFingerprint : Fingerprint(
-    returnType = "V",
-    parameters = listOf(),
-    filters = listOf(string("api_key"), string("pingback_id")),
+    strings = listOf("api_key", "pingback_id"),
 )
 
-/** Sends Tenor's registerview / registershare / registeraction URL. */
+/** Opens Tenor's registerview / registershare / registeraction URL (the AsyncTask's background work). */
 internal object TenorRegisterFingerprint : Fingerprint(
-    name = "doInBackground",
-    filters = listOf(string("url is null")),
+    strings = listOf("GRS_TenorRegisterManager", "url is null"),
 )
