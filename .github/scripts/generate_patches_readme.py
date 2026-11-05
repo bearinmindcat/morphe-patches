@@ -52,14 +52,21 @@ VENDOR_GROUPS = [
     ("LG Apps", "lg ", ("com.lge.",), ()),
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
-     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ("com.android.launcher",)),
+     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ()),
+    # Home screen apps from every vendor get one dropdown of their own instead of sitting in their vendor's.
+    ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
+                           "com.nothing.launcher", "net.oneplus.launcher")),
 ]
 
 
 def vendor_group(pkg):
-    """The vendor group an app is listed under, or None for a top-level app."""
+    """The vendor group an app is listed under, or None for a top-level app. A package named outright in a group
+    (the launchers) wins over a vendor's package prefix."""
     for group in VENDOR_GROUPS:
-        if pkg.startswith(group[2]) or pkg in group[3]:
+        if pkg in group[3]:
+            return group
+    for group in VENDOR_GROUPS:
+        if group[2] and pkg.startswith(group[2]):
             return group
     return None
 
