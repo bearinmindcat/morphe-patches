@@ -16,6 +16,14 @@ public class SemDvfsManager {
     public int getApproximateFrequency(int p0, int p1, int p2) {
         return p2;
     }
+    public static com.samsung.android.os.SemDvfsManager createInstance(android.content.Context p0, java.lang.String p1, int p2) {
+        return new com.samsung.android.os.SemDvfsManager();
+    }
+    public int getApproximateFrequency(int p0) {
+        return 0;
+    }
+    public void setDvfsValue(int p0) {
+    }
     public void release() {
     }
     public void setHint(int p0) {

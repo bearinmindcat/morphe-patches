@@ -10,6 +10,9 @@ public class SmpsManager {
     public int getPenIndex(int p0) {
         return 0;
     }
+    public int getActivePen() {
+        return 0;
+    }
     public void onDestroy() {
     }
     public boolean setActivePen(int p0) {

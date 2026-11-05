@@ -14,6 +14,9 @@ public class SemWindowManager {
     }
     public void registerSystemKeyEvent(int p0, android.content.ComponentName p1, int p2) {
     }
+    public boolean requestSystemKeyEvent(int p0, android.content.ComponentName p1, boolean p2) {
+        return false;
+    }
     public void unregisterFoldStateListener(com.samsung.android.view.SemWindowManager.FoldStateListener p0) {
     }
     public void unregisterSystemKeyEvent(int p0, android.content.ComponentName p1) {

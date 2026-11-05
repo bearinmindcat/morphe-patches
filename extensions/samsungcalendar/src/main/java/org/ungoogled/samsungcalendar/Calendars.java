@@ -143,7 +143,9 @@ public final class Calendars {
                     for (String name : c.getColumnNames()) known.add(name.toLowerCase(Locale.ROOT));
                 }
             } catch (RuntimeException e) {
+                // Not readable yet (a first start queries before Calendar has asked for the permission): list later.
                 if (debug()) Log.d(TAG, "calendar columns of " + kind + ": " + e);
+                return null;
             }
         }
         SCHEMAS.put(kind, known);
@@ -489,14 +491,20 @@ public final class Calendars {
         if (localCalendarChecked) return;
         synchronized (Calendars.class) {
             if (localCalendarChecked) return;
-            localCalendarChecked = true;
             String name = "My calendar";
             try (Cursor c = r.query(CalendarContract.Calendars.CONTENT_URI, new String[]{"_id"},
                     "account_type=? AND account_name=?", new String[]{CalendarContract.ACCOUNT_TYPE_LOCAL, name}, null)) {
-                if (c == null || c.getCount() > 0) return;
+                if (c == null) return;
+                if (c.getCount() > 0) {
+                    localCalendarChecked = true;
+                    return;
+                }
             } catch (RuntimeException e) {
+                // Not readable yet: a first start queries before Calendar has asked for the permission. The next
+                // calendars query tries again (it used to give up, and a fresh install had no calendar to save to).
                 return;
             }
+            localCalendarChecked = true;
             ContentValues v = new ContentValues();
             v.put(CalendarContract.Calendars.ACCOUNT_NAME, name);
             v.put(CalendarContract.Calendars.ACCOUNT_TYPE, CalendarContract.ACCOUNT_TYPE_LOCAL);

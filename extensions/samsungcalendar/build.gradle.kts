@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungcalendar"
 
     defaultConfig {
-        // Samsung Calendar 12.8 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Samsung Calendar 12.8 requires Android 15 (API 35), 12.5 Android 13 (API 33).
+        minSdk = 33
     }
 }
 

@@ -20,4 +20,22 @@ public class SemLog {
     public static int w(java.lang.String p0, java.lang.String p1) {
         return 0;
     }
+    public static int secD(java.lang.String p0, java.lang.String p1) {
+        return 0;
+    }
+    public static int secE(java.lang.String p0, java.lang.String p1) {
+        return 0;
+    }
+    public static int secE(java.lang.String p0, java.lang.String p1, java.lang.Throwable p2) {
+        return 0;
+    }
+    public static int secI(java.lang.String p0, java.lang.String p1) {
+        return 0;
+    }
+    public static int secV(java.lang.String p0, java.lang.String p1) {
+        return 0;
+    }
+    public static int secW(java.lang.String p0, java.lang.String p1) {
+        return 0;
+    }
 }

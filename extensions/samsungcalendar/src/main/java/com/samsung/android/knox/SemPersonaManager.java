@@ -2,6 +2,9 @@ package com.samsung.android.knox;
 
 /** Generated stand-in (.github/scripts/samsung-standins): names and signatures Samsung Calendar uses, answering "absent" off One UI (no Samsung code). */
 public class SemPersonaManager {
+    public java.util.HashMap getAllKnoxNamesAndIds(boolean p0) {
+        return new java.util.HashMap<>();
+    }
     public java.util.List getKnoxIds(boolean p0) {
         return new java.util.ArrayList<>();
     }

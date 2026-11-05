@@ -75,8 +75,8 @@ private val displayPatch = bytecodePatch(
             "Lorg/ungoogled/samsungcalendar/Displays;",
             mapOf("Landroid/content/Context;" to setOf("getDisplay()Landroid/view/Display;")),
         )
-        // Measured against 12.8.01.0: 14 calls.
-        if (moved < 5) throw PatchException("only $moved getDisplay calls found")
+        // Measured: 14 calls in 12.8.01.0, 2 in 12.5.06.5.
+        if (moved < 1) throw PatchException("no getDisplay calls found")
     }
 }
 

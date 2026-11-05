@@ -5,4 +5,10 @@ public class SemEmergencyManager {
     public static boolean isEmergencyMode(android.content.Context p0) {
         return false;
     }
+    public static com.samsung.android.emergencymode.SemEmergencyManager getInstance(android.content.Context p0) {
+        return new com.samsung.android.emergencymode.SemEmergencyManager();
+    }
+    public boolean checkModeType(int p0) {
+        return false;
+    }
 }
