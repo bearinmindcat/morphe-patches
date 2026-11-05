@@ -4,6 +4,7 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.stringOption
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import org.ungoogled.patches.shared.addInstructionsAtLabel
@@ -75,6 +76,15 @@ val wazeZoneBarPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeCustomizationPatch)
 
+    val position by stringOption(
+        key = "position",
+        default = "left",
+        values = mapOf("Left edge" to "left", "Above the speed limit" to "speedometer", "Right edge" to "right"),
+        title = "Position",
+        description = "On the phone's screen. Android Auto shows it in Waze's bottom pill.",
+        required = true,
+    )
+
     execute {
         AverageSpeedZoneUpdateFingerprint.method.addInstruction(0, "invoke-static/range { p1 .. p1 }, $ZONE_BAR->legacy(Ljava/lang/Object;)V")
         AverageSpeedZoneClearFingerprint.method.addInstruction(0, "invoke-static {}, $ZONE_BAR->legacyClear()V")
@@ -116,5 +126,7 @@ val wazeZoneBarPatch = bytecodePatch(
         // Belgium's rule: 6 km/h up to 100 km/h, 6% above it.
         declareWazeValue("zoneBar", "ZONE_TOLERANCE_PERCENT", 6)
         declareWazeValue("zoneBar", "ZONE_TOLERANCE_MIN", 6)
+        // Where the bar goes on the phone (issue #91).
+        declareWazeValue("zoneBar", "ZONE_POSITION", position!!)
     }
 }

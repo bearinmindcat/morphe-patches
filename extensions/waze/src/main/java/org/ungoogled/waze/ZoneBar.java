@@ -263,14 +263,61 @@ public final class ZoneBar {
         if (view != null && view.getParent() != decor) hide();
         if (view == null) {
             view = new ZoneView(a);
-            float d = a.getResources().getDisplayMetrics().density;
-            int height = Math.round(Math.min(decor.getHeight() > 0 ? decor.getHeight() * 0.42f : 420 * d, 360 * d));
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Math.round(64 * d), height, Gravity.START | Gravity.CENTER_VERTICAL);
-            lp.leftMargin = Math.round(8 * d);
-            decor.addView(view, lp);
+            decor.addView(view, place(a, decor));
+        } else {
+            FrameLayout.LayoutParams lp = place(a, decor), now = (FrameLayout.LayoutParams) view.getLayoutParams();
+            if (lp.width != now.width || lp.height != now.height || lp.gravity != now.gravity
+                    || lp.leftMargin != now.leftMargin || lp.topMargin != now.topMargin || lp.rightMargin != now.rightMargin) {
+                view.setLayoutParams(lp);
+            }
         }
         view.night = (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         view.invalidate();
+    }
+
+    /** Where the bar goes (issue #91): Customization's position -- the left edge, above the speed limit sign, or the right edge. */
+    static final String LEFT = "left", ABOVE_SPEED_LIMIT = "speedometer", RIGHT = "right";
+    private static int speedometerId;
+
+    private static FrameLayout.LayoutParams place(Activity a, ViewGroup decor) {
+        float d = a.getResources().getDisplayMetrics().density;
+        int width = Math.round(64 * d), margin = Math.round(8 * d);
+        int height = Math.round(Math.min(decor.getHeight() > 0 ? decor.getHeight() * 0.42f : 420 * d, 360 * d));
+        String where = Customization.string(Customization.ZONE_POSITION, LEFT);
+        if (ABOVE_SPEED_LIMIT.equals(where)) {
+            // Waze's speedometer (layout speedometer.xml, id Speedometer) carries the limit sign at its top right.
+            if (speedometerId == 0) speedometerId = a.getResources().getIdentifier("Speedometer", "id", a.getPackageName());
+            View speedometer = speedometerId != 0 ? decor.findViewById(speedometerId) : null;
+            if (speedometer != null && speedometer.isShown() && speedometer.getWidth() > 0) {
+                int[] at = new int[2], origin = new int[2];
+                speedometer.getLocationInWindow(at);
+                decor.getLocationInWindow(origin);
+                int top = at[1] - origin[1], room = top - margin - Math.round(48 * d);
+                if (room >= Math.round(150 * d)) {
+                    int h = Math.min(height, room);
+                    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, h, Gravity.TOP | Gravity.LEFT);
+                    lp.leftMargin = Math.max(margin, at[0] - origin[0] + (speedometer.getWidth() - width) / 2);
+                    lp.topMargin = top - margin - h;
+                    return lp;
+                }
+            }
+            // No speedometer on screen, or no room above it: the left edge.
+        }
+        if (RIGHT.equals(where)) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.END | Gravity.CENTER_VERTICAL);
+            lp.rightMargin = margin;
+            return lp;
+        }
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height, Gravity.START | Gravity.CENTER_VERTICAL);
+        lp.leftMargin = margin;
+        return lp;
+    }
+
+    /** Customization's position was changed: move the bar now. */
+    static void moved() {
+        MAIN.post(() -> {
+            if (view != null) show();
+        });
     }
 
     private static void hide() {
@@ -483,7 +530,8 @@ public final class ZoneBar {
      * quarter of the zone), int hold (seconds per quarter, 6), boolean enable (switch the bar on first); or boolean
      * customization alone, which opens the Customization screen (the side menu is out of reach before sign-up). Each
      * quarter's updates come every half second with a made-up clock, so the averages are reached exactly; then
-     * the zone ends. boolean car also sends each update through carPill() and saves four car pills to files/. Waze's real updates come the same way, through the same methods.
+     * the zone ends. boolean car also sends each update through carPill() and saves four car pills to files/;
+     * boolean speedometer places a stand-in for Waze's speedometer (for the Above the speed limit position). Waze's real updates come the same way, through the same methods.
      */
     private static final class SelfTest extends BroadcastReceiver {
         @Override public void onReceive(Context context, Intent intent) {
@@ -494,6 +542,7 @@ public final class ZoneBar {
                     return;
                 }
                 if (intent.getBooleanExtra("enable", false)) Customization.setForTest("zoneBar", true);
+                if (intent.getBooleanExtra("speedometer", false)) standIn();
                 String path = intent.getStringExtra("path");
                 if (path == null) path = "insights";
                 int len = intent.getIntExtra("length", 3000), lim = intent.getIntExtra("limit", 100);
@@ -542,7 +591,31 @@ public final class ZoneBar {
                 else if ("real".equals(path)) callReal("onAverageSpeedCamZoneClear", null);
                 else insights(insightsUpdate(-1, len));
                 Log.i(TAG, "zone bar self-test: done");
+                if (standIn != null && standIn.getParent() instanceof ViewGroup) ((ViewGroup) standIn.getParent()).removeView(standIn);
+                standIn = null;
             }, at + 1500L);
+        }
+
+        /**
+         * With boolean speedometer: a grey square with the id of Waze's speedometer at its place on the map, bottom left,
+         * for the "Above the speed limit" position on screens without the map (signed out); gone when the test ends.
+         */
+        private static View standIn;
+
+        private static void standIn() {
+            Activity a = Customization.activity();
+            if (a == null) return;
+            int id = a.getResources().getIdentifier("Speedometer", "id", a.getPackageName());
+            if (id == 0) return;
+            float d = a.getResources().getDisplayMetrics().density;
+            standIn = new View(a);
+            standIn.setId(id);
+            standIn.setBackgroundColor(0xFF9E9E9E);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Math.round(110 * d), Math.round(110 * d), Gravity.BOTTOM | Gravity.START);
+            lp.leftMargin = Math.round(12 * d);
+            lp.bottomMargin = Math.round(140 * d);
+            ((ViewGroup) a.getWindow().getDecorView()).addView(standIn, lp);
+            Log.i(TAG, "zone bar self-test: speedometer stand-in placed");
         }
 
         /** With boolean car: each update also goes through carPill(), as Waze's car pill would, and four are saved as PNGs. */

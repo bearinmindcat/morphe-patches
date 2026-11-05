@@ -163,6 +163,8 @@ public final class Customization {
     private static final String PIN_SIZE = "PIN_SIZE";
     /** Average speed zone bar's tolerance: a percentage of the limit, and at least this many km/h or mph. */
     static final String ZONE_TOLERANCE_PERCENT = "ZONE_TOLERANCE_PERCENT", ZONE_TOLERANCE_MIN = "ZONE_TOLERANCE_MIN";
+    /** Where the zone bar goes on the phone's screen (issue #91). */
+    static final String ZONE_POSITION = "ZONE_POSITION";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -194,6 +196,9 @@ public final class Customization {
         VALUE_LABELS.put(PIN_SIZE, new Label("Alert pin size", "%", 1, 300, 100));
         VALUE_LABELS.put(ZONE_TOLERANCE_PERCENT, new Label("Tolerance above the limit", "%", 1, 50));
         VALUE_LABELS.put(ZONE_TOLERANCE_MIN, new Label("Tolerance, at least", "km/h or mph", 1, 50));
+        VALUE_LABELS.put(ZONE_POSITION, new Label("Position",
+                new String[]{ZoneBar.LEFT, ZoneBar.ABOVE_SPEED_LIMIT, ZoneBar.RIGHT},
+                new String[]{"Left edge", "Above the speed limit", "Right edge"}));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -342,6 +347,18 @@ public final class Customization {
         return v instanceof Integer ? (Integer) v : fallback;
     }
 
+    /** A string of [feature]'s: the one chosen on this screen, else the patch's, else [fallback]. */
+    static String string(String name, String fallback) {
+        Object patched;
+        synchronized (declared) {
+            features();
+            Value v = values.get(name);
+            patched = v != null ? v.patched : fallback;
+        }
+        Object now = current(name, patched);
+        return now instanceof String ? (String) now : fallback;
+    }
+
     /** The Waze screen in front, if any. */
     static Activity activity() {
         return resumed.get();
@@ -391,6 +408,7 @@ public final class Customization {
         e.commit();
         if (name.startsWith("SKIN_")) applySkin();
         if (name.equals(PIN_SIZE)) applyPins();
+        if (name.equals(ZONE_POSITION)) ZoneBar.moved();
         reapply(name + " = " + (value == null ? "the patch's" : value));
     }
 
