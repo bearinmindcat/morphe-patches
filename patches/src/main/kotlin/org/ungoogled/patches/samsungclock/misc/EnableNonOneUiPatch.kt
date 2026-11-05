@@ -9,8 +9,10 @@ import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.samsung.addOneUiFrameworkResources
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.makeLibrariesOptional
+import org.ungoogled.patches.samsung.redirectOneUiFrameworkLookups
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -141,16 +143,32 @@ private val systemAccessPatch = bytecodePatch(
     }
 }
 
-/** Sends Clock's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers). */
+/** One UI's framework colours Clock looks up by name in dark mode, added as app colours (see OneUi.getIdentifier). */
+private val oneUiFrameworkResourcesPatch = resourcePatch {
+    execute {
+        if (addOneUiFrameworkResources() == 0) throw PatchException("no One UI framework resource added")
+    }
+}
+
+/**
+ * Sends Clock's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers), and its
+ * resource lookups by name, as in dark mode it colours its lists with One UI's framework colour (getColor(0) off One
+ * UI: the app died opening on the alarm or world clock list).
+ */
 private val oneUiMembersPatch = bytecodePatch(
     description = "Answers One UI's additions to Android classes where the phone has none.",
 ) {
+    dependsOn(oneUiFrameworkResourcesPatch)
     extendWith(SAMSUNG_CLOCK_EXTENSION)
 
     execute {
         val (calls, fields) = redirectOneUiMembers("Lorg/ungoogled/samsungclock/OneUi;", "Lorg/ungoogled/samsungclock/Sem;")
         java.util.logging.Logger.getLogger("SamsungClock").info("One UI members: $calls calls, $fields fields")
         if (calls < 100 || fields < 10) throw PatchException("only $calls One UI calls and $fields field accesses found")
+        val lookups = redirectOneUiFrameworkLookups("Lorg/ungoogled/samsungclock/OneUi;")
+        java.util.logging.Logger.getLogger("SamsungClock").info("Resource lookups by name: $lookups")
+        // Measured against 12.4.02.38: 47 lookups by name, 7 of them One UI's dark screen colour.
+        if (lookups < 7) throw PatchException("only $lookups resource lookups by name found")
     }
 }
 

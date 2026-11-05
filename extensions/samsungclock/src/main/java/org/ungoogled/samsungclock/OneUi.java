@@ -1,5 +1,7 @@
 package org.ungoogled.samsungclock;
 
+import android.app.Application;
+import android.content.res.Resources;
 import android.util.Log;
 
 import java.lang.reflect.Field;
@@ -150,5 +152,32 @@ public final class OneUi {
         } catch (IllegalAccessException e) {
             // Left as it is.
         }
+    }
+
+    /**
+     * Resources.getIdentifier for the app (patches/.../samsung/OneUiFrameworkResources.kt sends its calls here): a
+     * resource only One UI's framework has ("android" package) answers 0 off One UI, and the app uses some unchecked
+     * (getColor(0) throws). Where the patch added a stand-in for it ("oneui_<name>" in the app) the lookup gets that;
+     * everything else answers as Android does. Never for the system Resources, which cannot read the app's resources.
+     */
+    public static int getIdentifier(Resources resources, String name, String type, String pkg) {
+        int id = resources.getIdentifier(name, type, pkg);
+        if (id != 0 || name == null || resources == Resources.getSystem()) return id;
+        String n = name, t = type, p = pkg;
+        int colon = n.indexOf(':');
+        if (colon >= 0) {
+            p = n.substring(0, colon);
+            n = n.substring(colon + 1);
+        }
+        int slash = n.indexOf('/');
+        if (slash >= 0) {
+            t = n.substring(0, slash);
+            n = n.substring(slash + 1);
+        }
+        if (!"android".equals(p) || t == null) return 0;
+        String app = Application.getProcessName();
+        if (app == null) return 0;
+        if (app.indexOf(':') >= 0) app = app.substring(0, app.indexOf(':'));
+        return resources.getIdentifier("oneui_" + n, t, app);
     }
 }
