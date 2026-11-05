@@ -9,9 +9,11 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.samsung.addOneUiFrameworkResources
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.samsung.redirectOneUiFrameworkLookups
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsung.redirectToWrappers
@@ -261,10 +263,21 @@ private val settingsPatch = bytecodePatch(
     }
 }
 
-/** Sends the app's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers). */
+/** One UI's framework colour the app looks up by name in dark mode, added as an app colour (see OneUi.getIdentifier). */
+private val oneUiFrameworkResourcesPatch = resourcePatch {
+    execute {
+        if (addOneUiFrameworkResources() == 0) throw PatchException("no One UI framework resource added")
+    }
+}
+
+/**
+ * Sends the app's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers), and its
+ * resource lookups by name: in dark mode it colours its cards with One UI's framework colour (getColor(0) off One UI).
+ */
 private val oneUiMembersPatch = bytecodePatch(
     description = "Answers One UI's additions to Android classes where the phone has none.",
 ) {
+    dependsOn(oneUiFrameworkResourcesPatch)
     extendWith(SAMSUNG_PHONE_EXTENSION)
 
     execute {
@@ -272,6 +285,10 @@ private val oneUiMembersPatch = bytecodePatch(
         java.util.logging.Logger.getLogger(LOG).info("One UI members: $calls calls, $fields fields")
         // Measured against 16.3.52.1: 231 calls and 13 field accesses.
         if (calls < 150) throw PatchException("only $calls One UI calls and $fields field accesses found")
+        val lookups = redirectOneUiFrameworkLookups("$EXT/OneUi;")
+        java.util.logging.Logger.getLogger(LOG).info("Resource lookups by name: $lookups")
+        // Measured against 16.3.52.1: 35 lookups by name, 2 of them One UI's dark screen colour.
+        if (lookups < 1) throw PatchException("no resource lookup by name found")
     }
 }
 

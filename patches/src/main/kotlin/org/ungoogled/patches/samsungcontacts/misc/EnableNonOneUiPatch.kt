@@ -3,8 +3,10 @@ package org.ungoogled.patches.samsungcontacts.misc
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.addOneUiFrameworkResources
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.samsung.redirectOneUiFrameworkLookups
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsung.redirectToWrappers
@@ -114,10 +116,21 @@ private val settingsPatch = bytecodePatch(
     }
 }
 
-/** Sends the app's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers). */
+/** One UI's framework colour the app looks up by name in dark mode, added as an app colour (see OneUi.getIdentifier). */
+private val oneUiFrameworkResourcesPatch = resourcePatch {
+    execute {
+        if (addOneUiFrameworkResources() == 0) throw PatchException("no One UI framework resource added")
+    }
+}
+
+/**
+ * Sends the app's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers), and its
+ * resource lookups by name: in dark mode it colours its cards with One UI's framework colour (getColor(0) off One UI).
+ */
 private val oneUiMembersPatch = bytecodePatch(
     description = "Answers One UI's additions to Android classes where the phone has none.",
 ) {
+    dependsOn(oneUiFrameworkResourcesPatch)
     extendWith(SAMSUNG_CONTACTS_EXTENSION)
 
     execute {
@@ -125,6 +138,10 @@ private val oneUiMembersPatch = bytecodePatch(
         java.util.logging.Logger.getLogger(LOG).info("One UI members: $calls calls, $fields fields")
         // Measured against 16.3.00.87: 366 calls and 17 field accesses.
         if (calls < 150) throw PatchException("only $calls One UI calls and $fields field accesses found")
+        val lookups = redirectOneUiFrameworkLookups("$EXT/OneUi;")
+        java.util.logging.Logger.getLogger(LOG).info("Resource lookups by name: $lookups")
+        // Measured against 16.3.00.87: 47 lookups by name, 1 of them One UI's dark screen colour.
+        if (lookups < 1) throw PatchException("no resource lookup by name found")
     }
 }
 
