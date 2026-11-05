@@ -1,13 +1,16 @@
 package org.ungoogled.samsunggallery;
 
 import android.content.ContentProvider;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
+import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.HashMap;
@@ -22,7 +25,8 @@ import java.util.regex.Pattern;
  * stories, people, places ...); Google's does not. Gallery's queries are answered here instead, from a copy of
  * the phone's photos and videos in Samsung's shape: the files table, refreshed from MediaStore whenever it
  * changes. A table or column the copy does not know yet is added empty, so features built on Samsung's
- * analysis (stories, people, places) find nothing rather than failing.
+ * analysis (stories, people, places) find nothing rather than failing. What the user adds (tags) is kept in a
+ * database of its own that the copy attaches.
  */
 public final class MediaMirror extends ContentProvider {
     private static final String TAG = "UA";
@@ -30,6 +34,10 @@ public final class MediaMirror extends ContentProvider {
     private static final Pattern NO_TABLE = Pattern.compile("no such table: (?:main\\.)?([A-Za-z0-9_]+)");
     /** Samsung's statements name the provider's own indexes, which the copy does not have. */
     private static final Pattern INDEX_HINT = Pattern.compile("(?i)\\s+indexed\\s+by\\s+[A-Za-z0-9_]+");
+    private static final String USER_TAGS = "usertag";
+    private static final String TAG_VIEW = "tagview";
+    private static final String SAVED = "saved";
+    private static final String SAVED_FILE = "gallery_saved.db";
 
     // Columns are NUMERIC: MediaStore keeps some numbers as text (bucket_id), Samsung's queries compare them as
     // numbers, and SQLite only converts in a column with that affinity. Paths and names stay text.
@@ -43,6 +51,16 @@ public final class MediaMirror extends ContentProvider {
     /** Where Gallery's raw SQL goes; providers start before the app, so the authority is known by then. */
     public static Uri rawQueryUri() {
         return Uri.parse("content://" + authority + "/raw_sql");
+    }
+
+    /** Gallery's user tags (One UI keeps them in Samsung's media provider, content://secmedia/cmh/usertag). */
+    public static Uri userTagsUri() {
+        return Uri.parse("content://" + authority + "/" + USER_TAGS);
+    }
+
+    /** Every tag of every photo (One UI's tag view): sec_media_id, tag_data, tag_type (0 = the user's own tag). */
+    public static Uri tagViewUri() {
+        return Uri.parse("content://" + authority + "/" + TAG_VIEW);
     }
 
     /** The app's context; the provider starts with the app's process. */
@@ -88,8 +106,42 @@ public final class MediaMirror extends ContentProvider {
             c.deleteDatabase("media_mirror.db");
             db = SQLiteDatabase.openOrCreateDatabase(c.getDatabasePath("media_mirror.db"), null);
             db.execSQL("CREATE TABLE files (_id INTEGER PRIMARY KEY)");
+            attachSaved(db);
         }
         return db;
+    }
+
+    /**
+     * What the user adds to Gallery lives in a database of its own, attached to the copy (which is rebuilt from
+     * MediaStore on every start) so that Gallery's statements find it under One UI's names: the user's tags (One UI's
+     * usertag table) and the tag view over them that Gallery searches.
+     */
+    private void attachSaved(SQLiteDatabase d) {
+        boolean attached = false;
+        try (Cursor c = d.rawQuery("PRAGMA database_list", null)) {
+            while (c.moveToNext()) attached |= SAVED.equals(c.getString(1));
+        }
+        if (!attached) {
+            String path = getContext().getDatabasePath(SAVED_FILE).getPath().replace("'", "''");
+            d.execSQL("ATTACH DATABASE '" + path + "' AS " + SAVED);
+        }
+        // _data: the photo's path, so its tags find it again if MediaStore gives it a new id (its database rebuilt).
+        d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".usertag (_id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + "sec_media_id INTEGER, tag TEXT, server_id TEXT, _data TEXT, UNIQUE (sec_media_id, tag) ON CONFLICT IGNORE)");
+        d.execSQL("CREATE INDEX IF NOT EXISTS " + SAVED + ".usertag_media ON usertag (sec_media_id)");
+        // One UI's view puts every kind of tag together; tag_type 0 = the user's own. Gallery orders by its rowid.
+        d.execSQL("CREATE TEMP VIEW IF NOT EXISTS tag_view AS SELECT _id AS rowid, _id, sec_media_id, tag AS tag_data, "
+                + "0 AS tag_type FROM " + SAVED + ".usertag");
+    }
+
+    /** The saved tables are gone from the connection (SQLite reopened it): attach them again. */
+    private synchronized boolean reattach(SQLiteException e) {
+        String msg = String.valueOf(e.getMessage());
+        if (!msg.contains("no such table: usertag") && !msg.contains("no such table: tag_view")
+                && !msg.contains("no such table: " + SAVED + ".")) return false;
+        attachSaved(db());
+        Log.i(TAG, "mirror: saved tables attached again");
+        return true;
     }
 
     /** Copies MediaStore's photos and videos when its contents changed since the last copy. */
@@ -138,6 +190,7 @@ public final class MediaMirror extends ContentProvider {
                 }
                 d.execSQL("DELETE FROM local_metadata");
                 d.execSQL("INSERT INTO local_metadata (generation_modified) VALUES (" + generation + ")");
+                refindTags(d);
                 d.setTransactionSuccessful();
             } finally {
                 d.endTransaction();
@@ -146,6 +199,33 @@ public final class MediaMirror extends ContentProvider {
         syncedGeneration = generation;
         syncedVersion = version;
         if (debug()) Log.d(TAG, "mirror: " + rows + " files in " + (System.currentTimeMillis() - started) + " ms");
+    }
+
+    /**
+     * Tags whose photo is no longer in the copy under its id: a photo MediaStore gave a new id (its database rebuilt)
+     * gets them back by its path. A photo in Android's trash keeps its id and comes back with it, so its tags stay.
+     */
+    private void refindTags(SQLiteDatabase d) {
+        Set<Long> lost = new HashSet<>();
+        try (Cursor c = d.rawQuery("SELECT DISTINCT sec_media_id FROM " + SAVED + ".usertag WHERE sec_media_id NOT IN "
+                + "(SELECT _id FROM files) AND _data IN (SELECT _data FROM files)", null)) {
+            while (c.moveToNext()) lost.add(c.getLong(0));
+        }
+        if (lost.isEmpty()) return;
+        Bundle q = new Bundle();
+        q.putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "_id IN (" + TextUtils.join(",", lost) + ")");
+        q.putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_INCLUDE);
+        try (Cursor c = getContext().getContentResolver().query(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                new String[]{"_id"}, q, null)) {
+            while (c != null && c.moveToNext()) lost.remove(c.getLong(0));
+        } catch (RuntimeException e) {
+            Log.w(TAG, "mirror: tags not checked: " + e.getMessage());
+            return;
+        }
+        if (lost.isEmpty()) return;
+        d.execSQL("UPDATE " + SAVED + ".usertag SET sec_media_id = (SELECT f._id FROM files f WHERE f._data = usertag._data) "
+                + "WHERE sec_media_id IN (" + TextUtils.join(",", lost) + ") AND _data IN (SELECT _data FROM files)");
+        Log.i(TAG, "mirror: tags of " + lost.size() + " photos found again by path");
     }
 
     /** Samsung's own columns that have a meaning without Samsung's analysis. */
@@ -171,7 +251,10 @@ public final class MediaMirror extends ContentProvider {
 
     private static Set<String> columns(SQLiteDatabase d, String table) {
         Set<String> set = new HashSet<>();
-        try (Cursor c = d.rawQuery("PRAGMA table_info(" + table + ")", null)) {
+        int dot = table.indexOf('.');
+        String pragma = dot < 0 ? "PRAGMA table_info(" + table + ")"
+                : "PRAGMA " + table.substring(0, dot) + ".table_info(" + table.substring(dot + 1) + ")";
+        try (Cursor c = d.rawQuery(pragma, null)) {
             while (c.moveToNext()) set.add(c.getString(1));
         }
         return set;
@@ -185,6 +268,7 @@ public final class MediaMirror extends ContentProvider {
     }
 
     private synchronized boolean heal(String sql, SQLiteException e) {
+        if (reattach(e)) return true;
         String msg = String.valueOf(e.getMessage());
         SQLiteDatabase d = db();
         Matcher t = NO_TABLE.matcher(msg);
@@ -200,7 +284,12 @@ public final class MediaMirror extends ContentProvider {
             if (table == null) table = alias != null && !columns(d, alias).isEmpty() ? alias : "files";
             if (columns(d, table).isEmpty()) d.execSQL("CREATE TABLE IF NOT EXISTS " + table + " (_id INTEGER PRIMARY KEY)");
             if (columns(d, table).contains(c.group(2))) return false;
-            d.execSQL("ALTER TABLE " + table + " ADD COLUMN " + c.group(2) + " NUMERIC");
+            try {
+                d.execSQL("ALTER TABLE " + table + " ADD COLUMN " + c.group(2) + " NUMERIC");
+            } catch (SQLiteException notTable) {
+                // A view (tag_view): its columns are fixed.
+                return false;
+            }
             Log.i(TAG, "mirror: added column " + table + "." + c.group(2));
             return true;
         }
@@ -209,7 +298,11 @@ public final class MediaMirror extends ContentProvider {
 
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sortOrder) {
-        if (!"raw_sql".equals(uri.getLastPathSegment()) || selection == null) return null;
+        String path = uri.getLastPathSegment();
+        if (USER_TAGS.equals(path) || TAG_VIEW.equals(path)) {
+            return savedQuery(USER_TAGS.equals(path) ? SAVED + ".usertag" : "tag_view", projection, selection, args, sortOrder);
+        }
+        if (!"raw_sql".equals(path) || selection == null) return null;
         selection = INDEX_HINT.matcher(selection).replaceAll(" ");
         sync();
         for (int attempt = 0; attempt < 40; attempt++) {
@@ -240,18 +333,98 @@ public final class MediaMirror extends ContentProvider {
         return null;
     }
 
+    private Cursor savedQuery(String table, String[] projection, String selection, String[] args, String sortOrder) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                return db().query(table, projection, selection, args, null, null, sortOrder);
+            } catch (SQLiteException e) {
+                if (attempt > 0 || !reattach(e)) {
+                    Log.w(TAG, "mirror: " + e.getMessage() + " in " + table);
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isUserTags(Uri uri) {
+        return USER_TAGS.equals(uri.getLastPathSegment());
+    }
+
+    /** One tag of one photo (Gallery's tag, sec_media_id and, with Samsung Cloud, server_id). */
+    private long insertTag(SQLiteDatabase d, ContentValues values) {
+        ContentValues v = new ContentValues(values);
+        Set<String> have = columns(d, SAVED + ".usertag");
+        for (String key : v.keySet()) {
+            if (!have.contains(key)) d.execSQL("ALTER TABLE " + SAVED + ".usertag ADD COLUMN " + key + " NUMERIC");
+        }
+        Long media = v.getAsLong("sec_media_id");
+        if (media != null && !v.containsKey("_data")) {
+            try (Cursor c = d.rawQuery("SELECT _data FROM files WHERE _id = " + media, null)) {
+                if (c.moveToFirst()) v.put("_data", c.getString(0));
+            }
+        }
+        return d.insert(SAVED + ".usertag", null, v);
+    }
+
+    private void changed(Uri uri) {
+        getContext().getContentResolver().notifyChange(uri, null);
+    }
+
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-        return null;
+        if (!isUserTags(uri) || values == null) return null;
+        long id;
+        sync();
+        synchronized (this) {
+            id = insertTag(db(), values);
+        }
+        changed(uri);
+        return Uri.withAppendedPath(uri, String.valueOf(Math.max(id, 0)));
+    }
+
+    @Override
+    public int bulkInsert(Uri uri, ContentValues[] values) {
+        if (!isUserTags(uri) || values == null) return 0;
+        int added = 0;
+        sync();
+        synchronized (this) {
+            SQLiteDatabase d = db();
+            d.beginTransaction();
+            try {
+                for (ContentValues v : values) {
+                    if (v != null && insertTag(d, v) > 0) added++;
+                }
+                d.setTransactionSuccessful();
+            } finally {
+                d.endTransaction();
+            }
+        }
+        if (debug()) Log.d(TAG, "mirror: " + added + " of " + values.length + " tags added");
+        changed(uri);
+        return values.length;
     }
 
     @Override
     public int delete(Uri uri, String selection, String[] args) {
-        return 0;
+        if (!isUserTags(uri)) return 0;
+        int n;
+        synchronized (this) {
+            n = db().delete(SAVED + ".usertag", selection, args);
+        }
+        if (debug()) Log.d(TAG, "mirror: " + n + " tags removed");
+        if (n > 0) changed(uri);
+        return n;
     }
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] args) {
-        return 0;
+        if (!isUserTags(uri) || values == null) return 0;
+        int n;
+        synchronized (this) {
+            n = db().update(SAVED + ".usertag", values, selection, args);
+        }
+        if (n > 0) changed(uri);
+        return n;
     }
 }

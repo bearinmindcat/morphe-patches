@@ -18,6 +18,8 @@ private const val MEDIA_QUERIES = "Lorg/ungoogled/samsunggallery/MediaQueries;"
 
 /** The URIs Gallery uses off One UI (its "generic device" table), unobfuscated. */
 private const val MEDIA_URI_GED = "Lcom/samsung/android/gallery/support/providers/MediaUriGed;"
+/** Gallery's URIs into Samsung's media analysis; the base class (all "unsupported") is the one used off One UI. */
+private const val CMH_URIS = "Lcom/samsung/android/gallery/support/providers/CmhUri\$PrivilegedUri;"
 private const val PREFERENCE_FEATURES = "Lcom/samsung/android/gallery/support/utils/PreferenceFeatures;"
 /** Gallery's Android-only answers to what One UI adds (used where SEM version is 0), unobfuscated. */
 private const val GED_API_COMPAT = "Lcom/samsung/android/gallery/support/library/v0/GedApiCompatImpl;"
@@ -69,6 +71,23 @@ val enableNonOneUiPatch = bytecodePatch(
                 return-object v0
             """,
         )
+
+        // The user's tags ("Add tag" in a photo's details) go to Samsung's media provider (content://secmedia/cmh/
+        // usertag); off One UI Gallery's URI table has "content://unsupported" for them, so every tag vanished and a
+        // search by tag found nothing. The media copy keeps them (in a database of their own) and searches them.
+        val privilegedUri = mutableClassDefByOrNull(CMH_URIS) ?: throw PatchException("Samsung Gallery has no $CMH_URIS")
+        mapOf("getUserTags" to "userTagsUri", "getTagView" to "tagViewUri").forEach { (name, target) ->
+            privilegedUri.methods.firstOrNull {
+                it.name == name && it.parameterTypes.isEmpty() && it.returnType == "Landroid/net/Uri;"
+            }?.addInstructions(
+                0,
+                """
+                    invoke-static { }, $MEDIA_MIRROR->$target()Landroid/net/Uri;
+                    move-result-object v0
+                    return-object v0
+                """,
+            ) ?: throw PatchException("no $name in Gallery's generic-device URI table")
+        }
 
         // Gallery also queries MediaStore itself with Samsung's columns (media_id, cloud hashes ...), which Google's
         // MediaStore refuses with an exception Gallery does not catch: the viewer crashed whenever the media changed
