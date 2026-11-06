@@ -202,6 +202,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland',
         '<img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland',
     ),
+    "com.samsung.android.sidegesturepad": (
+        '<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +',
+        '<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +',
+    ),
     "com.miui.compass": (
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
