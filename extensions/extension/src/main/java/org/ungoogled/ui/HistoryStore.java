@@ -8,7 +8,6 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -85,6 +84,7 @@ final class HistoryStore {
         }
 
         static Entry fromJson(JSONObject o) {
+            SavedStore.validatePlaceJson(o);
             Entry e = new Entry();
             e.ftid = o.has("ftid") ? o.optString("ftid", null) : null;
             e.name = o.optString("name", "");
@@ -94,6 +94,8 @@ final class HistoryStore {
             e.reviews = o.optInt("reviews", 0);
             e.lat = o.optDouble("lat");
             e.lng = o.optDouble("lng");
+            SavedStore.checkCoordinates(e.lat, e.lng);
+            if (Float.isInfinite(e.rating)) throw new IllegalArgumentException("Invalid rating");
             for (int i = 0; i < KINDS.length; i++) {
                 e.at[i] = o.optLong(KIND_NAMES[i], 0);
                 e.last = Math.max(e.last, e.at[i]);
@@ -103,6 +105,7 @@ final class HistoryStore {
     }
 
     private static boolean loaded;
+    private static Exception loadError;
     /** Key -> entry, oldest use first. */
     private static final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
 
@@ -124,17 +127,28 @@ final class HistoryStore {
     static synchronized void load(Context c) {
         if (loaded) return;
         loaded = true;
+        loadError = null;
         entries.clear();
         try {
             File f = new File(c.getFilesDir(), FILE);
-            if (f.exists()) readArray(new JSONObject(SavedStore.readAll(new FileInputStream(f))).optJSONArray("places"));
-        } catch (Throwable ignored) {}
+            if (f.exists()) {
+                JSONObject root = SavedStore.parseJson(SavedStore.readAll(new FileInputStream(f)));
+                JSONArray places = SavedStore.optionalArray(root, "places");
+                if (places == null) throw new IllegalArgumentException("Missing recent places array");
+                readArray(places);
+            }
+        } catch (Exception e) {
+            entries.clear();
+            loadError = e;
+            SavedStore.warnSave(c, "Recent places could not be read; the original file has been preserved");
+        }
     }
 
     /** Merges [a] into what is there, keeping each place's latest use of each kind, oldest first. */
     private static void readArray(JSONArray a) throws Exception {
         if (a == null) return;
-        LinkedHashMap<String, Entry> all = new LinkedHashMap<>(entries);
+        LinkedHashMap<String, Entry> all = new LinkedHashMap<>();
+        for (Entry e : entries.values()) all.put(e.key(), Entry.fromJson(e.toJson()));
         for (int i = 0; i < a.length(); i++) {
             Entry e = Entry.fromJson(a.getJSONObject(i));
             Entry old = all.get(e.key());
@@ -156,12 +170,28 @@ final class HistoryStore {
 
     static synchronized void save(Context c) {
         try {
-            File tmp = new File(c.getFilesDir(), FILE + ".tmp");
-            try (OutputStream out = new FileOutputStream(tmp)) {
-                out.write(new JSONObject().put("places", toJson()).toString(1).getBytes(StandardCharsets.UTF_8));
-            }
-            if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
-        } catch (Throwable ignored) {}
+            saveChecked(c);
+        } catch (Exception e) {
+            SavedStore.warnSave(c, "Recent places could not be saved: " + e.getMessage());
+        }
+    }
+
+    private static void saveChecked(Context c) throws Exception {
+        requireReadable();
+        byte[] data = new JSONObject().put("places", toJson()).toString(1).getBytes(StandardCharsets.UTF_8);
+        File tmp = new File(c.getFilesDir(), FILE + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
+            out.write(data);
+            out.getFD().sync();
+        }
+        if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) {
+            tmp.delete();
+            throw new java.io.IOException("Could not replace the recent places file");
+        }
+    }
+
+    private static void requireReadable() throws java.io.IOException {
+        if (loadError != null) throw new java.io.IOException("The recent places file could not be read; refusing to overwrite it", loadError);
     }
 
     /** A use of [p] of [kind]: moves it to the top of the recent places, unless it is the same use again. */
@@ -221,7 +251,10 @@ final class HistoryStore {
     }
 
     static synchronized void clear(Context c) {
+        load(c);
         entries.clear();
+        // Unlike an automatic save, the caller has explicitly confirmed clearing history.
+        loadError = null;
         save(c);
     }
 
@@ -236,9 +269,27 @@ final class HistoryStore {
     }
 
     /** From an imported backup: merged in, keeping the latest time of each use. */
+    static void validateImport(JSONArray a) throws Exception {
+        for (int i = 0; i < a.length(); i++) Entry.fromJson(a.getJSONObject(i));
+    }
+
+    static synchronized void validateImport(Context c, JSONArray a) throws Exception {
+        load(c);
+        requireReadable();
+        validateImport(a);
+    }
+
     static synchronized void merge(Context c, JSONArray a) throws Exception {
         load(c);
-        readArray(a);
-        save(c);
+        requireReadable();
+        LinkedHashMap<String, Entry> previous = new LinkedHashMap<>(entries);
+        try {
+            readArray(a);
+            saveChecked(c);
+        } catch (Exception e) {
+            entries.clear();
+            entries.putAll(previous);
+            throw e;
+        }
     }
 }
