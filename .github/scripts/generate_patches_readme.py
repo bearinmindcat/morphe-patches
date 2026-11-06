@@ -47,7 +47,7 @@ VENDOR_GROUPS = [
     # Home screen apps from every vendor get one dropdown of their own, listed first,
     # instead of sitting in their vendor's.
     ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
-                           "com.nothing.launcher", "net.oneplus.launcher")),
+                           "com.nothing.launcher", "net.oneplus.launcher", "com.sonymobile.launcher")),
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
@@ -350,6 +350,11 @@ APP_RENAMES = {
     "com.sonyericsson.album": (
         '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
         '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
+    ),
+    # Xperia Home (Sony's launcher, sony-ports): listed under Launchers.
+    "com.sonymobile.launcher": (
+        '<img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home',
+        '<img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home',
     ),
 }
 
