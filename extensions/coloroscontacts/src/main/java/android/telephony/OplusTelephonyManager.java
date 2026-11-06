@@ -1,0 +1,22 @@
+package android.telephony;
+
+/** Generated stand-in (.github/scripts/coloros-standins): names and signatures OnePlus Contacts uses, answering "absent" off ColorOS (no OPPO code). */
+public class OplusTelephonyManager {
+    public OplusTelephonyManager() {
+    }
+    public static android.telephony.OplusTelephonyManager getInstance(android.content.Context p0) {
+        return new android.telephony.OplusTelephonyManager();
+    }
+    public com.oplus.virtualcomm.VirtualCommServiceState getVirtualCommState() {
+        return null;
+    }
+    public int getVirtualcommDeviceType() {
+        return 0;
+    }
+    public boolean hasVirtualCommCapability(int p0, int p1) {
+        return false;
+    }
+    public boolean isVirtualCommSupport() {
+        return false;
+    }
+}
