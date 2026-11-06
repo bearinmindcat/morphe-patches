@@ -1,3 +1,38 @@
+## [2.8.8](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.7...v2.8.8) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* add gmail black theme ([be42a6f](https://github.com/bearinmindcat/morphe-patches/commit/be42a6ff3e6cffa7a8e6ba649ec2244924e5b762))
+* add gmail block remote images ([744e9a7](https://github.com/bearinmindcat/morphe-patches/commit/744e9a70536d021193d35ec4382eaf9293286f6f))
+* add gmail hide ads ([fa3b04f](https://github.com/bearinmindcat/morphe-patches/commit/fa3b04f78e58e32cc586f9eb48644d1a98a73664))
+* add gmail hide ai ([1190f45](https://github.com/bearinmindcat/morphe-patches/commit/1190f451a597cac9df1c9cc9e0057f7f4d82dc37))
+* add gmail hide upsells ([5d04474](https://github.com/bearinmindcat/morphe-patches/commit/5d0447402ec587749fdde08c8dd40b9f0b33f293))
+* add gmail remove telemetry ([ebd8363](https://github.com/bearinmindcat/morphe-patches/commit/ebd8363fb2f78b1e369dca0f4b6149101e9612dc))
+* add gmail strip link trackers ([e3c9919](https://github.com/bearinmindcat/morphe-patches/commit/e3c9919da6211e32b6e563644a89531946d6cbcf))
+* add gmail turn off smart compose ([6afaace](https://github.com/bearinmindcat/morphe-patches/commit/6afaacec7a148d53c255fc57c80f6577144ee694))
+* add honor screen recording non-magicos support; issue [#115](https://github.com/bearinmindcat/morphe-patches/issues/115) ([9fd63db](https://github.com/bearinmindcat/morphe-patches/commit/9fd63dbd8c4fb519d4781510da20944573641f56))
+* add microg-re support to gmail ([9d849d2](https://github.com/bearinmindcat/morphe-patches/commit/9d849d2f761b819164645d1446015fe9158e9e1b))
+* add nothing screenshot non-nothing os support; issue [#110](https://github.com/bearinmindcat/morphe-patches/issues/110) ([aca1f0b](https://github.com/bearinmindcat/morphe-patches/commit/aca1f0b9d6a25936a4eaba09e9126eae068a66ca))
+* add oneplus contacts and dialer non-coloros support; issue [#106](https://github.com/bearinmindcat/morphe-patches/issues/106) ([e029e67](https://github.com/bearinmindcat/morphe-patches/commit/e029e670a657df8276a8f6b952f52899fb4f8038))
+* add samsung email non-one ui support ([6ca0bec](https://github.com/bearinmindcat/morphe-patches/commit/6ca0bec6a9bf5a03e267d5d22a6d1973f47eda30))
+* add samsung good lock non-one ui support ([4d950f4](https://github.com/bearinmindcat/morphe-patches/commit/4d950f4ac398a01edf656c471ac0c0d6e93513da))
+* add samsung home up non-one ui support (with one ui home) ([3c4973f](https://github.com/bearinmindcat/morphe-patches/commit/3c4973f1c3a4c10f8444e6cf3a5ab1c0f3893361))
+* add samsung screen recorder non-one ui support; issue [#111](https://github.com/bearinmindcat/morphe-patches/issues/111) ([c678a55](https://github.com/bearinmindcat/morphe-patches/commit/c678a55eaf5641eac5672884c6b61d4b138a8c88))
+* add samsung wonderland non-one ui support ([6d47d70](https://github.com/bearinmindcat/morphe-patches/commit/6d47d70f993f4a47eddea32bc2dd9e7b551afac8))
+* add sony album non-xperia support ([6392b42](https://github.com/bearinmindcat/morphe-patches/commit/6392b420bf2ba22ba3a88ef02a6abe933070a44f))
+* add sony xperia home non-xperia support ([c2a5d64](https://github.com/bearinmindcat/morphe-patches/commit/c2a5d6405172b70bb387d1276b70bb847e0813b6))
+* follow playing media explains android's restricted setting; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([0fdca94](https://github.com/bearinmindcat/morphe-patches/commit/0fdca9439a53309ce67f418b2c2c8342d670b79b))
+* navigation search shows review counts; issue [#123](https://github.com/bearinmindcat/morphe-patches/issues/123) ([f373991](https://github.com/bearinmindcat/morphe-patches/commit/f37399116ee5fe712d4e31841d496a522f0929c0))
+* remove google services from samsung notes and gallery ([8de4e2b](https://github.com/bearinmindcat/morphe-patches/commit/8de4e2b241c51e5a6adffba10a17d44a8c170520))
+* samsung gallery finds photos by what's in them; issue [#120](https://github.com/bearinmindcat/morphe-patches/issues/120) ([a45e240](https://github.com/bearinmindcat/morphe-patches/commit/a45e240c0b7497a33a45b4423d7049343ffa79fa))
+* samsung gallery shows mirrored selfies the same way everywhere; issue [#104](https://github.com/bearinmindcat/morphe-patches/issues/104) ([f672936](https://github.com/bearinmindcat/morphe-patches/commit/f6729363dbb8660c904dff2b4937ad66ce3fa36f))
+* samsung good lock contacts samsung only after you agree ([48ecbb6](https://github.com/bearinmindcat/morphe-patches/commit/48ecbb688956b9567d655a1e2ab32dc6d8a477bf))
+* samsung keyboard gifs work in every language and region (giphy, region switch); issue [#122](https://github.com/bearinmindcat/morphe-patches/issues/122) ([e73b998](https://github.com/bearinmindcat/morphe-patches/commit/e73b998daddfab2293015864a4f7bcb14aa230e9))
+* samsung notes imports and exports notes (.sdocx) ([c17eb37](https://github.com/bearinmindcat/morphe-patches/commit/c17eb37819aacb17d23daaf835bffad8f78fca3d))
+* samsung notes signs in to your samsung account (experimental sync) ([af48d9b](https://github.com/bearinmindcat/morphe-patches/commit/af48d9b2ff429383aba5c63b43f19cbd3e84faaa))
+* waze map theme makes only the map black; issue [#126](https://github.com/bearinmindcat/morphe-patches/issues/126) ([9f955c2](https://github.com/bearinmindcat/morphe-patches/commit/9f955c2890ec298aa3d9f7151cc624c9a263c024))
+* xiaomi cloud import works with every xiaomi region and says what failed; issue [#125](https://github.com/bearinmindcat/morphe-patches/issues/125) ([38cfa0f](https://github.com/bearinmindcat/morphe-patches/commit/38cfa0fb05a6d5712d47b6b099ae10f3a3c06a30))
+
 ## [2.8.7](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.6...v2.8.7) (2026-11-05)
 
 ### 🐛 Bug Fixes

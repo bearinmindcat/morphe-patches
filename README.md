@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.7](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.7)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;134 patches total
+> **[v2.8.8](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.8)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;163 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;30 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;31 patches</summary>
 <br>
 
 <p>
@@ -56,6 +56,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Remove permissions](#remove-permissions) | Removes permissions that only serve Google-account features or Google's data collection: background location, physical activity, contacts, microphone (voice search stops working), camera (Lens and Live View stop working), car speed, advertising ID, push messages and Google services settings. Left out with Add microG-RE support, whose account features need them. |  |
 | [Remove sign-in prompts](#remove-sign-in-prompts) | Removes Google's sign-in prompts: the first-launch "Make it your map" page, the search screen's "Tired of typing?" card and the account sheet's "Sign in" pill. Tapping "Your profile" (or the pill, where it still shows) answers with a "Can't sign in" toast instead of nothing. With Add microG-RE support, which signs in, only the first-launch page and the card go. |  |
 | [Remove telemetry](#remove-telemetry) | Points the Firebase Installations and Play services compliance check-ins at an unresolvable host, stops every ad impression and click ping from being sent, and deregisters Google's logging, performance-monitoring, survey and Location History libraries and the on-device federated-learning services. With Add microG-RE support, Firebase Installations and Location History are left alone, so Timeline, account sync and push messages keep working. |  |
+| [Review counts in navigation search](#review-counts-in-navigation-search) | Places found while navigating show their review count next to the rating. |  |
 | [Speed cameras](#speed-cameras) | Chimes and shows a note when a speed or red light camera is coming up ahead, and puts the cameras on the map, from OpenStreetMap. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the cameras near you from an OpenStreetMap server -- an area you choose there, about 25 to 175 km across. |  |
 | [Speeding chime](#speeding-chime) | Plays a chime when your speed passes the speed limit during navigation, as Waze does. Maps itself only turns its speedometer red. When it chimes is chosen in Waze & external data source, a row on the account sheet. |  |
 | [Trim account menu](#trim-account-menu) | Removes Your Timeline, Location sharing, Your data in Maps and Help & feedback from the account sheet. Left out with Add microG-RE support, whose account features need them. |  |
@@ -84,7 +85,27 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;24 patches</summary>
+<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<br>
+
+**Supported version(s):** 2026.11.02.1012472355.Release
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app that signs in to your Google account through microG-RE. Not for root installs. |  |
+| [Black theme](#black-theme) | Pure black dark mode. |  |
+| [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
+| [Hide AI](#hide-ai) | Hides Gemini, Help me write, Polish, summaries, the AI inbox and Gemini replies. |  |
+| [Hide ads](#hide-ads) | Removes sponsored mail from the inbox, Promotions and Social. |  |
+| [Hide upsells](#hide-upsells) | Hides storage nags and Google One, Gemini and Workspace upgrade offers. |  |
+| [Remove telemetry](#remove-telemetry) | Stops logging, surveys, promo fetches and link-click tracking. |  |
+| [Strip link trackers](#strip-link-trackers) | Opens links without Google's redirect and without utm and click-tracking parameters. |  |
+| [Turn off Smart Compose](#turn-off-smart-compose) | Turns off Smart Compose and Smart Reply, so what you type isn't sent to Google for suggestions. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;25 patches</summary>
 <br>
 
 **Supported version(s):** 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
@@ -101,6 +122,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Full black](#full-black) | True black dark mode for AMOLED screens. | • Black night map |
 | [Hide ads](#hide-ads) | Removes sponsored pins, stop ads and ad tracking. |  |
 | [Map skin](#map-skin) | Bigger map labels, a wider arrow and a warm day background. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
+| [Map theme](#map-theme) | Black or dark grey map by day and night. Menus keep their colours. | • Day map<br>• Night map |
 | [Navigation distances](#navigation-distances) | Android Auto heads-up distances and the traffic bar threshold. | • Android Auto heads-up, normal roads (m)<br>• Android Auto heads-up, freeways (m)<br>• Traffic bar: time in traffic (s) |
 | [No AI reporting](#no-ai-reporting) | Turns off Gemini voice reporting. |  |
 | [No Google Assistant](#no-google-assistant) | Removes Google Assistant from Waze. |  |
@@ -130,7 +152,87 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;20 apps&nbsp;&nbsp;•&nbsp;&nbsp;31 patches</summary>
+<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;6 apps&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<br>
+<blockquote>
+
+<details>
+<summary><img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.0.210
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Home usable as a home screen on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.0.20
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Launcher usable as a home screen on non-Nothing OS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.0.07.59
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes One UI Home usable as a home screen on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 5.2.66
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-OxygenOS ROM support](#enable-non-oxygenos-rom-support) | Makes the old OxygenOS 11 OnePlus Launcher usable as a home screen on non-OxygenOS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 16.4.30
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus System Launcher usable as a home screen on non-ColorOS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 15
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Xperia ROM support](#enable-non-xperia-rom-support) | Makes Xperia Home usable as a home screen on non-Xperia ROMs. |  |
+
+</details>
+
+</blockquote>
+</details>
+
+<details>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;25 apps&nbsp;&nbsp;•&nbsp;&nbsp;43 patches</summary>
 <br>
 <blockquote>
 
@@ -183,7 +285,19 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
+<summary><img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 6.2.13.1
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Email usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
 
 **Supported version(s):** 15.9.01.7
@@ -193,7 +307,21 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Gallery installable and usable on non-One UI ROMs. |  |
 | [Extract text](#extract-text) | Brings back Extract text with an on-device text recognizer. |  |
+| [Remove Google services](#remove-google-services) | Turns off Google Maps and Play services location; maps and places are hidden. |  |
+| [Search by content](#search-by-content) | Finds photos by what's in them, such as dogs, food or credit cards, with an on-device model. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores policies pushed from Samsung's servers. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 3.0.16.6
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Good Lock on non-One UI ROMs, listing the modules that work there. |  |
 
 </details>
 
@@ -222,7 +350,19 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
+<summary><img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 18.0.00.24
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Home Up on non-One UI ROMs together with the patched One UI Home. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
 
 **Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
@@ -230,11 +370,13 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Always incognito](#always-incognito) | Never learns from what you type. |  |
+| [Always use GIPHY](#always-use-giphy) | Shows GIPHY GIFs in every language. |  |
 | [Change app name](#change-app-name) | Renames Samsung Keyboard, so the two keyboards can be told apart. | • App name |
 | [Change package name](#change-package-name) | Installs next to the system Samsung Keyboard under its own package name. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports and typed-text collection. |  |
 | [No GIF tracking](#no-gif-tracking) | Stops GIPHY and Tenor view and share pings. |  |
 | [Remove internet permission](#remove-internet-permission) | Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working. |  |
+| [Show GIFs in every region](#show-gifs-in-every-region) | Shows the GIF board where the phone's region turns it off. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores keyboard policies pushed from Samsung's servers. |  |
 
 </details>
@@ -288,7 +430,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;5 patches</summary>
 <br>
 
 **Supported version(s):** 4.4.48.15
@@ -297,6 +439,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports, usage surveys and marketing data. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
+| [Import and export notes](#import-and-export-notes) | Adds Import notes and Export notes (.sdocx files) to Settings. |  |
+| [Remove Google services](#remove-google-services) | Starts Firebase only for Samsung Cloud sync and removes the Play review prompt and Google Meet sharing. |  |
+| [Samsung account sign-in](#samsung-account-sign-in) | Signs in to your Samsung account on Samsung's web page to sync with Samsung Cloud (experimental). |  |
 
 </details>
 
@@ -333,6 +478,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Reminder installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 4.0.23
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Screen Recorder installable and usable on non-One UI ROMs. |  |
 
 </details>
 
@@ -382,6 +539,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Weather usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 1.6.22
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Wonderland on non-One UI ROMs. |  |
 
 </details>
 
@@ -507,7 +676,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Nothing Apps&nbsp;&nbsp;•&nbsp;&nbsp;2 apps&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary>📱 Nothing Apps&nbsp;&nbsp;•&nbsp;&nbsp;3 apps&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 <blockquote>
 
@@ -535,11 +704,23 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 </details>
 
+<details>
+<summary><img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.0
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Opens Nothing Screenshot's editor on any image on non-Nothing OS ROMs. |  |
+
+</details>
+
 </blockquote>
 </details>
 
 <details>
-<summary>📱 Honor Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary>📱 Honor Apps&nbsp;&nbsp;•&nbsp;&nbsp;10 apps&nbsp;&nbsp;•&nbsp;&nbsp;10 patches</summary>
 <br>
 <blockquote>
 
@@ -628,6 +809,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
+<summary><img src="docs/icons/honor-screen-recorder.png" width="20" height="20" align="top"> Honor Screen recording&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-screen-recorder.png" width="20" height="20" align="top"> Honor Screen recording&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 14.0.1.181
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Screen recording usable on non-Honor ROMs. |  |
+
+</details>
+
+<details>
 <summary><img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-video-player.png" width="20" height="20" align="top"> Honor Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
@@ -707,7 +900,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;10 apps&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
 <br>
 <blockquote>
 
@@ -744,6 +937,19 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Compass installable and usable on non-ColorOS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**Supported version(s):** 16.80.15
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to the phone's own Contacts app under its own package name. | • Package name |
+| [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Runs OnePlus Contacts on non-ColorOS ROMs; your default phone app still handles calls. |  |
 
 </details>
 
@@ -823,67 +1029,19 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;5 apps&nbsp;&nbsp;•&nbsp;&nbsp;5 patches</summary>
+<summary>📱 Sony Apps&nbsp;&nbsp;•&nbsp;&nbsp;1 app&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 <blockquote>
 
 <details>
-<summary><img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 14.0.0.210
+**Supported version(s):** 9.9.A.0.20
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Home usable as a home screen on non-Honor ROMs. |  |
-
-</details>
-
-<details>
-<summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
-<br>
-
-**Supported version(s):** 4.0.20
-
-| Patch | Description | Options |
-|----------|----------------|-----------|
-| [Enable non-Nothing OS ROM support](#enable-non-nothing-os-rom-support) | Makes Nothing Launcher usable as a home screen on non-Nothing OS ROMs. |  |
-
-</details>
-
-<details>
-<summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
-<br>
-
-**Supported version(s):** 18.0.07.59
-
-| Patch | Description | Options |
-|----------|----------------|-----------|
-| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes One UI Home usable as a home screen on non-One UI ROMs. |  |
-
-</details>
-
-<details>
-<summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
-<br>
-
-**Supported version(s):** 5.2.66
-
-| Patch | Description | Options |
-|----------|----------------|-----------|
-| [Enable non-OxygenOS ROM support](#enable-non-oxygenos-rom-support) | Makes the old OxygenOS 11 OnePlus Launcher usable as a home screen on non-OxygenOS ROMs. |  |
-
-</details>
-
-<details>
-<summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
-<br>
-
-**Supported version(s):** 16.4.30
-
-| Patch | Description | Options |
-|----------|----------------|-----------|
-| [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus System Launcher usable as a home screen on non-ColorOS ROMs. |  |
+| [Enable non-Xperia ROM support](#enable-non-xperia-rom-support) | Makes Sony Album usable on non-Xperia ROMs. |  |
 
 </details>
 
