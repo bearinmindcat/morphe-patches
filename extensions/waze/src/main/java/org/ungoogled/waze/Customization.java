@@ -93,6 +93,8 @@ public final class Customization {
                 "Bigger labels, wider arrow, warm day map"});
         LABELS.put("blackNightMap", new String[]{"Black night map",
                 "Pure black night map"});
+        LABELS.put("mapTheme", new String[]{"Map theme",
+                "Dark map by day or night, menus unchanged"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "One sign style in every country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
@@ -161,6 +163,10 @@ public final class Customization {
     private static final String FONT_HUGE = "SKIN_FONT_HUGE", FONT_BIG = "SKIN_FONT_BIG", FONT_MEDIUM = "SKIN_FONT_MEDIUM",
             FONT_SMALL = "SKIN_FONT_SMALL", ARROW_HEAD = "SKIN_ARROW_HEAD", DAY_BACKGROUND = "SKIN_DAY_BACKGROUND";
     private static final String PIN_SIZE = "PIN_SIZE";
+    /** Map theme's choices for the day and the night map (issue #126): stock, black or grey. */
+    private static final String MAP_THEME_DAY = "MAP_THEME_DAY", MAP_THEME_NIGHT = "MAP_THEME_NIGHT";
+    private static final String[] MAP_THEMES = {"stock", "black", "grey"};
+    private static final String[] MAP_THEME_NAMES = {"Stock", "Black", "Dark grey"};
     /** Average speed zone bar's tolerance: a percentage of the limit, and at least this many km/h or mph. */
     static final String ZONE_TOLERANCE_PERCENT = "ZONE_TOLERANCE_PERCENT", ZONE_TOLERANCE_MIN = "ZONE_TOLERANCE_MIN";
     /** Where the zone bar goes on the phone's screen (issue #91). */
@@ -194,6 +200,8 @@ public final class Customization {
         VALUE_LABELS.put(ARROW_HEAD, Label.tenths("Navigation arrow head width", "x the tail", 300, 30));
         VALUE_LABELS.put(DAY_BACKGROUND, Label.hex("Day map background", "FAFCFA"));
         VALUE_LABELS.put(PIN_SIZE, new Label("Alert pin size", "%", 1, 300, 100));
+        VALUE_LABELS.put(MAP_THEME_DAY, new Label("Day map", MAP_THEMES, MAP_THEME_NAMES));
+        VALUE_LABELS.put(MAP_THEME_NIGHT, new Label("Night map", MAP_THEMES, MAP_THEME_NAMES));
         VALUE_LABELS.put(ZONE_TOLERANCE_PERCENT, new Label("Tolerance above the limit", "%", 1, 50));
         VALUE_LABELS.put(ZONE_TOLERANCE_MIN, new Label("Tolerance, at least", "km/h or mph", 1, 50));
         VALUE_LABELS.put(ZONE_POSITION, new Label("Position",
@@ -371,7 +379,7 @@ public final class Customization {
     private static void set(String feature, boolean on) {
         SharedPreferences p = prefs();
         if (p != null) p.edit().putBoolean(feature, on).commit();
-        if (feature.equals("mapSkin") || feature.equals("blackNightMap")) applySkin();
+        if (feature.equals("mapSkin") || feature.equals("blackNightMap") || feature.equals("mapTheme")) applySkin();
         if (feature.equals("biggerPins")) applyPins();
         if (feature.equals("zoneBar")) ZoneBar.switched(on);
         if (feature.equals("flockCameras")) Flock.switched(on);
@@ -406,7 +414,7 @@ public final class Customization {
         else if (value instanceof Integer) e.putInt(valueKey(name), (Integer) value);
         else e.putString(valueKey(name), String.valueOf(value));
         e.commit();
-        if (name.startsWith("SKIN_")) applySkin();
+        if (name.startsWith("SKIN_") || name.startsWith("MAP_THEME_")) applySkin();
         if (name.equals(PIN_SIZE)) applyPins();
         if (name.equals(ZONE_POSITION)) ZoneBar.moved();
         reapply(name + " = " + (value == null ? "the patch's" : value));
@@ -538,6 +546,12 @@ public final class Customization {
      * its map engine reads that copy from then on; it does not copy again. So these features rewrite the
      * copy, from the APK's untouched originals, as Waze starts and whenever they change here -- the APK's
      * assets are never edited (Morphe Manager 1.35 crashes Waze when they are). Off writes the originals.
+     *
+     * Only the map's skin is touched: Waze's menus, sheets and buttons are app resources, which Full black
+     * changes and Map theme leaves alone. Who decides each map, first match wins:
+     *   day map:   Map theme's day choice when not Stock (Waze's night colours on black or dark grey), else Map
+     *              skin's day background, else Waze's own;
+     *   night map: Map theme's night choice when not Stock, else Full black's Black night map, else Waze's own.
      */
     private static final String SKIN_ASSETS = "res/skins/default/";
     private static final String[] SKIN_STRUCTURES = {"skin_structure.main.lua", "experiment/skin_structure.main.lua"};
@@ -545,30 +559,48 @@ public final class Customization {
             "experiment/skin_values.day.lua", "experiment/skin_values.editor.day.lua"};
     private static final String[] SKIN_NIGHT = {"skin_values.night.lua", "skin_values.editor.night.lua",
             "experiment/skin_values.night.lua", "experiment/skin_values.editor.night.lua"};
+    private static final String BLACK = "000000", DARK_GREY = "202124";
     private static boolean waitingForSkins;
 
-    /** Rewrites Waze's skin copy for Map skin and Black night map as they are set now. */
+    /** A Map theme choice's background, or null for Stock (or Map theme switched off or not patched). */
+    private static String themeBackground(String name) {
+        if (!features().contains("mapTheme") || !on("mapTheme")) return null;
+        String v = string(name, "stock");
+        return "black".equals(v) ? BLACK : "grey".equals(v) ? DARK_GREY : null;
+    }
+
+    /** Rewrites Waze's skin copy for Map skin, Map theme and Black night map as they are set now. */
     static synchronized void applySkin() {
         try {
             Context c = context();
             if (c == null) return;
             List<String> list = features();
-            boolean skinPatched = list.contains("mapSkin"), nightPatched = list.contains("blackNightMap");
-            if (!skinPatched && !nightPatched) return;
+            boolean skinPatched = list.contains("mapSkin"), nightPatched = list.contains("blackNightMap"),
+                    themePatched = list.contains("mapTheme");
+            if (!skinPatched && !nightPatched && !themePatched) return;
             File dir = new File(c.getApplicationInfo().dataDir, "waze/skins/default");
             if (!new File(dir, SKIN_STRUCTURES[0]).isFile()) {
                 waitForSkins();   // Waze's first start: its copy is made after this
                 return;
             }
-            boolean skin = skinPatched && on("mapSkin"), night = nightPatched && on("blackNightMap");
+            boolean skin = skinPatched && on("mapSkin");
+            String day = themeBackground(MAP_THEME_DAY), night = themeBackground(MAP_THEME_NIGHT);
+            if (night == null && nightPatched && on("blackNightMap")) night = BLACK;
             int written = 0;
-            if (skinPatched) {
-                for (String f : SKIN_STRUCTURES) written += rewrite(c, dir, f, skin ? 1 : 0);
-                for (String f : SKIN_DAY) written += rewrite(c, dir, f, skin ? 2 : 0);
+            if (skinPatched) for (String f : SKIN_STRUCTURES) written += rewrite(c, dir, f, f, skin ? 1 : 0, null);
+            if (skinPatched || themePatched) {
+                for (int i = 0; i < SKIN_DAY.length; i++) {
+                    // A dark day map is Waze's night skin on the chosen background, in the day files.
+                    if (day != null) written += rewrite(c, dir, SKIN_DAY[i], SKIN_NIGHT[i], 3, day);
+                    else written += rewrite(c, dir, SKIN_DAY[i], SKIN_DAY[i], skin ? 2 : 0, null);
+                }
             }
-            if (nightPatched) for (String f : SKIN_NIGHT) written += rewrite(c, dir, f, night ? 3 : 0);
-            Log.i("UA", "Waze customization: map skin " + (skinPatched ? (skin ? "on" : "off") : "-") + ", black night map "
-                    + (nightPatched ? (night ? "on" : "off") : "-") + ", " + written + " skin files written");
+            if (nightPatched || themePatched) {
+                for (String f : SKIN_NIGHT) written += rewrite(c, dir, f, f, night != null ? 3 : 0, night);
+            }
+            Log.i("UA", "Waze customization: map skin " + (skinPatched ? (skin ? "on" : "off") : "-") + ", day map "
+                    + (day != null ? day : skin ? "map skin" : "stock") + ", night map " + (night != null ? night : "stock")
+                    + ", " + written + " skin files written");
         } catch (Throwable t) {
             Log.w("UA", "Waze customization: map skin", t);
         }
@@ -708,19 +740,19 @@ public final class Customization {
     }
 
     /**
-     * [file] of the copy rewritten from the APK's original: [how] 0 = as it is, 1 = Map skin's label sizes
-     * and arrow head, 2 = Map skin's day background, 3 = a black night background. 1 when it was written.
+     * [file] of the copy rewritten from the APK's original [from]: [how] 0 = as it is, 1 = Map skin's label sizes
+     * and arrow head, 2 = Map skin's day background, 3 = the background [hex]. 1 when it was written.
      */
-    private static int rewrite(Context c, File dir, String file, int how) {
+    private static int rewrite(Context c, File dir, String file, String from, int how, String hex) {
         try {
             String original;
-            try (InputStream in = c.getAssets().open(SKIN_ASSETS + file)) {
+            try (InputStream in = c.getAssets().open(SKIN_ASSETS + from)) {
                 original = text(in);
             }
             String text = original;
             if (how == 1) text = structure(original);
             else if (how == 2) text = background(original, skinString(DAY_BACKGROUND, "EBE7DD"));
-            else if (how == 3) text = background(original, "000000");
+            else if (how == 3) text = background(original, hex);
             File out = new File(dir, file);
             if (out.isFile()) {
                 try (InputStream in = new FileInputStream(out)) {

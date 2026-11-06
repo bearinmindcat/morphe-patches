@@ -11,7 +11,8 @@ import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 /**
  * Black night map, applied while Waze runs: the extension writes a black background into Waze's own copy
  * of its night skins (Customization.applySkin), as for Map skin -- the APK's assets are not edited. Here
- * it is only listed, with a switch, when Full black's option asks for it.
+ * it is only listed, with a switch, when Full black's option asks for it. Map theme writes the same files the
+ * same way; its night choice, when not Stock, wins over this one.
  */
 private val wazeBlackNightMapPatch: BytecodePatch = bytecodePatch {
     dependsOn(wazeCustomizationPatch)
