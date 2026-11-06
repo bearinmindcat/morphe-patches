@@ -4,8 +4,11 @@ import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.UserHandle;
 import android.provider.Settings;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -324,6 +327,35 @@ public final class SystemAccess {
         } catch (SecurityException | IllegalArgumentException e) {
             refused(name, e);
             return false;
+        }
+    }
+
+    // Build
+
+    /**
+     * The phone's serial number, which only a system app may read: refused, it is withheld (as Android withholds it
+     * from every ordinary app), and the keyboard sends its language pack requests without it.
+     */
+    public static String buildGetSerial() {
+        try {
+            return Build.getSerial();
+        } catch (SecurityException e) {
+            refused("serial", e);
+            return "";
+        }
+    }
+
+    // TelephonyManager
+
+    /**
+     * The keyboard listens for calls as it starts, which needs a phone permission only the system keyboard has: refused,
+     * it simply does not hear of calls (it stopped starting up halfway before).
+     */
+    public static void telephonyManagerListen(TelephonyManager manager, PhoneStateListener listener, int events) {
+        try {
+            manager.listen(listener, events);
+        } catch (SecurityException e) {
+            refused("phone state", e);
         }
     }
 

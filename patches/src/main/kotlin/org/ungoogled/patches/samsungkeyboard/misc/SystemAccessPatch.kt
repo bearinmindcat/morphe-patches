@@ -19,6 +19,8 @@ private val OWNERS = mapOf(
     "Landroid/provider/Settings\$System;" to "system",
     "Landroid/provider/Settings\$Global;" to "global",
     "Landroid/content/Context;" to "context",
+    "Landroid/os/Build;" to "build",
+    "Landroid/telephony/TelephonyManager;" to "telephonyManager",
     "Landroid/view/ViewManager;" to "viewManager",
     "Landroid/view/WindowManager;" to "windowManager",
 )
@@ -26,7 +28,8 @@ private val OWNERS = mapOf(
 /**
  * Calls only a system app may make go through SystemAccess, which does them the ordinary app's way: the copy is
  * an ordinary app, and Android refuses it the hidden settings the system keyboard reads as it starts, the
- * broadcast to every user it sends as it shows and the system window sticker suggestions open as you type. Every
+ * broadcast to every user it sends as it shows, the system window sticker suggestions open as you type and the serial
+ * number its language pack downloads ask for, and the call listener it registers as it starts. Every
  * call SystemAccess has a method for moves (an instance call passes its receiver first); nothing else does.
  */
 internal val systemAccessPatch = bytecodePatch(
