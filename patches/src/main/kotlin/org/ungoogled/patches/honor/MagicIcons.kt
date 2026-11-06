@@ -14,7 +14,8 @@ private val FRAMEWORK_ICON_ATTRIBUTES = mapOf(
     "0201013b" to "width",
 )
 
-private val FRAMEWORK_ATTRIBUTE = Regex("""androidhnext:r0x(02[0-9a-f]{6})="([^"]*)"""", RegexOption.IGNORE_CASE)
+// The namespace's prefix is androidhnext, or Huawei's older androidhwext (Screen recording).
+private val FRAMEWORK_ATTRIBUTE = Regex("""android(?:hn|hw)ext:r0x(02[0-9a-f]{6})="([^"]*)"""", RegexOption.IGNORE_CASE)
 private val ROOT = Regex("""<(\w[\w.]*)\b([^>]*?)(/?)>""")
 private fun attribute(attributes: String, name: String) = Regex("""\b$name="([^"]*)"""").find(attributes)?.groupValues?.get(1)
 

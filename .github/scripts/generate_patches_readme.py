@@ -272,6 +272,10 @@ APP_RENAMES = {
         '<img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather',
         '<img src="docs/icons/honor-weather.png" width="20" height="20" align="top"> Honor Weather',
     ),
+    "com.hihonor.screenrecorder": (
+        '<img src="docs/icons/honor-screen-recorder.png" width="20" height="20" align="top"> Honor Screen recording',
+        '<img src="docs/icons/honor-screen-recorder.png" width="20" height="20" align="top"> Honor Screen recording',
+    ),
     "com.hihonor.android.launcher": (
         '<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home',
         '<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home',
