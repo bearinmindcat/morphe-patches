@@ -19,6 +19,11 @@ public final class Done<V> implements ListenableFuture<V> {
         return new Done<>(Collections.emptyList());
     }
 
+    /** Remove telemetry: GrowthKit's start-up, reported as done without starting it -- no promo sync. */
+    public static ListenableFuture<?> nothing() {
+        return new Done<>(null);
+    }
+
     @Override
     public void addListener(Runnable listener, Executor executor) {
         executor.execute(listener);
