@@ -178,6 +178,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder',
         '<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder',
     ),
+    "com.sec.app.screenrecorder": (
+        '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
+        '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
+    ),
     "com.sec.android.app.launcher": (
         '<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home',
         '<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home',
