@@ -47,7 +47,7 @@ VENDOR_GROUPS = [
     # Home screen apps from every vendor get one dropdown of their own, listed first,
     # instead of sitting in their vendor's.
     ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
-                           "com.nothing.launcher", "net.oneplus.launcher", "com.sonymobile.launcher", "com.asus.launcher", "com.motorola.launcher3")),
+                           "com.nothing.launcher", "net.oneplus.launcher", "com.sonymobile.launcher", "com.asus.launcher", "com.motorola.launcher3", "com.miui.home")),
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
@@ -386,6 +386,11 @@ APP_RENAMES = {
     "com.motorola.launcher3": (
         '<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher',
         '<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher',
+    ),
+    # HyperOS launcher (Xiaomi's System launcher, com.miui.home): listed under Launchers, not Xiaomi Apps.
+    "com.miui.home": (
+        '<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher',
+        '<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher',
     ),
 }
 

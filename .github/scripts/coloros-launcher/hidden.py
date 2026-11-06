@@ -343,22 +343,22 @@ src = f'''package {pkg}
  * {", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))}
  */
 
-internal val HIDDEN_MEMBERS = setOf(
+internal val HIDDEN_MEMBERS = setOf''' + ('' if members else '<String>') + '''(
 ''' + ''.join(f'    {kt(k)},\n' for k in sorted(members)) + ''')
 
 /** Constructors of the same kind, called with new: Members.construct makes the object where it can (null otherwise). */
-internal val HIDDEN_CONSTRUCTORS = setOf(
+internal val HIDDEN_CONSTRUCTORS = setOf''' + ('' if ctors else '<String>') + '''(
 ''' + ''.join(f'    {kt(k)},\n' for k in sorted(ctors)) + ''')
 
 /** Super calls to such a constructor that take an open constructor of the same class with the first arguments. */
-internal val SUPER_CONSTRUCTORS = mapOf(
+internal val SUPER_CONSTRUCTORS = mapOf''' + ('' if substitutes else '<String, String>') + '''(
 ''' + ''.join(f'    {kt(k)} to {kt(v)},\n' for k, v in sorted(substitutes.items())) + ''')
 
 /**
  * Android classes the launcher extends through such a constructor, with the class each subclass is rebased onto and the
  * Android interfaces it keeps (see rebaseSubclasses).
  */
-internal val HIDDEN_SUPERCLASSES = mapOf(
+internal val HIDDEN_SUPERCLASSES = mapOf''' + ('' if rebases else '<String, Pair<String, List<String>>>') + '''(
 ''' + ''.join(f'    {kt(k)} to ({kt(b)} to listOf({", ".join(kt(i) for i in its)})),\n' for k, (b, its) in sorted(rebases.items())) + ')\n'
 open(out, 'w').write(src)
 print(len(members), 'members,', len(ctors), 'constructors;', dict(counts), len(substitutes), 'super constructors,',
