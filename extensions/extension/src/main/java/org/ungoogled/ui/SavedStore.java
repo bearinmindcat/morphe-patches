@@ -121,6 +121,8 @@ final class SavedStore {
     static final Map<String, Place> labels = new LinkedHashMap<>();
     /** Lists whose places are not drawn on the map ("Hide on map"); every other list is. */
     static final Set<String> hiddenOnMap = new LinkedHashSet<>();
+    /** List id -> the emoji its places are drawn with on the map (issue #128); lists of the user's own only. */
+    static final Map<String, String> emojis = new java.util.HashMap<>();
 
     private SavedStore() {}
 
@@ -131,6 +133,7 @@ final class SavedStore {
         places.clear();
         labels.clear();
         hiddenOnMap.clear();
+        emojis.clear();
         home = work = null;
         try {
             File f = new File(c.getFilesDir(), FILE);
@@ -165,7 +168,10 @@ final class SavedStore {
         JSONArray l = root.optJSONArray("lists");
         if (l != null) for (int i = 0; i < l.length(); i++) {
             JSONObject o = l.getJSONObject(i);
-            if (replace || !lists.containsKey(o.getString("id"))) lists.put(o.getString("id"), o.getString("name"));
+            String id = o.getString("id");
+            if (replace || !lists.containsKey(id)) lists.put(id, o.getString("name"));
+            String emoji = o.optString("emoji", "");
+            if (!emoji.isEmpty() && (replace || !emojis.containsKey(id))) emojis.put(id, emoji);
         }
         JSONArray ps = root.optJSONArray("places");
         if (ps != null) for (int i = 0; i < ps.length(); i++) merge(Place.fromJson(ps.getJSONObject(i)));
@@ -204,7 +210,11 @@ final class SavedStore {
         root.put("app", "Ungoogled Maps");
         root.put("version", 2);
         JSONArray l = new JSONArray();
-        for (Map.Entry<String, String> e : lists.entrySet()) l.put(new JSONObject().put("id", e.getKey()).put("name", e.getValue()));
+        for (Map.Entry<String, String> e : lists.entrySet()) {
+            JSONObject o = new JSONObject().put("id", e.getKey()).put("name", e.getValue());
+            if (emojis.containsKey(e.getKey())) o.put("emoji", emojis.get(e.getKey()));
+            l.put(o);
+        }
         root.put("lists", l);
         JSONArray ps = new JSONArray();
         for (Place p : places.values()) ps.put(p.toJson());
@@ -290,15 +300,20 @@ final class SavedStore {
         return out;
     }
 
-    static synchronized String addList(Context c, String name) {
+    static synchronized String addList(Context c, String name, String emoji) {
         String id = "l" + System.currentTimeMillis();
         lists.put(id, name);
+        if (emoji != null && !emoji.isEmpty()) emojis.put(id, emoji);
         save(c);
         return id;
     }
 
-    static synchronized void renameList(Context c, String id, String name) {
-        if (lists.containsKey(id)) lists.put(id, name);
+    /** A new name and, for a list of the user's own, emoji (null or "" for the list icon). */
+    static synchronized void editList(Context c, String id, String name, String emoji) {
+        if (!lists.containsKey(id)) return;
+        lists.put(id, name);
+        if (emoji == null || emoji.isEmpty() || isDefault(id)) emojis.remove(id);
+        else emojis.put(id, emoji);
         save(c);
     }
 
@@ -306,6 +321,7 @@ final class SavedStore {
     static synchronized void deleteList(Context c, String id) {
         if (isDefault(id)) return;
         lists.remove(id);
+        emojis.remove(id);
         for (Place p : places.values()) p.lists.remove(id);
         save(c);
     }

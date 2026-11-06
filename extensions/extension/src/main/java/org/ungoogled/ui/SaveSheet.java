@@ -183,8 +183,8 @@ final class SaveSheet {
         newList.setCompoundDrawablePadding(dp(8));
         newList.setGravity(Gravity.CENTER_VERTICAL);
         newList.setPadding(dp(8), dp(1), 0, 0);
-        newList.setOnClickListener(v -> SavedPlaces.newList(a, n -> {
-            String id = SavedStore.addList(a, n);
+        newList.setOnClickListener(v -> SavedPlaces.listDialog(a, null, (n, e) -> {
+            String id = SavedStore.addList(a, n, e);
             Set<String> in = new LinkedHashSet<>(place.lists);
             in.add(id);
             SavedStore.setLists(a, place, in);
@@ -456,7 +456,10 @@ final class SaveSheet {
             }
             case SavedStore.STARRED: return new PathIcon(PathIcon.STAR, dark ? 0xFFFCAD70 : 0xFFD57A2D);
             case SavedStore.FAVOURITES: return new PathIcon(PathIcon.HEART, dark ? 0xFFFF8BCB : 0xFFD23B8F);
-            default: return new PathIcon(PathIcon.LIST, dark ? 0xFF7CD0E0 : 0xFF489CAC);
+            default: {
+                String emoji = SavedStore.emojis.get(id);
+                return emoji != null ? new EmojiIcon(emoji) : new PathIcon(PathIcon.LIST, dark ? 0xFF7CD0E0 : 0xFF489CAC);
+            }
         }
     }
 

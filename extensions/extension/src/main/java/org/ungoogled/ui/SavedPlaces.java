@@ -8,6 +8,8 @@ import android.net.Uri;
 import android.text.InputType;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -298,23 +300,80 @@ public final class SavedPlaces {
 
     interface NameListener { void named(String name); }
 
-    static void newList(Activity a, NameListener then) {
+    interface ListListener { void done(String name, String emoji); }
+
+    /** Emoji offered for a list's places on the map; any other can be typed. */
+    private static final String[] EMOJI = {
+            "\uD83C\uDF7D\uFE0F", "\u2615", "\uD83C\uDF55", "\uD83C\uDF7A", "\uD83D\uDED2", "\uD83C\uDFE8", "\u26FD",
+            "\uD83C\uDF33", "\uD83C\uDFD6\uFE0F", "\u26F0\uFE0F", "\uD83C\uDFDB\uFE0F", "\uD83C\uDFAD", "\uD83C\uDFB5",
+            "\uD83C\uDFCB\uFE0F", "\uD83C\uDFE5", "\uD83D\uDCDA", "\u2764\uFE0F", "\u2B50", "\uD83D\uDCCD", "\uD83D\uDC36",
+    };
+
+    /**
+     * Creates a list ([id] null) or edits one: its name and, for a list of the user's own, the emoji its places are
+     * drawn with on the map (issue #128).
+     */
+    static void listDialog(Activity a, String id, ListListener then) {
+        boolean own = id == null || !SavedStore.isDefault(id);
+        float dp = a.getResources().getDisplayMetrics().density;
+        int pad = Math.round(20 * dp);
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
         EditText field = new EditText(a);
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         field.setHint("List name");
-        int pad = (int) (20 * a.getResources().getDisplayMetrics().density);
-        android.widget.FrameLayout box = new android.widget.FrameLayout(a);
-        box.setPadding(pad, pad / 2, pad, 0);
+        if (id != null) field.setText(SavedStore.lists.get(id));
         box.addView(field);
+        EditText emoji = new EditText(a);
+        if (own) {
+            TextView title = new TextView(a);
+            title.setText("Icon on the map");
+            title.setPadding(0, Math.round(12 * dp), 0, Math.round(4 * dp));
+            box.addView(title);
+            LinearLayout row = new LinearLayout(a);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            emoji.setSingleLine(true);
+            emoji.setTextSize(22);
+            emoji.setGravity(android.view.Gravity.CENTER);
+            emoji.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(16)});
+            String now = id == null ? null : SavedStore.emojis.get(id);
+            if (now != null) emoji.setText(now);
+            row.addView(emoji, new LinearLayout.LayoutParams(Math.round(64 * dp), -2));
+            android.widget.HorizontalScrollView scroll = new android.widget.HorizontalScrollView(a);
+            scroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout picks = new LinearLayout(a);
+            for (String e : EMOJI) {
+                TextView t = new TextView(a);
+                t.setText(e);
+                t.setTextSize(24);
+                t.setGravity(android.view.Gravity.CENTER);
+                t.setPadding(Math.round(6 * dp), Math.round(4 * dp), Math.round(6 * dp), Math.round(4 * dp));
+                t.setOnClickListener(v -> emoji.setText(e.equals(emoji.getText().toString()) ? "" : e));
+                picks.addView(t);
+            }
+            scroll.addView(picks);
+            row.addView(scroll, new LinearLayout.LayoutParams(0, -2, 1f));
+            box.addView(row);
+        }
         new AlertDialog.Builder(a, dialogTheme(a))
-                .setTitle("New list")
+                .setTitle(id == null ? "New list" : "Edit list")
                 .setView(box)
-                .setPositiveButton("Create", (d, w) -> {
+                .setPositiveButton(id == null ? "Create" : "Save", (d, w) -> {
                     String name = field.getText().toString().trim();
-                    if (!name.isEmpty()) then.named(name);
+                    if (!name.isEmpty()) then.done(name, own ? firstGrapheme(emoji.getText().toString().trim()) : null);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** The first character as people see it (an emoji with its modifiers and joiners), or "". */
+    private static String firstGrapheme(String s) {
+        if (s.isEmpty()) return "";
+        android.icu.text.BreakIterator b = android.icu.text.BreakIterator.getCharacterInstance();
+        b.setText(s);
+        int end = b.next();
+        return end <= 0 ? s : s.substring(0, end);
     }
 
     /** Names [p]; [old] is the label being renamed, or null. "Home" and "Work" set those. */

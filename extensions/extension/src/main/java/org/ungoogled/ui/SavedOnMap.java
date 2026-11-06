@@ -160,7 +160,9 @@ public final class SavedOnMap {
             low = Long.parseUnsignedLong(p.ftid.substring(colon + 3), 16);
         }
         String name = title != null && !title.isEmpty() ? title : p.name != null ? p.name : "";
-        Object list = listType == null ? null : listInfo("ungoogled:" + listId, listType, listName != null ? listName : "", null);
+        // A list of the user's own is drawn with its emoji when it has one (issue #128).
+        String emoji = "CUSTOM".equals(listType) ? SavedStore.emojis.get(listId) : null;
+        Object list = listType == null ? null : listInfo("ungoogled:" + listId, listType, listName != null ? listName : "", emoji);
         Object item = item(high, low, p.lat, p.lng, name, name, alias, list, starred);
         if (item != null) out.add(item);
     }

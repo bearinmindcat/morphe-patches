@@ -171,7 +171,7 @@ public final class YouActivity extends UiScreen {
 
         body.addView(bandView());
         body.addView(sectionTitle("Your saves", null, "New list", v ->
-                SavedPlaces.newList(this, n -> { SavedStore.addList(this, n); render(); })));
+                SavedPlaces.listDialog(this, null, (n, e) -> { SavedStore.addList(this, n, e); render(); })));
         body.addView(allSavedCard());
         List<View> lists = new ArrayList<>();
         for (Map.Entry<String, String> e : listsByUse()) lists.add(listRow(e.getKey(), e.getValue()));
@@ -862,11 +862,11 @@ public final class YouActivity extends UiScreen {
         if (name == null) return;
         PopupMenu m = new PopupMenu(this, anchor);
         m.getMenu().add(0, 0, 0, "Share list");
-        m.getMenu().add(0, 1, 1, "Rename");
+        m.getMenu().add(0, 1, 1, SavedStore.isDefault(listId) ? "Rename" : "Edit list");
         if (!SavedStore.isDefault(listId)) m.getMenu().add(0, 2, 2, "Delete list");
         m.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 0) shareList(name, SavedStore.inList(listId));
-            else if (item.getItemId() == 1) SavedPlaces.newList(this, n -> { SavedStore.renameList(this, listId, n); render(); });
+            else if (item.getItemId() == 1) SavedPlaces.listDialog(this, listId, (n, e) -> { SavedStore.editList(this, listId, n, e); render(); });
             else deleteList(listId, name);
             return true;
         });
@@ -885,13 +885,13 @@ public final class YouActivity extends UiScreen {
     /** Edit on a list: rename it, take places out of it, or delete it (one of the user's own). */
     private void editList(String title) {
         List<String> items = new ArrayList<>();
-        items.add("Rename");
+        items.add(SavedStore.isDefault(listId) ? "Rename" : "Edit list");
         items.add("Remove places…");
         if (!SavedStore.isDefault(listId)) items.add("Delete list");
         new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
                 .setTitle(title)
                 .setItems(items.toArray(new String[0]), (d, which) -> {
-                    if (which == 0) SavedPlaces.newList(this, n -> { SavedStore.renameList(this, listId, n); render(); });
+                    if (which == 0) SavedPlaces.listDialog(this, listId, (n, e) -> { SavedStore.editList(this, listId, n, e); render(); });
                     else if (which == 1) removePlaces();
                     else deleteList(listId, title);
                 })
@@ -1256,8 +1256,8 @@ public final class YouActivity extends UiScreen {
         List<Runnable> acts = new ArrayList<>();
         names.add("Open");
         acts.add(() -> { if (!LIST.equals(page)) go(LIST, id); });
-        names.add("Rename");
-        acts.add(() -> SavedPlaces.newList(this, n -> { SavedStore.renameList(this, id, n); if (LIST.equals(page)) recreate(); else render(); }));
+        names.add(SavedStore.isDefault(id) ? "Rename" : "Edit list");
+        acts.add(() -> SavedPlaces.listDialog(this, id, (n, e) -> { SavedStore.editList(this, id, n, e); if (LIST.equals(page)) recreate(); else render(); }));
         // Its places on Maps' map, with the list's icon (SavedOnMap).
         boolean onMap = !SavedStore.hiddenOnMap.contains(id);
         names.add(onMap ? "Hide on map" : "Show on map");
