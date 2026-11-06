@@ -8,7 +8,9 @@ import android.os.Process;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -19,12 +21,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 final class ExifOrientation {
     private static final String TAG = "UA";
-    /** More unread photos than this are read in the background, so that Gallery's first query does not wait. */
+    /** Unread photos read during the sync (the newest); the rest are read in the background, so Gallery's query does not wait. */
     private static final int AT_ONCE = 64;
     private static final int CHUNK = 200;
     private static final String TYPES = "('image/jpeg','image/heic','image/heif','image/webp','image/x-adobe-dng')";
     private static final String MATCH = "e._id = files._id AND e.date_modified IS files.date_modified AND e._size IS files._size";
     private static final AtomicBoolean reading = new AtomicBoolean();
+    /** Photos the background read has taken. */
+    private static final Set<Long> IN_FLIGHT = new HashSet<>();
 
     private ExifOrientation() {
     }
@@ -51,7 +55,9 @@ final class ExifOrientation {
 
     /**
      * Fills files.orientation_tag: the value that goes with the photo's rotation, then every value read from a photo.
-     * Runs inside the copy's sync.
+     * The newest unread photos (a new selfie) are read at once; the rest of a library read the first time is read in the
+     * background, and Gallery's lists reload when that read is done (MediaMirror.orientationsRead) -- a list loaded
+     * before showed those photos unmirrored while screens loaded later showed them mirrored. Runs inside the copy's sync.
      */
     static void fill(MediaMirror mirror, SQLiteDatabase d, String schema) {
         String table = schema + ".exif_orientation";
@@ -59,26 +65,33 @@ final class ExifOrientation {
                 + "WHEN 180 THEN 3 WHEN 270 THEN 8 ELSE 1 END ELSE 0 END");
         d.execSQL("UPDATE files SET orientation_tag = (SELECT e.tag FROM " + table + " e WHERE " + MATCH + ") "
                 + "WHERE EXISTS (SELECT 1 FROM " + table + " e WHERE " + MATCH + " AND e.tag > 0)");
-        if (reading.get()) return;
         List<Photo> unread = new ArrayList<>();
         try (Cursor c = d.rawQuery("SELECT _id, _data, date_modified, _size FROM files WHERE media_type = 1 AND mime_type IN "
-                + TYPES + " AND NOT EXISTS (SELECT 1 FROM " + table + " e WHERE " + MATCH + ")", null)) {
-            while (c.moveToNext()) unread.add(new Photo(c));
+                + TYPES + " AND NOT EXISTS (SELECT 1 FROM " + table + " e WHERE " + MATCH + ") "
+                + "ORDER BY datetime DESC, _id DESC", null)) {
+            synchronized (IN_FLIGHT) {
+                while (c.moveToNext()) {
+                    if (!IN_FLIGHT.contains(c.getLong(0))) unread.add(new Photo(c));
+                }
+            }
         }
         if (unread.isEmpty()) return;
-        if (unread.size() <= AT_ONCE) {
-            for (Photo p : unread) read(p);
-            store(d, table, unread);
-            return;
+        List<Photo> now = unread.subList(0, Math.min(AT_ONCE, unread.size()));
+        for (Photo p : now) read(p);
+        store(d, table, now);
+        List<Photo> later = new ArrayList<>(unread.subList(now.size(), unread.size()));
+        // A read already running takes the rest when it ends.
+        if (later.isEmpty() || !reading.compareAndSet(false, true)) return;
+        synchronized (IN_FLIGHT) {
+            for (Photo p : later) IN_FLIGHT.add(p.id);
         }
-        if (!reading.compareAndSet(false, true)) return;
         Thread t = new Thread(() -> {
             Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
             long started = System.currentTimeMillis();
             int mirrored = 0;
             try {
-                for (int i = 0; i < unread.size(); i += CHUNK) {
-                    List<Photo> chunk = unread.subList(i, Math.min(unread.size(), i + CHUNK));
+                for (int i = 0; i < later.size(); i += CHUNK) {
+                    List<Photo> chunk = later.subList(i, Math.min(later.size(), i + CHUNK));
                     for (Photo p : chunk) {
                         read(p);
                         if (isMirror(p.tag)) mirrored++;
@@ -90,10 +103,14 @@ final class ExifOrientation {
             } catch (RuntimeException e) {
                 Log.w(TAG, "mirror: orientation of photos not read: " + e);
             } finally {
+                synchronized (IN_FLIGHT) {
+                    IN_FLIGHT.clear();
+                }
                 reading.set(false);
             }
-            Log.i(TAG, "mirror: orientation of " + unread.size() + " photos read in "
+            Log.i(TAG, "mirror: orientation of " + later.size() + " photos read in "
                     + (System.currentTimeMillis() - started) + " ms, " + mirrored + " mirrored");
+            mirror.orientationsRead();
         }, "UA-exif");
         t.start();
     }

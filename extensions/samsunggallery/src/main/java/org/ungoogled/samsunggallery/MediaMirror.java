@@ -47,6 +47,8 @@ public final class MediaMirror extends ContentProvider {
     // numbers, and SQLite only converts in a column with that affinity. Paths and names stay text.
     private SQLiteDatabase db;
     private long syncedGeneration = -1;
+    /** Added to local_metadata's generation each time the copy changed without MediaStore (see orientationsRead). */
+    private long stampOffset;
     private String syncedVersion;
 
     private static volatile String authority;
@@ -178,6 +180,28 @@ public final class MediaMirror extends ContentProvider {
         return mirrored;
     }
 
+    /**
+     * A background read of photos' orientation is done: photos added meanwhile are read too, and Gallery's lists reload
+     * (its change stamp includes local_metadata.generation_modified; MediaStore's observers tell it to check).
+     */
+    void orientationsRead() {
+        synchronized (this) {
+            SQLiteDatabase d = db();
+            d.beginTransaction();
+            try {
+                ExifOrientation.fill(this, d, SAVED);
+                stampOffset += 1L << 40;
+                d.execSQL("UPDATE local_metadata SET generation_modified = " + (syncedGeneration + stampOffset));
+                d.setTransactionSuccessful();
+            } catch (SQLiteException e) {
+                Log.w(TAG, "mirror: " + e.getMessage());
+            } finally {
+                d.endTransaction();
+            }
+        }
+        getContext().getContentResolver().notifyChange(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null);
+    }
+
     /** The copy's database, for work that runs outside a query (lock the provider around its use). */
     synchronized SQLiteDatabase database() {
         return db();
@@ -232,7 +256,7 @@ public final class MediaMirror extends ContentProvider {
                     d.execSQL("ALTER TABLE local_metadata ADD COLUMN generation_modified NUMERIC");
                 }
                 d.execSQL("DELETE FROM local_metadata");
-                d.execSQL("INSERT INTO local_metadata (generation_modified) VALUES (" + generation + ")");
+                d.execSQL("INSERT INTO local_metadata (generation_modified) VALUES (" + (generation + stampOffset) + ")");
                 refindTags(d);
                 d.setTransactionSuccessful();
             } finally {
