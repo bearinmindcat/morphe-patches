@@ -27,6 +27,12 @@ private const val LOCAL_THUMBNAIL_LOADER = "Lcom/samsung/android/gallery/module/
 private const val THUMBNAIL_REQUEST = "Lcom/samsung/android/gallery/module/thumbnail/type/ReqInfo;"
 private const val MEDIA_PLAYER = "Lcom/samsung/android/gallery/support/library/v0/media/GedMediaPlayerCompat;"
 private const val MEDIA_MIRROR = "Lorg/ungoogled/samsunggallery/MediaMirror;"
+private const val MEDIA_MOVES = "Lorg/ungoogled/samsunggallery/MediaMoves;"
+private const val FILE_OPERATION_SERVICE = "Lcom/samsung/android/gallery/app/service/FileOperationService;"
+private const val PROGRESS_SERVICE = "Lcom/samsung/android/gallery/app/service/abstraction/AbsProgressService;"
+private const val FILE_EDITOR = "Lcom/samsung/android/gallery/module/fileio/redact/FileEditor;"
+private const val LOCAL_DB_OPERATION = "Lcom/samsung/android/gallery/module/fileio/database/mpq/MpQLocalDbOperation;"
+private const val FILE_INFO = "Lcom/samsung/android/gallery/module/fileio/type/FileInfo;"
 
 /**
  * MANAGE_MEDIA lets the user allow Gallery to make the changes below without Android's dialog each time ("Media
@@ -71,10 +77,12 @@ private fun MutableMethod.requireLocal(count: Int = 1) {
  * it is on One UI, and Android lets any other app change only its own files (MediaProvider answers "0 rows"); its
  * Recycle bin, a hidden folder of its own, is One UI only. Both now go through Android's MediaStore requests (see the
  * extension's MediaRequests): favourites to MediaStore's IS_FAVORITE, deletes to Android's trash, which Gallery's
- * Recycle bin now shows (RecycleBin), and from where restore and delete permanently work.
+ * Recycle bin now shows (RecycleBin), and from where restore and delete permanently work. Moving another app's photos
+ * to an album (a MediaStore folder change) or renaming them failed the same way; both now ask for write access first
+ * (MediaMoves).
  */
 internal val mediaChangesPatch = bytecodePatch(
-    description = "Makes favourites and deletes work through Android's MediaStore.",
+    description = "Makes favourites, deletes and moves work through Android's MediaStore.",
 ) {
     dependsOn(mediaChangesManifestPatch)
     extendWith(SAMSUNG_GALLERY_EXTENSION)
@@ -206,6 +214,50 @@ internal val mediaChangesPatch = bytecodePatch(
                 "invoke-static/range { p0 .. p0 }, $TRASH_OPS->flush(Ljava/lang/Object;)V",
             )
         }
+        // Move to album and album rename: one write request for the queued items as the operation starts, on the
+        // service's own thread and before its first job, so Gallery's MediaStore folder changes are allowed.
+        if (method(PROGRESS_SERVICE, "getUnFinishedJob", emptyList()).returnType != "Ljava/util/Queue;") {
+            throw PatchException("Gallery's AbsProgressService.getUnFinishedJob() does not answer a Queue")
+        }
+        method(FILE_OPERATION_SERVICE, "onStartInternal", emptyList()).apply {
+            if (mutableClassDefBy(definingClass).fields.none { it.name == "mOperationType" && it.type == "Ljava/lang/String;" }) {
+                throw PatchException("Gallery's FileOperationService has no mOperationType")
+            }
+            requireLocal(2)
+            if (implementation!!.registerCount > 16) throw PatchException("FileOperationService.onStartInternal() has too many registers")
+            addInstructions(
+                0,
+                """
+                    invoke-virtual { p0 }, $PROGRESS_SERVICE->getUnFinishedJob()Ljava/util/Queue;
+                    move-result-object v0
+                    iget-object v1, p0, $FILE_OPERATION_SERVICE->mOperationType:Ljava/lang/String;
+                    invoke-static { v1, v0 }, $MEDIA_MOVES->beforeStart(Ljava/lang/String;Ljava/util/Collection;)V
+                """,
+            )
+        }
+
+        // A move to another storage (or one replacing an item) copies, then removes the original by a files uri, which
+        // the write access does not cover.
+        method(LOCAL_DB_OPERATION, "updateDatabaseByCopyInsteadOfMove", listOf("Landroid/content/Context;", FILE_INFO))
+            .addInstructions(0, "invoke-static/range { p2 .. p2 }, $MEDIA_MOVES->removeSource(Ljava/lang/Object;)V")
+
+        // The details screen's rename, date and location changes (and the timeline's bulk ones) go through FileEditor:
+        // the same write request for its items, on its file thread, before the first.
+        method(FILE_EDITOR, "handleFile", emptyList()).apply {
+            if (mutableClassDefBy(definingClass).fields.none { it.name == "mFiles" && it.type == "[$FILE_ITEM" }) {
+                throw PatchException("Gallery's FileEditor has no mFiles")
+            }
+            requireLocal()
+            if (implementation!!.registerCount > 16) throw PatchException("FileEditor.handleFile() has too many registers")
+            addInstructions(
+                0,
+                """
+                    iget-object v0, p0, $FILE_EDITOR->mFiles:[$FILE_ITEM
+                    invoke-static { v0 }, $MEDIA_MOVES->beforeEdit([Ljava/lang/Object;)V
+                """,
+            )
+        }
+
         // Delete permanently from the bin's viewer ends with dump(), not done().
         method("${TRASH_HELPERS}TrashHelper;", "dump", listOf("${TRASH_ITEMS}TrashLogType;", "Ljava/lang/String;")).addInstructions(
             0,

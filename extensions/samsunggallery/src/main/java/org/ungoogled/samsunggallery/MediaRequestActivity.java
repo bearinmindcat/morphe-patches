@@ -46,7 +46,7 @@ public final class MediaRequestActivity extends Activity {
         new AlertDialog.Builder(this, night ? android.R.style.Theme_DeviceDefault_Dialog_Alert
                 : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
                 .setTitle("Allow media management?")
-                .setMessage("Android asks you to confirm each delete and restore. Allow Gallery to manage media to skip that.")
+                .setMessage("Android asks you to confirm each delete, restore and move. Allow Gallery to manage media to skip that.")
                 .setPositiveButton("Settings", (d, w) -> openSettings())
                 .setNegativeButton("Not now", (d, w) -> ask())
                 .setOnCancelListener(d -> ask())

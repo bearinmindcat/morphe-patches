@@ -26,7 +26,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Changes to other apps' photos and videos (favourite, move to and out of Android's trash, delete) as Android allows
+ * Changes to other apps' photos and videos (favourite, move to and out of Android's trash, delete, write access for
+ * moves, renames and edits) as Android allows
  * them to a gallery that is not the phone's own: as MediaStore requests the user confirms in Android's dialog, which
  * Android skips for an app the user allowed to manage media. Samsung's Gallery makes these changes through Samsung's
  * MediaProvider, which off One UI refuses them.
@@ -38,6 +39,7 @@ public final class MediaRequests {
     static final int DELETE = 3;
     static final int FAVORITE = 4;
     static final int UNFAVORITE = 5;
+    static final int WRITE = 6;
 
     private static final String PREFS = "ungoogled_media_requests";
     private static final String EXPLAINED = "manage_media_explained";
@@ -106,6 +108,7 @@ public final class MediaRequests {
                 case TRASH: intent = MediaStore.createTrashRequest(resolver, uris, true); break;
                 case RESTORE: intent = MediaStore.createTrashRequest(resolver, uris, false); break;
                 case DELETE: intent = MediaStore.createDeleteRequest(resolver, uris); break;
+                case WRITE: intent = MediaStore.createWriteRequest(resolver, uris); break;
                 default: intent = MediaStore.createFavoriteRequest(resolver, uris, kind == FAVORITE);
             }
         } catch (RuntimeException e) {
