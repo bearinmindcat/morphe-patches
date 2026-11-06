@@ -360,6 +360,8 @@ public final class PlayingMedia {
             if (c == null || pkg == null || !allowed(c)) return;
             PlayingMedia.panel = new WeakReference<>(panel);
             panelPackage = pkg;
+            MAIN.removeCallbacks(UNBIND);
+            MediaListener.want(c, true);
             watch(c);
         } catch (Throwable t) {
             android.util.Log.w("UA", "media panel", t);
@@ -369,6 +371,55 @@ public final class PlayingMedia {
     /** The panel disconnected. */
     public static void panelGone(Object panel) {
         if (PlayingMedia.panel.get() == panel) PlayingMedia.panel = new WeakReference<>(null);
+        // Not at once: the panel disconnects to reconnect, too.
+        MAIN.removeCallbacks(UNBIND);
+        MAIN.postDelayed(UNBIND, 30000);
+    }
+
+    private static final Runnable UNBIND = () -> {
+        Context c = Shapes.appContext();
+        if (panel.get() == null && c != null) MediaListener.want(c, false);
+    };
+
+    /** The media notifications changed (the listener is bound while the panel is up). */
+    static void notificationsChanged() {
+        MAIN.post(() -> {
+            Context c = Shapes.appContext();
+            if (c == null || watching == null) return;
+            try {
+                sessionsChanged(c.getSystemService(MediaSessionManager.class).getActiveSessions(new ComponentName(c, MediaListener.class)));
+            } catch (Throwable t) {
+                android.util.Log.w("UA", "media follow", t);
+            }
+        });
+    }
+
+    /**
+     * The sessions an app may be playing in: the active ones, and those its media notifications name -- an app can
+     * play in a session it never makes active (Jellyfin's web player, issue #78), which only its notification shows.
+     */
+    private static List<MediaController> sessions(Context c, List<MediaController> active) {
+        List<MediaController> out = new java.util.ArrayList<>();
+        java.util.Set<MediaSession.Token> seen = new java.util.HashSet<>();
+        if (active != null) for (MediaController s : active) if (seen.add(s.getSessionToken())) out.add(s);
+        for (MediaSession.Token t : MediaListener.notified(null)) {
+            if (seen.add(t)) {
+                try {
+                    out.add(new MediaController(c, t));
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return out;
+    }
+
+    private static List<MediaController> sessions(Context c) {
+        List<MediaController> active = null;
+        try {
+            active = c.getSystemService(MediaSessionManager.class).getActiveSessions(new ComponentName(c, MediaListener.class));
+        } catch (Throwable ignored) {
+        }
+        return sessions(c, active);
     }
 
     private static synchronized void watch(Context c) {
@@ -381,8 +432,10 @@ public final class PlayingMedia {
     }
 
     /** Watches every open session's playback, so a session starting to play is seen. */
-    private static synchronized void sessionsChanged(List<MediaController> sessions) {
+    private static synchronized void sessionsChanged(List<MediaController> active) {
         Map<MediaSession.Token, MediaController> now = new HashMap<>();
+        Context c = Shapes.appContext();
+        List<MediaController> sessions = c == null ? active : sessions(c, active);
         if (sessions != null) for (MediaController s : sessions) now.put(s.getSessionToken(), s);
         WATCHED.keySet().removeIf(t -> !now.containsKey(t));
         for (Map.Entry<MediaSession.Token, MediaController> e : now.entrySet()) {
@@ -415,8 +468,7 @@ public final class PlayingMedia {
             if (p == null || pkg == null || c == null) return;
             MediaSession.Token current = CHOSEN.get(pkg);
             MediaController play = null;
-            for (MediaController s : c.getSystemService(MediaSessionManager.class)
-                    .getActiveSessions(new ComponentName(c, MediaListener.class))) {
+            for (MediaController s : sessions(c)) {
                 if (!pkg.equals(s.getPackageName()) || !playing(s)) continue;
                 if (s.getSessionToken().equals(current)) return;
                 if (play == null) play = s;
@@ -475,12 +527,8 @@ public final class PlayingMedia {
 
     /** The app's playing session, or with {@code any} the first it has open; null without notification access. */
     private static MediaController sessionOf(Context c, String pkg, boolean any) {
-        List<MediaController> all;
-        try {
-            all = c.getSystemService(MediaSessionManager.class).getActiveSessions(new ComponentName(c, MediaListener.class));
-        } catch (Throwable t) {
-            return null;
-        }
+        if (!allowed(c)) return null;
+        List<MediaController> all = sessions(c);
         MediaController first = null;
         for (MediaController s : all) {
             if (!pkg.equals(s.getPackageName())) continue;
