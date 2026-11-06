@@ -7,6 +7,7 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
@@ -23,6 +24,7 @@ private const val RUNTIME = "Lorg/ungoogled/colorosclock/ColorOS;"
 private const val CONSENT = "Lorg/ungoogled/colorosclock/Consent;"
 private const val ALERTS = "Lorg/ungoogled/colorosclock/Alerts;"
 private const val RINGTONES = "Lorg/ungoogled/colorosclock/Ringtones;"
+private const val WIDGETS = "Lorg/ungoogled/colorosclock/Widgets;"
 
 private val log = java.util.logging.Logger.getLogger("OnePlusClock")
 
@@ -59,6 +61,46 @@ private object RingtonePickerFingerprint : Fingerprint(
     strings = listOf("oppo.intent.action.ACTION_MUSIC_SELECT"),
 )
 
+private const val OPLUS_TEXT_CLOCK = "com.oplus.widget.OplusTextClock"
+
+/** DeviceUtils' "OnePlus red hour" check (does com.oplus.widget.OplusTextClock load?), by the class it looks for. */
+private object RedHourWidgetFingerprint : Fingerprint(
+    returnType = "Z",
+    parameters = listOf(),
+    strings = listOf(OPLUS_TEXT_CLOCK),
+)
+
+private const val APP_WIDGET_MANAGER = "Landroid/appwidget/AppWidgetManager;"
+private val WIDGET_UPDATES = setOf("updateAppWidget", "partiallyUpdateAppWidget")
+
+/**
+ * Home screen widgets are inflated by the launcher, which only has the framework's views. The OnePlus widget layouts
+ * with a red hour use ColorOS's OplusTextClock; those with a TextClock twin are left for the code to choose (see
+ * RedHourWidgetFingerprint), the rest (the OxygenOS widget has no twin) get Android's TextClock.
+ */
+private val widgetLayoutsPatch = resourcePatch {
+    execute {
+        // Patcher 2.0 decodes resources on request: decode the widget layouts read below.
+        decode("res/layout*/*widget*.xml")
+        val layouts = get("res").listFiles { file -> file.isDirectory && file.name.startsWith("layout") }.orEmpty()
+            .flatMap { dir -> dir.listFiles { file -> file.name.endsWith(".xml") }.orEmpty().toList() }
+            .filter { OPLUS_TEXT_CLOCK in it.readText() }
+        if (layouts.isEmpty()) throw PatchException("no widget layout uses $OPLUS_TEXT_CLOCK")
+        var rewritten = 0
+        layouts.forEach { file ->
+            if (!file.name.contains("_red_widget")) throw PatchException("$OPLUS_TEXT_CLOCK outside a red widget layout: ${file.name}")
+            if (java.io.File(file.parentFile, file.name.replace("_red_widget", "_widget")).isFile) return@forEach
+            file.writeText(
+                file.readText().replace("<$OPLUS_TEXT_CLOCK ", "<TextClock ").replace("</$OPLUS_TEXT_CLOCK>", "</TextClock>"),
+            )
+            rewritten++
+        }
+        // Measured against 16.19.8: 24 layouts, 3 without a twin (the OxygenOS clock and weather widget).
+        log.info("widget layouts with $OPLUS_TEXT_CLOCK: ${layouts.size}, rewritten to TextClock: $rewritten")
+        if (rewritten == 0) throw PatchException("expected red widget layouts without a TextClock twin")
+    }
+}
+
 /** The alarm and timer screens open from the background through full-screen notifications (see Alerts). */
 private val manifestPatch = resourcePatch {
     execute {
@@ -88,6 +130,10 @@ private val manifestPatch = resourcePatch {
  * background, which Android refuses a re-signed copy: they come up through full-screen notifications instead (Alerts).
  * Sounds are picked with ColorOS Settings' picker: Android's where it is missing (Ringtones).
  *
+ * Widgets: the launcher draws them with the framework's views only, so the OnePlus red-hour layouts (ColorOS's
+ * OplusTextClock, found in the stand-ins) gave "Can't load widget"; they use TextClock now (Widgets), and leave out
+ * the weather where ColorOS's weather service is missing.
+ *
  * Network: its export build fetches cloud settings from OPPO's servers (HeyTap cloud config) at first launch without
  * asking; that now waits for an explicit Allow (Consent, asked once on the home screen).
  */
@@ -98,7 +144,7 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_CLOCK)
-    dependsOn(manifestPatch)
+    dependsOn(manifestPatch, widgetLayoutsPatch)
     extendWith(COLOROS_CLOCK_EXTENSION)
 
     execute {
@@ -109,6 +155,57 @@ val enableNonColorOsPatch = bytecodePatch(
 
         IsQcomPlatformFingerprint.method.addInstructions(0, "const/4 v0, 0x1\nreturn v0")
         IsMtkPlatformFingerprint.method.addInstructions(0, "const/4 v0, 0x0\nreturn v0")
+
+        // Widgets: the red-hour layouts only where the launcher can inflate OplusTextClock (Widgets).
+        RedHourWidgetFingerprint.method.addInstructions(
+            0,
+            """
+                const-string v0, "$OPLUS_TEXT_CLOCK"
+                invoke-static {v0}, $WIDGETS->frameworkHas(Ljava/lang/String;)Z
+                move-result v0
+                return v0
+            """,
+        )
+
+        // Their weather comes from ColorOS's weather service: where it is missing every widget update leaves the
+        // weather views out (Widgets) instead of showing "--" that never fills.
+        var widgetUpdates = 0
+        val updateSites = mutableListOf<Pair<String, Method>>()
+        fun Any.widgetUpdate(): MethodReference? {
+            if (this !is ReferenceInstruction || opcode != Opcode.INVOKE_VIRTUAL) return null
+            val r = reference as? MethodReference ?: return null
+            return r.takeIf {
+                it.definingClass == APP_WIDGET_MANAGER && it.name in WIDGET_UPDATES &&
+                    it.parameterTypes.size == 2 && it.parameterTypes[0].toString() in setOf("I", "[I") &&
+                    it.parameterTypes[1].toString() == "Landroid/widget/RemoteViews;"
+            }
+        }
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            c.methods.forEach { m ->
+                if (m.implementation?.instructions?.any { it.widgetUpdate() != null } == true) updateSites += c.type to m
+            }
+        }
+        updateSites.forEach { (type, method) ->
+            val mutable = mutableClassDefBy(type).methods.first {
+                it.name == method.name && it.parameterTypes == method.parameterTypes && it.returnType == method.returnType
+            }
+            val instructions = mutable.implementation!!.instructions
+            for (index in instructions.indices) {
+                val insn = instructions[index]
+                val r = insn.widgetUpdate() ?: continue
+                val call = insn as FiveRegisterInstruction
+                mutable.replaceInstruction(
+                    index,
+                    "invoke-static { v${call.registerC}, v${call.registerD}, v${call.registerE} }, " +
+                        "$WIDGETS->${r.name}($APP_WIDGET_MANAGER${r.parameterTypes.joinToString("")})V",
+                )
+                widgetUpdates++
+            }
+        }
+        // Measured against 16.19.8: 4 (WidgetUpdateHelper 3, DigitalAppWidgetProvider 1).
+        log.info("widget updates through Widgets: $widgetUpdates")
+        if (widgetUpdates < 2) throw PatchException("only $widgetUpdates widget updates found")
 
         CanAccessCloudConfigFingerprint.method.addInstructions(
             0,
