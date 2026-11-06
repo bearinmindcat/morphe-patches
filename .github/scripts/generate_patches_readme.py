@@ -395,6 +395,10 @@ APP_RENAMES = {
 }
 
 
+# Shown under the patch list, every time the list is generated.
+FOOTER = "Can't find an APK in Morphe Manager? See [where to get each APK](docs/APK-SOURCES.md)."
+
+
 def pkg_label(pkg, entry):
     """Spoiler label for one app."""
     pair = APP_RENAMES.get(pkg)
@@ -585,6 +589,9 @@ def build_content(expanded=False):
 
 </details>""")
         lines.append("")
+
+    lines.append(FOOTER)
+    lines.append("")
 
     return "\n".join(lines)
 
