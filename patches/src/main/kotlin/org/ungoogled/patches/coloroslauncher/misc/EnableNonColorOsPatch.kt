@@ -13,7 +13,9 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloroslauncher.ColorOsLauncherConstants.COMPATIBILITY_COLOROS_LAUNCHER
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.samsung.redirectCalls
@@ -114,8 +116,12 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(COLOROS_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS)
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
         skipCastOfNull("$EXT/Hidden;")

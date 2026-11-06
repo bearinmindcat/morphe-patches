@@ -541,3 +541,46 @@ internal val HIDDEN_CONSTRUCTORS = setOf(
     "Lcom/android/internal/view/AppearanceRegion;-><init>(ILandroid/graphics/Rect;)V",
     "Lsun/misc/Signal;-><init>(Ljava/lang/String;)V",
 )
+
+/* Android 16 and 17 */
+/*
+ * Members and constructors One UI Home references that Android 16 or 17 refuses or lacks although Android 15 allowed
+ * them, or that belong to classes it carries copies of and the newer framework has (the framework's class wins and its
+ * members are hidden). Found by checking the patched APK against the Android 16 and 17 emulators' boot classpath and
+ * hidden API flags; they go through the same member helper (used where the phone allows, "absent" elsewhere).
+ */
+internal val HIDDEN_MEMBERS_16_17 = setOf(
+    "Landroid/app/ActivityOptions;->makeRemoteAnimation(Landroid/view/RemoteAnimationAdapter;Landroid/window/RemoteTransition;)Landroid/app/ActivityOptions;",
+    "Landroid/gui/BorderSettings;->CREATOR:Landroid/os/Parcelable\$Creator;",
+    "Landroid/gui/BoxShadowSettings;->CREATOR:Landroid/os/Parcelable\$Creator;",
+    "Landroid/gui/EarlyWakeupInfo;->token:Landroid/os/IBinder;",
+    "Landroid/gui/EarlyWakeupInfo;->trace:Ljava/lang/String;",
+    "Landroid/hardware/input/KeyGestureEvent;->getAction()I",
+    "Landroid/hardware/input/KeyGestureEvent;->getDisplayId()I",
+    "Landroid/hardware/input/KeyGestureEvent;->getKeyGestureType()I",
+    "Landroid/hardware/input/KeyGestureEvent;->getKeycodes()[I",
+    "Landroid/hardware/input/KeyGestureEvent;->isCancelled()Z",
+    "Landroid/window/DesktopExperienceFlags;->ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX:Landroid/window/DesktopExperienceFlags;",
+    "Landroid/window/DesktopExperienceFlags;->ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT:Landroid/window/DesktopExperienceFlags;",
+    "Landroid/window/DesktopExperienceFlags;->ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE:Landroid/window/DesktopExperienceFlags;",
+    "Landroid/window/DesktopExperienceFlags;->isTrue()Z",
+    "Landroid/window/DesktopModeFlags;->ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS_BUGFIX:Landroid/window/DesktopModeFlags;",
+    "Landroid/window/DesktopModeFlags;->ENABLE_DESKTOP_WINDOWING_MODE:Landroid/window/DesktopModeFlags;",
+    "Landroid/window/DesktopModeFlags;->isDesktopModeForcedEnabled()Z",
+    "Landroid/window/DesktopModeFlags;->isTrue()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/android/companion/virtualdevice/flags/Flags;->viewconfigurationApis()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->enableDesktopModeThroughDevOption()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->onlyCacheLowResTaskSnapshot()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->showAppHandleLargeScreens()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->showDesktopExperienceDevOption()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->showDesktopWindowingDevOption()Z",
+    "Lcom/android/internal/hidden_from_bootclasspath/com/android/window/flags/Flags;->showHomeBehindDesktop()Z",
+    "Lcom/android/systemui/shared/system/InputChannelCompat\$InputEventReceiver\$1;->finishInputEvent(Landroid/view/InputEvent;Z)V",
+    "Lcom/android/systemui/shared/system/InputConsumerController\$InputEventReceiver;->dispose()V",
+    "Lcom/android/systemui/shared/system/InputConsumerController\$InputEventReceiver;->finishInputEvent(Landroid/view/InputEvent;Z)V",
+)
+
+internal val HIDDEN_CONSTRUCTORS_16_17 = setOf(
+    "Landroid/gui/EarlyWakeupInfo;-><init>()V",
+    "Lcom/android/internal/dynamicanimation/animation/SpringAnimation;-><init>(Ljava/lang/Object;Landroid/util/FloatProperty;)V",
+)

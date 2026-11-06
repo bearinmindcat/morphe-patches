@@ -3,26 +3,28 @@ package org.ungoogled.patches.honorhome.misc
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
-import app.morphe.patcher.util.smali.ExternalLabel
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.resource.resourceId
+import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.honor.followMagicDayNight
 import org.ungoogled.patches.honor.redirectMagicFrameworkLookups
 import org.ungoogled.patches.honor.replaceMagicFrameworkIds
 import org.ungoogled.patches.honor.replaceMagicFrameworkReferences
 import org.ungoogled.patches.honor.replaceMagicInterpolators
 import org.ungoogled.patches.honorhome.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.honorhome.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.honorhome.HIDDEN_MEMBERS
+import org.ungoogled.patches.honorhome.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.honorhome.HonorHomeConstants.COMPATIBILITY_HONOR_HOME
-import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
-import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.redirectCalls
-import org.ungoogled.patches.samsung.redirectMembers
 import org.ungoogled.patches.samsung.rewriteStringLiterals
 
 internal const val HONOR_HOME_EXTENSION = "extensions/honorhome.mpe"
@@ -257,6 +259,15 @@ private val resourcesPatch = resourcePatch(
 }
 
 /**
+ * System service calls that need a permission only the system holds (INTERACT_ACROSS_USERS); the member helper answers
+ * the SecurityException with "absent" (user 0).
+ */
+private val REFUSED_CALLS = setOf(
+    "Landroid/app/IActivityManager;->getCurrentUser()Landroid/content/pm/UserInfo;",
+    "Landroid/app/ActivityManager;->getCurrentUser()I",
+)
+
+/**
  * Honor Home is a system app built against the full Android framework; an installed app may not link to its hidden
  * parts. Each hidden member it uses goes through Framework (used where Android allows it, "absent" elsewhere), each
  * `new` of a class an app may not construct through Framework.construct, and subclasses of such classes are rebased.
@@ -267,10 +278,13 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(HONOR_HOME_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectMembers(
-            "$EXT/Framework;", "$EXT/Hidden;", HIDDEN_MEMBERS + MAGIC_MEMBERS_WITHOUT_STAND_IN,
-        ) { _, _ -> false }
-        val constructors = redirectConstructors("$EXT/Framework;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Framework;", "$EXT/Hidden;",
+            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS + MAGIC_MEMBERS_WITHOUT_STAND_IN,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Framework;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val rebased = rebaseSubclasses(REBASES)
         skipCastOfNull("$EXT/Hidden;")
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; rebased classes: $rebased")

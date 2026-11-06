@@ -431,3 +431,18 @@ internal val HIDDEN_SUPERCLASSES = mapOf(
     "Landroid/window/IWindowContainerTransactionCallback\$Stub;" to ("Landroid/os/Binder;" to listOf("Landroid/window/IWindowContainerTransactionCallback;", "Landroid/os/IInterface;")),
     "Lcom/android/internal/view/menu/MenuBuilder;" to ("Ljava/lang/Object;" to listOf("Landroid/view/Menu;")),
 )
+
+/* Android 16 and 17 */
+/*
+ * Members and constructors the HyperOS launcher references that Android 16 or 17 refuses or lacks although Android 15
+ * allowed them, or that belong to classes it carries copies of and the newer framework has (the framework's class wins
+ * and its members are hidden). Found by checking the patched APK against the Android 16 and 17 emulators' boot
+ * classpath and hidden API flags; they go through the same member helper (used where the phone allows, "absent"
+ * elsewhere).
+ */
+internal val HIDDEN_MEMBERS_16_17 = setOf(
+    "Landroid/app/ActivityOptions;->makeMultiThumbFutureAspectScaleAnimation(Landroid/content/Context;Landroid/os/Handler;Landroid/view/IAppTransitionAnimationSpecsFuture;Landroid/app/ActivityOptions\$OnAnimationStartedListener;Z)Landroid/app/ActivityOptions;",
+)
+
+internal val HIDDEN_CONSTRUCTORS_16_17 = setOf<String>(
+)

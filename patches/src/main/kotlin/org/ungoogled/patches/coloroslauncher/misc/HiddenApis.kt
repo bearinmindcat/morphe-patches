@@ -392,14 +392,22 @@ internal fun BytecodePatchContext.redirectHiddenMembers(
     fun oneUi(ref: FieldReference) = if (keys == null) oneUi(ref.definingClass, ref.name)
         else "${ref.definingClass}->${ref.name}:${ref.type}" in keys
 
+    // A class's own members, used by its own code, stay as they are: where that code runs at all, the class is the
+    // app's (not a framework class of the same name, which would win), so the member is there. Redirecting them broke
+    // constructors that set a field before calling super (Android 17 has some of the classes apps carry copies of).
+    val declared = mutableMapOf<String, Set<String>>()
+    fun own(type: String, key: String) = key.startsWith("$type->") && key in declared[type].orEmpty()
+
     val sites = mutableListOf<Pair<String, Method>>()
     classDefForEach { c ->
         if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        declared[c.type] = c.fields.map { "${c.type}->${it.name}:${it.type}" }.toSet() +
+            c.methods.map { "${c.type}->${it.name}(${it.parameterTypes.joinToString("")})${it.returnType}" }
         for (m in c.methods) {
             val hit = m.implementation?.instructions?.any { insn ->
                 when (val ref = (insn as? ReferenceInstruction)?.reference) {
-                    is MethodReference -> oneUi(ref)
-                    is FieldReference -> oneUi(ref)
+                    is MethodReference -> oneUi(ref) && !own(c.type, ref.key())
+                    is FieldReference -> oneUi(ref) && !own(c.type, "${ref.definingClass}->${ref.name}:${ref.type}")
                     else -> false
                 }
             } ?: false
@@ -419,7 +427,7 @@ internal fun BytecodePatchContext.redirectHiddenMembers(
             val insn = instructions[index]
             when (val ref = (insn as? ReferenceInstruction)?.reference) {
                 is MethodReference -> {
-                    if (!oneUi(ref)) continue
+                    if (!oneUi(ref) || own(type, ref.key())) continue
                     val (receiver, superCall) = when (insn.opcode) {
                         Opcode.INVOKE_STATIC, Opcode.INVOKE_STATIC_RANGE -> false to false
                         Opcode.INVOKE_SUPER, Opcode.INVOKE_SUPER_RANGE -> true to true
@@ -438,7 +446,7 @@ internal fun BytecodePatchContext.redirectHiddenMembers(
                     calls++
                 }
                 is FieldReference -> {
-                    if (!oneUi(ref)) continue
+                    if (!oneUi(ref) || own(type, "${ref.definingClass}->${ref.name}:${ref.type}")) continue
                     when (insn.opcode) {
                         in SGET -> {
                             val a = (insn as OneRegisterInstruction).registerA

@@ -24,8 +24,11 @@ import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.sony.evenResourceEntryCounts
+import org.ungoogled.patches.sony.replacePrivateThemeColors
 import org.ungoogled.patches.sonylauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.sonylauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.sonylauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.sonylauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.sonylauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.sonylauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.sonylauncher.SonyLauncherConstants.COMPATIBILITY_XPERIA_HOME
@@ -106,18 +109,25 @@ private val GUARDED_CALLS = mapOf(
 
 /**
  * Xperia Home requires Sony's com.sonyericsson.idd library (its usage-data client), so Android refuses the install.
- * Changing the manifest makes Morphe rewrite the resource table, which for this app needs even entry counts to stay
- * loadable (see evenResourceEntryCounts).
+ * Its layouts and styles also name Android 15's private theme colors, which Android 16 and 17 no longer have (see
+ * replacePrivateThemeColors). Changing resources makes Morphe rewrite the resource table, which for this app needs
+ * even entry counts to stay loadable (see evenResourceEntryCounts).
  */
 private val librariesPatch = resourcePatch(
-    description = "Makes Xperia Home's Sony library optional.",
+    description = "Makes Xperia Home's Sony library optional and its theme colors work on Android 16 and 17.",
 ) {
     execute {
         val required = makeLibrariesOptional()
+        val colors = replacePrivateThemeColors()
         val padded = evenResourceEntryCounts()
-        log.info("required libraries made optional: $required; resource types padded to even counts: $padded")
+        log.info(
+            "required libraries made optional: $required; private theme colors: $colors; " +
+                "resource types padded to even counts: $padded",
+        )
         // Measured against 15: one, com.sonyericsson.idd.
         if (required == 0) throw PatchException("no required library found")
+        // Measured against 15: 74 references (the overview's clear-all button stopped the launcher on Android 16).
+        if (colors == 0) throw PatchException("no private theme colors found")
     }
 }
 
@@ -172,8 +182,12 @@ private val hiddenApisPatch = bytecodePatch(
         // Measured against 15: one check, in the view capture factory.
         if (debuggable == 0) throw PatchException("view capture debuggable check not found")
 
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS)
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val bases = HIDDEN_SUPERCLASSES.filterKeys { !it.startsWith("Landroid/tracing/perfetto/") } + EXTRA_SUPERCLASSES
         val rebased = rebaseSubclasses(bases)

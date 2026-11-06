@@ -1130,3 +1130,19 @@ internal val HIDDEN_SUPERCLASSES = mapOf(
     "Landroid/window/IOnBackInvokedCallback\$Stub;" to ("Landroid/os/Binder;" to listOf("Landroid/window/IOnBackInvokedCallback;", "Landroid/os/IInterface;")),
     "Lcom/android/internal/os/IResultReceiver\$Stub;" to ("Landroid/os/Binder;" to listOf("Lcom/android/internal/os/IResultReceiver;", "Landroid/os/IInterface;")),
 )
+
+/* Android 16 and 17 */
+/*
+ * Members and constructors Xperia Home references that Android 16 or 17 refuses or lacks although Android 15 allowed
+ * them, or that belong to classes it carries copies of and the newer framework has (the framework's class wins and its
+ * members are hidden). Found by checking the patched APK against the Android 16 and 17 emulators' boot classpath and
+ * hidden API flags; they go through the same member helper (used where the phone allows, "absent" elsewhere).
+ */
+internal val HIDDEN_MEMBERS_16_17 = setOf(
+    "Landroid/app/ActivityOptions;->makeMultiThumbFutureAspectScaleAnimation(Landroid/content/Context;Landroid/os/Handler;Landroid/view/IAppTransitionAnimationSpecsFuture;Landroid/app/ActivityOptions\$OnAnimationStartedListener;Z)Landroid/app/ActivityOptions;",
+    "Landroid/tracing/Flags;->perfettoViewCaptureTracing()Z",
+)
+
+internal val HIDDEN_CONSTRUCTORS_16_17 = setOf(
+    "Landroid/view/RemoteAnimationTarget;-><init>(IILandroid/view/SurfaceControl;ZLandroid/graphics/Rect;Landroid/graphics/Rect;ILandroid/graphics/Point;Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/app/WindowConfiguration;ZLandroid/view/SurfaceControl;Landroid/graphics/Rect;Landroid/app/ActivityManager\$RunningTaskInfo;ZI)V",
+)

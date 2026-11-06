@@ -7,20 +7,22 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patcher.util.smali.ExternalLabel
-import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
-import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
-import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
+import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.nothinglauncher.NothingLauncherConstants.COMPATIBILITY_NOTHING_LAUNCHER
 import org.ungoogled.patches.samsung.redirectCalls
-import org.ungoogled.patches.samsung.redirectMembers
 
 internal const val NOTHING_LAUNCHER_EXTENSION = "extensions/nothinglauncher.mpe"
 
@@ -87,6 +89,15 @@ private val DISPLAY_CALLS = listOf("Landroid/content/Context;", "Landroid/conten
 }
 
 /**
+ * System service calls that need a permission only the system holds (INTERACT_ACROSS_USERS); the member helper answers
+ * the SecurityException with "absent" (user 0).
+ */
+private val REFUSED_CALLS = setOf(
+    "Landroid/app/IActivityManager;->getCurrentUser()Landroid/content/pm/UserInfo;",
+    "Landroid/app/ActivityManager;->getCurrentUser()I",
+)
+
+/**
  * Nothing Launcher is a system app built against the full Android framework: an installed app may not link to its
  * hidden parts. Each hidden member it uses goes through Members (used where Android allows it, "absent" elsewhere),
  * each `new` of a class an app may not construct through Members.construct, and subclasses of such classes are
@@ -135,8 +146,12 @@ private val hiddenApisPatch = bytecodePatch(
         log.info("display lookups: $displays")
         // Measured against 4.0.20: 32, the home screen preview's (Customization > Home screen layout) among them.
         if (displays == 0) throw PatchException("no Context.getDisplay calls found")
-        val (calls, fields) = redirectMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS) { _, _ -> false }
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val rebased = rebaseSubclasses(REBASES)
         skipCastOfNull("$EXT/Hidden;")
         log.info("settings calls: $settings; hidden members: $calls calls, $fields fields; constructors: $constructors; rebased: $rebased")

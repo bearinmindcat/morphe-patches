@@ -54,7 +54,12 @@ internal fun BytecodePatchContext.redirectConstructors(helper: String, shimClass
     val shims = mutableMapOf<String, String>()
 
     fun shim(r: MethodReference): String = shims.getOrPut(r.key()) {
-        val parameters = r.parameterTypes.map { it.toString() }
+        // References typed Object: a rebased object (see rebaseSubclasses), no longer the Android class, still verifies
+        // as an argument (on Android 16+ some of those classes exist, and the verifier rejects the class otherwise).
+        val parameters = r.parameterTypes.map {
+            val t = it.toString()
+            if (t.startsWith("L") || t.startsWith("[")) "Ljava/lang/Object;" else t
+        }
         val name = "c${shims.size}"
         val registers = parameters.sumOf { if (wide(it)) 2 else 1 }
         sem.methods.add(

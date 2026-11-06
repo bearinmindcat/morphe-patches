@@ -16,11 +16,6 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
-import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS
-import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS
-import org.ungoogled.patches.xiaomilauncher.HIDDEN_SUPERCLASSES
-import org.ungoogled.patches.xiaomilauncher.SUPER_CONSTRUCTORS
-import org.ungoogled.patches.xiaomilauncher.XiaomiLauncherConstants.COMPATIBILITY_XIAOMI_LAUNCHER
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloroslauncher.misc.rebaseSubclasses
 import org.ungoogled.patches.coloroslauncher.misc.redirectConstructors
@@ -28,6 +23,13 @@ import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.coloroslauncher.misc.skipCastOfNull
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_SUPERCLASSES
+import org.ungoogled.patches.xiaomilauncher.SUPER_CONSTRUCTORS
+import org.ungoogled.patches.xiaomilauncher.XiaomiLauncherConstants.COMPATIBILITY_XIAOMI_LAUNCHER
 
 internal const val XIAOMI_LAUNCHER_EXTENSION = "extensions/xiaomilauncher.mpe"
 
@@ -147,6 +149,15 @@ private val SYSTEM_ONLY_CALLS = setOf(
 )
 
 /**
+ * An Android class the launcher carries a copy of that Android 16 and 17 have, with a constructor only the system may
+ * call (the framework's class wins): its subclass is rebased onto Object as well (the recents model made one at start,
+ * which stopped the launcher on Android 17).
+ */
+private val SUPERCLASSES_16_17 = mapOf(
+    "Landroid/window/TaskSnapshotListener;" to ("Ljava/lang/Object;" to emptyList<String>()),
+)
+
+/**
  * The HyperOS launcher is a system app built against the full Android framework; an installed app may not link to its
  * hidden parts. Each hidden member it uses goes through Members (used where Android allows it, "absent" elsewhere), each
  * `new` of a class an app may not construct through Members.construct, and subclasses of such classes are rebased.
@@ -159,11 +170,16 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(XIAOMI_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS)
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;",
+            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
-        val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
-        val casts = nullCastsToRebasedBases(HIDDEN_SUPERCLASSES.keys)
+        val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES + SUPERCLASSES_16_17)
+        val casts = nullCastsToRebasedBases(HIDDEN_SUPERCLASSES.keys + SUPERCLASSES_16_17.keys)
         skipCastOfNull("$EXT/Hidden;")
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; casts to their old bases: $casts")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")

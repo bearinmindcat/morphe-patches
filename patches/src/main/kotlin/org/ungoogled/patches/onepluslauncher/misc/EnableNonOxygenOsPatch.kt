@@ -1,18 +1,25 @@
 package org.ungoogled.patches.onepluslauncher.misc
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.onepluslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.onepluslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.onepluslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.onepluslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.onepluslauncher.OnePlusLauncherConstants.COMPATIBILITY_ONEPLUS_LAUNCHER
 import org.ungoogled.patches.samsung.redirectCalls
-import org.ungoogled.patches.samsung.redirectMembers
 
 internal const val ONEPLUS_LAUNCHER_EXTENSION = "extensions/onepluslauncher.mpe"
 
@@ -65,6 +72,15 @@ private val SETTINGS_CALLS: Map<String, String> = buildMap {
         }
     }
 }
+
+/**
+ * System service calls that need a permission only the system holds; Members answers the SecurityException with
+ * "absent". getCurrentUser (INTERACT_ACROSS_USERS) stopped the launcher whenever an app was installed or updated.
+ */
+private val REFUSED_CALLS = setOf(
+    "Landroid/app/IActivityManager;->getCurrentUser()Landroid/content/pm/UserInfo;",
+    "Landroid/app/ActivityManager;->getCurrentUser()I",
+)
 
 /**
  * The launcher refuses to start anywhere but a OnePlus phone (the "com.oneplus.software.oos" system feature or
@@ -177,14 +193,62 @@ private val hiddenApisPatch = bytecodePatch(
         log.info("settings calls: $settings")
         // Measured against 5.2.66: 113 settings calls.
         if (settings < 50) throw PatchException("only $settings settings calls found")
-        val (calls, fields) = redirectMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS) { _, _ -> false }
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val rebased = rebaseSubclasses(REBASES)
         skipCastOfNull("$EXT/Hidden;")
         val receivers = exportDynamicReceivers(RUNTIME)
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; rebased: $rebased; receivers: $receivers")
         // Measured against 5.2.66: 208 calls, 26 field accesses, 12 constructors, 4 rebased classes, 51 receivers.
         if (calls < 50) throw PatchException("only $calls hidden member calls found")
+
+        // The launcher's "running task" lookups find none (an installed home app sees no other app's task): reading the
+        // top activity of none is null instead of a crash.
+        val taskTypes = setOf(
+            "Landroid/app/TaskInfo;",
+            "Landroid/app/ActivityManager\$RunningTaskInfo;",
+            "Landroid/app/ActivityManager\$RecentTaskInfo;",
+        )
+        val topReads = mutableListOf<Pair<String, String>>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (m in c.methods) {
+                if (m.implementation?.instructions?.any { insn ->
+                        insn.opcode == Opcode.IGET_OBJECT &&
+                            ((insn as ReferenceInstruction).reference as FieldReference)
+                                .let { it.name == "topActivity" && it.definingClass in taskTypes }
+                    } == true
+                ) topReads += c.type to "${m.name}${m.parameterTypes.joinToString("", "(", ")")}${m.returnType}"
+            }
+        }
+        var tops = 0
+        for ((type, signature) in topReads) {
+            val method = mutableClassDefBy(type).methods.first {
+                "${it.name}${it.parameterTypes.joinToString("", "(", ")")}${it.returnType}" == signature
+            }
+            val instructions = method.implementation!!.instructions
+            for (index in instructions.indices.reversed()) {
+                val insn = instructions[index]
+                if (insn.opcode != Opcode.IGET_OBJECT) continue
+                val f = (insn as ReferenceInstruction).reference as FieldReference
+                if (f.name != "topActivity" || f.definingClass !in taskTypes) continue
+                val i = insn as TwoRegisterInstruction
+                method.replaceInstruction(
+                    index,
+                    "invoke-static/range { v${i.registerB} .. v${i.registerB} }, " +
+                        "$EXT/Tasks;->topActivity(Landroid/app/TaskInfo;)Landroid/content/ComponentName;",
+                )
+                method.addInstruction(index + 1, "move-result-object v${i.registerA}")
+                tops++
+            }
+        }
+        log.info("top activity reads: $tops")
+        // Measured against 5.2.66: 12 reads (the wallpaper-changed receiver's among them).
+        if (tops == 0) throw PatchException("no running-task top activity reads found")
 
         // Android 11's ParcelableColorSpace was a ColorSpace; later ones are not, and the recents screenshot helper
         // passing one to Bitmap.wrapHardwareBuffer made its class fail verification: it now passes its ColorSpace.

@@ -658,3 +658,22 @@ internal val HIDDEN_CONSTRUCTORS = setOf(
     "Lcom/android/internal/widget/LinearLayoutManager;-><init>(Landroid/content/Context;)V",
     "Lcom/android/internal/widget/RecyclerView\$ViewHolder;-><init>(Landroid/view/View;)V",
 )
+
+/* Android 16 and 17 */
+/*
+ * Members and constructors Nothing Launcher references that Android 16 or 17 refuses or lacks although Android 15
+ * allowed them, or that belong to classes it carries copies of and the newer framework has (the framework's class wins
+ * and its members are hidden). Found by checking the patched APK against the Android 16 and 17 emulators' boot
+ * classpath and hidden API flags; they go through the same member helper (used where the phone allows, "absent"
+ * elsewhere).
+ */
+internal val HIDDEN_MEMBERS_16_17 = setOf(
+    "Landroid/app/ondeviceintelligence/flags/FeatureFlags;->enableOnDeviceIntelligence()Z",
+    "Landroid/app/ondeviceintelligence/flags/FeatureFlags;->enableOnDeviceIntelligenceModule()Z",
+    "Landroid/app/wallpaper/WallpaperDescription\$Builder;->setComponent(Landroid/content/ComponentName;)Landroid/app/wallpaper/WallpaperDescription\$Builder;",
+    "Landroid/os/IRemoteCallback\$Stub;->asInterface(Landroid/os/IBinder;)Landroid/os/IRemoteCallback;",
+)
+
+internal val HIDDEN_CONSTRUCTORS_16_17 = setOf(
+    "Lcom/android/internal/dynamicanimation/animation/SpringAnimation;-><init>(Ljava/lang/Object;Landroid/util/FloatProperty;)V",
+)

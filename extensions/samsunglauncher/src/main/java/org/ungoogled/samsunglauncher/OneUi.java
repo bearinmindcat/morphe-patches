@@ -121,6 +121,8 @@ public final class OneUi {
         try {
             return ((Method) m).invoke(receiver, args);
         } catch (InvocationTargetException e) {
+            // A call only the system may make (a system service's permission check): "not there" as well.
+            if (e.getCause() instanceof SecurityException) return absent(receiver, key);
             throw rethrow(e);
         } catch (IllegalAccessException e) {
             return absent(receiver, key);

@@ -16,7 +16,9 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.asuslauncher.AsusLauncherConstants.COMPATIBILITY_ASUS_LAUNCHER
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.asuslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.asuslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloros.exportDynamicReceivers
@@ -111,8 +113,12 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(ASUS_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS)
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
         val casts = nullCastsToRebasedBases(HIDDEN_SUPERCLASSES.keys)

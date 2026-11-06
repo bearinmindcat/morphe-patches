@@ -195,3 +195,28 @@ internal val HIDDEN_CONSTRUCTORS = setOf(
     "Lcom/android/internal/util/TraceBuffer;-><init>(ILcom/android/internal/util/TraceBuffer\$ProtoProvider;Ljava/util/function/Consumer;)V",
     "Lsun/misc/Signal;-><init>(Ljava/lang/String;)V",
 )
+
+/* Android 16 and 17 */
+/*
+ * Members and constructors OnePlus Launcher (OxygenOS 11) references that Android 16 or 17 refuses or lacks although
+ * Android 15 allowed them, or that belong to classes it carries copies of and the newer framework has (the framework's
+ * class wins and its members are hidden). Found by checking the patched APK against the Android 16 and 17 emulators'
+ * boot classpath and hidden API flags; they go through the same member helper (used where the phone allows, "absent"
+ * elsewhere).
+ */
+internal val HIDDEN_MEMBERS_16_17 = setOf(
+    "Landroid/app/ActivityOptions;->makeMultiThumbFutureAspectScaleAnimation(Landroid/content/Context;Landroid/os/Handler;Landroid/view/IAppTransitionAnimationSpecsFuture;Landroid/app/ActivityOptions\$OnAnimationStartedListener;Z)Landroid/app/ActivityOptions;",
+    "Landroid/hardware/input/InputManager;->getInstance()Landroid/hardware/input/InputManager;",
+    "Landroid/view/IRecentsAnimationController;->setAnimationTargetsBehindSystemBars(Z)V",
+    "Landroid/view/IRecentsAnimationController;->setInputConsumerEnabled(Z)V",
+    "Landroid/view/IWindowManager;->createInputConsumer(Landroid/os/IBinder;Ljava/lang/String;ILandroid/view/InputChannel;)V",
+    "Lcom/android/internal/telephony/MccTable;->countryCodeForMcc(I)Ljava/lang/String;",
+    "Lcom/android/internal/widget/LockPatternUtils;->setLockoutAttemptDeadline(II)J",
+    "Lcom/android/systemui/shared/system/InputChannelCompat\$InputEventReceiver\$1;->finishInputEvent(Landroid/view/InputEvent;Z)V",
+    "Lcom/android/systemui/shared/system/InputConsumerController\$InputEventReceiver;->dispose()V",
+    "Lcom/android/systemui/shared/system/InputConsumerController\$InputEventReceiver;->finishInputEvent(Landroid/view/InputEvent;Z)V",
+)
+
+internal val HIDDEN_CONSTRUCTORS_16_17 = setOf(
+    "Landroid/view/SurfaceControl;-><init>()V",
+)

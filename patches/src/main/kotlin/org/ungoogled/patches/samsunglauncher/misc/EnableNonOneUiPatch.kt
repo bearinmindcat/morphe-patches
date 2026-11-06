@@ -10,13 +10,15 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
+import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
-import org.ungoogled.patches.samsung.redirectMembers
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsunglauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.samsunglauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.samsunglauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.samsunglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.samsunglauncher.SamsungLauncherConstants.COMPATIBILITY_SAMSUNG_LAUNCHER
 
 internal const val SAMSUNG_LAUNCHER_EXTENSION = "extensions/samsunglauncher.mpe"
@@ -113,6 +115,15 @@ private val resourcesPatch = resourcePatch(
     }
 }
 
+/**
+ * System service calls that need a permission only the system holds (INTERACT_ACROSS_USERS); the member helper answers
+ * the SecurityException with "absent" (user 0).
+ */
+private val REFUSED_CALLS = setOf(
+    "Landroid/app/IActivityManager;->getCurrentUser()Landroid/content/pm/UserInfo;",
+    "Landroid/app/ActivityManager;->getCurrentUser()I",
+)
+
 /** Sends One UI Home's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers). */
 private val oneUiMembersPatch = bytecodePatch(
     description = "Answers One UI's additions to Android classes where the phone has none.",
@@ -158,6 +169,8 @@ private val REBASES = mapOf(
  * One UI Home is a system app built against the full Android framework; an installed app may not link to its hidden
  * parts. Each hidden member it uses goes through OneUi (used where Android allows it, "absent" elsewhere), each
  * `new` of a class an app may not construct through OneUi.construct, and subclasses of such classes are rebased.
+ * The lists cover Android 15, 16 and 17, and the generated helpers take objects untyped: on Android 16+ a rebased
+ * listener (TaskSnapshotListener) no longer verified as the class the call named, and the launcher did not start.
  */
 private val hiddenApisPatch = bytecodePatch(
     description = "Answers Android's hidden parts where an installed app may not use them.",
@@ -165,8 +178,12 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(SAMSUNG_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectMembers("$EXT/OneUi;", "$EXT/Hidden;", HIDDEN_MEMBERS) { _, _ -> false }
-        val constructors = redirectConstructors("$EXT/OneUi;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/OneUi;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/OneUi;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val rebased = rebaseSubclasses(REBASES)
         skipCastOfNull("$EXT/Hidden;")
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; rebased classes: $rebased")

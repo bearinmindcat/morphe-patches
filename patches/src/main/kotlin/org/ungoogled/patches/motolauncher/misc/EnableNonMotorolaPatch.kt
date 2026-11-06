@@ -14,17 +14,19 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
-import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS
-import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS
-import org.ungoogled.patches.motolauncher.HIDDEN_SUPERCLASSES
-import org.ungoogled.patches.motolauncher.MotoLauncherConstants.COMPATIBILITY_MOTO_LAUNCHER
-import org.ungoogled.patches.motolauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloroslauncher.misc.rebaseSubclasses
 import org.ungoogled.patches.coloroslauncher.misc.redirectConstructors
 import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.coloroslauncher.misc.skipCastOfNull
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
+import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.motolauncher.HIDDEN_SUPERCLASSES
+import org.ungoogled.patches.motolauncher.MotoLauncherConstants.COMPATIBILITY_MOTO_LAUNCHER
+import org.ungoogled.patches.motolauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
 
@@ -112,8 +114,12 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(MOTO_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS)
-        val constructors = redirectConstructors("$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS)
+        val (calls, fields) = redirectHiddenMembers(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+        )
+        val constructors = redirectConstructors(
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+        )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
         // The launcher's own PendingIntentCompat.newPendingIntent takes an IIntentSender.Stub, a rebased class: its two
