@@ -116,6 +116,7 @@ class CloudImporter {
         detectFormat();
         progress("Reading the list of notes…", 0, 0);
         Listing listing = listAll();
+        MiCloudApi.trace("listed " + listing.entries.size() + " entries, " + listing.folders.size() + " folders @" + api.host);
         importFolders(listing.folders);
         List<JSONObject> notes = new ArrayList<>();
         boolean anyEncrypted = false;
@@ -141,6 +142,8 @@ class CloudImporter {
         if (listing.syncTag != null) state.set("syncTag", listing.syncTag);
         state.set("format", format);
         state.set("lastImport", String.valueOf(System.currentTimeMillis()));
+        MiCloudApi.trace("import done: " + result.imported + " new, " + result.updated + " updated, " + result.unchanged
+            + " unchanged, " + result.encrypted + " encrypted, " + result.hidden + " hidden, " + result.failedFiles + " files failed");
         return result;
     }
 
@@ -153,11 +156,11 @@ class CloudImporter {
         try {
             JSONObject data = api.get("/note/v2/hasData", null);
             format = data.optBoolean("hasData", false) ? "/v2" : "";
-        } catch (MiCloudApi.SessionExpired e) {
+        } catch (MiCloudApi.SessionExpired | MiCloudApi.RegionMoved | MiCloudApi.Unreachable e) {
             throw e;
         } catch (IOException e) {
             // As the website: if the check fails, use the original format.
-            MiCloudApi.log("hasData failed: " + e.getMessage());
+            MiCloudApi.trace("hasData failed (" + e.getMessage() + "), using the original format");
             format = "";
         }
         String previous = state.get("format");
@@ -166,7 +169,7 @@ class CloudImporter {
             MiCloudApi.log("format changed " + previous + " -> " + format);
             state.set("syncTag", null);
         }
-        MiCloudApi.log("format " + (format.isEmpty() ? "v1" : "v2"));
+        MiCloudApi.trace("format " + (format.isEmpty() ? "v1" : "v2") + " @" + api.host);
     }
 
     String path(String rest) {
@@ -205,8 +208,16 @@ class CloudImporter {
             String next = data.has("syncTag") ? str(data, "syncTag") : null;
             if (next != null && !next.isEmpty()) listing.syncTag = next;
             progress("Reading the list of notes… " + listing.entries.size(), 0, 0);
-            if (data.optBoolean("lastPage", true)) return listing;
-            if (next == null || next.isEmpty() || !seenTags.add(next)) throw new IOException("the note list did not page");
+            int added = entries == null ? 0 : entries.length();
+            // The website pages until lastPage is true; without the field, a page that brought nothing new ends it.
+            boolean last = data.has("lastPage") ? data.optBoolean("lastPage", true) : added == 0;
+            if (last) return listing;
+            if (next == null || next.isEmpty() || !seenTags.add(next)) {
+                if (!data.has("lastPage")) return listing;
+                MiCloudApi.trace("GET " + path("/full/page") + " @" + api.host + " did not page (lastPage false, syncTag " +
+                    (next == null || next.isEmpty() ? "missing" : "repeated") + ")");
+                throw new IOException("Xiaomi Cloud's note list did not page (" + api.host + ").");
+            }
             syncTag = next;
         }
         throw new IOException("too many pages");

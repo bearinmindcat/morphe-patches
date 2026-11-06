@@ -2,6 +2,7 @@ package org.ungoogled.xiaominotes.micloud;
 
 import android.app.Activity;
 import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -425,28 +426,47 @@ public final class CloudSync extends CloudImporter {
     }
 
     private static void runQuietly(Context app, State state, String base, String cookie, String userAgent, boolean debug) {
-        MiCloudApi api;
-        try {
-            api = new MiCloudApi(base, cookie, userAgent, debug, true);
-        } catch (IllegalArgumentException e) {
-            return;
-        }
-        try (NotesStore store = new NotesStore(app)) {
-            CloudSync job = new CloudSync(app, api, state, store, null);
-            if (!CloudImporter.claim(job)) return;
+        for (int moves = 0; moves <= 2; moves++) {
+            MiCloudApi api;
             try {
-                job.sync();
-                MiCloudApi.log("sync on open: " + job.syncSummary());
-            } finally {
-                CloudImporter.release(job);
+                api = new MiCloudApi(base, cookie, userAgent, debug, true);
+            } catch (IllegalArgumentException e) {
+                return;
             }
-            state.set("session", api.cookie());
-        } catch (MiCloudApi.SessionExpired e) {
-            state.set("session", null);
-            warnSignIn(app, state);
-        } catch (Throwable t) {
-            Log.w(MiCloudApi.TAG, "sync on open failed", t);
-            state.set("lastSyncError", String.valueOf(t.getMessage()));
+            try (NotesStore store = new NotesStore(app)) {
+                CloudSync job = new CloudSync(app, api, state, store, null);
+                if (!CloudImporter.claim(job)) return;
+                try {
+                    job.sync();
+                    MiCloudApi.trace("sync on open @" + api.host + ": " + job.syncSummary());
+                } finally {
+                    CloudImporter.release(job);
+                }
+                state.set("session", api.cookie());
+                state.set("sessionBase", api.base);
+                return;
+            } catch (MiCloudApi.RegionMoved e) {
+                // The account lives on another regional host: carry on there if the WebView already has a session.
+                String there = MiCloudApi.sessionCookies(e.target);
+                MiCloudApi.trace("sync on open: region -> " + Uri.parse(e.target).getHost() + (MiCloudApi.hasSession(there) ? "" : ", no session there"));
+                if (!MiCloudApi.hasSession(there)) {
+                    state.set("session", null);
+                    warnSignIn(app, state);
+                    return;
+                }
+                base = e.target;
+                cookie = there;
+            } catch (MiCloudApi.SessionExpired e) {
+                MiCloudApi.trace("sync on open: " + e.getMessage());
+                state.set("session", null);
+                warnSignIn(app, state);
+                return;
+            } catch (Throwable t) {
+                Log.w(MiCloudApi.TAG, "sync on open failed", t);
+                MiCloudApi.trace("sync on open failed: " + t.getMessage());
+                state.set("lastSyncError", String.valueOf(t.getMessage()));
+                return;
+            }
         }
     }
 

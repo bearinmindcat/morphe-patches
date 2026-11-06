@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * The calls Xiaomi's own notes website (i.mi.com/note) makes, made the same way with the session the user signed in to
@@ -29,28 +30,87 @@ import java.util.Map;
  */
 final class MiCloudApi {
     static final String TAG = "UMiCloud";
+    /** Tag of the one-line traces a reporter's log needs (host, step, status; never cookies or note text). */
+    static final String TRACE = "UA";
 
-    /** The session is gone (HTTP 401/403): sign in again. */
-    static final class SessionExpired extends IOException {
-        SessionExpired(String message) {
+    /** Xiaomi Cloud's notes site: i.mi.com and every regional host (us., de., sg., ru., in., ...). */
+    static final Pattern NOTES_HOST = Pattern.compile("(?i)^(?:[a-z0-9-]+\\.)*i\\.mi\\.com$");
+    /** Debug-only stand-ins for that family (a local copy of the site on the emulator's host). */
+    private static final Pattern DEBUG_HOST = Pattern.compile("^(?:10\\.0\\.2\\.2|127\\.0\\.0\\.1|localhost)$");
+
+    /** A failure the screen can explain: which host, which step, what the site answered. */
+    static class Failure extends IOException {
+        final String host, step;
+
+        Failure(String host, String step, String message) {
             super(message);
+            this.host = host;
+            this.step = step;
+        }
+    }
+
+    /** The session is gone (HTTP 401/403 or a redirect to sign-in): sign in again. */
+    static final class SessionExpired extends Failure {
+        SessionExpired(String host, String step, String why) {
+            super(host, step, "Xiaomi Cloud ended the session (" + why + " at " + step + ", " + host + "). Sign in again.");
         }
     }
 
     /** The site answered with an error code. */
-    static final class ApiError extends IOException {
+    static final class ApiError extends Failure {
         final int code;
 
-        ApiError(int code, String message) {
-            super(message);
+        ApiError(String host, String step, int code, String detail) {
+            super(host, step, "Xiaomi Cloud answered " + (detail == null || detail.isEmpty() ? String.valueOf(code) : detail)
+                + " at " + step + " (" + host + ").");
             this.code = code;
         }
+    }
+
+    /** The site answered with an HTTP error or something that is not its data. */
+    static final class HttpError extends Failure {
+        final int status;
+
+        HttpError(String host, String step, int status, String what) {
+            super(host, step, "Xiaomi Cloud answered " + what + " at " + step + " (" + host + ").");
+            this.status = status;
+        }
+    }
+
+    /**
+     * The account lives on another regional host: the site answers code 308 with data.redirectUrl (its own scripts then
+     * reload the page there), or redirects to it.
+     */
+    static final class RegionMoved extends Failure {
+        final String target;
+
+        RegionMoved(String host, String step, String target) {
+            super(host, step, "Xiaomi Cloud moved this account from " + host + " to " + Uri.parse(target).getHost() + ".");
+            this.target = target;
+        }
+    }
+
+    /** The host could not be reached at all. */
+    static final class Unreachable extends Failure {
+        Unreachable(String host, String step, IOException cause) {
+            super(host, step, "Couldn't reach " + host + " (" + step + "): " + describe(cause));
+            initCause(cause);
+        }
+    }
+
+    private static String describe(IOException e) {
+        if (e instanceof java.net.UnknownHostException) return "no such host / no internet";
+        if (e instanceof java.net.SocketTimeoutException) return "timed out";
+        if (e instanceof javax.net.ssl.SSLException) return "secure connection failed";
+        String m = e.getMessage();
+        return e.getClass().getSimpleName() + (m == null ? "" : ": " + m);
     }
 
     private static final int MAX_RETRIES = 3;
     private static final long MAX_DOWNLOAD = 64L << 20;
 
     final String base;
+    final String host;
     private final String userAgent;
     private final boolean allowHttp;
     private final boolean keepCookies;
@@ -58,11 +118,51 @@ final class MiCloudApi {
 
     MiCloudApi(String base, String cookie, String userAgent, boolean allowHttp, boolean keepCookies) {
         this.base = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        Uri b = Uri.parse(this.base);
+        this.host = b.getHost() + (b.getPort() > 0 ? ":" + b.getPort() : "");
         this.cookie = cookie;
         this.userAgent = userAgent;
         this.allowHttp = allowHttp;
         this.keepCookies = keepCookies;
         if (!allowHttp && !this.base.startsWith("https://")) throw new IllegalArgumentException("not https: " + base);
+        if (!family(b, allowHttp)) throw new IllegalArgumentException("not a Xiaomi Cloud host: " + b.getHost());
+    }
+
+    /** True for i.mi.com and its regional hosts over https (and, in debug runs only, the local test hosts). */
+    static boolean family(Uri uri, boolean debug) {
+        if (uri == null || uri.getHost() == null) return false;
+        if (debug && DEBUG_HOST.matcher(uri.getHost()).matches()) return true;
+        return "https".equals(uri.getScheme()) && NOTES_HOST.matcher(uri.getHost()).matches();
+    }
+
+    /** "https://host[:port]" of a URL. */
+    static String origin(Uri u) {
+        return u.getScheme() + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
+    }
+
+    /**
+     * The session cookies the WebView holds for [base], as the page itself would send them (cookie paths differ, so
+     * the pages the site uses are asked too). Null when there is none.
+     */
+    static String sessionCookies(String base) {
+        CookieManager cm = CookieManager.getInstance();
+        Map<String, String> all = new LinkedHashMap<>();
+        for (String path : new String[] {"/", "/note/h5", "/note/", "/note/v2/", "/sts"}) {
+            String c = cm.getCookie(base + path);
+            if (c == null) continue;
+            for (String part : c.split(";")) {
+                String p = part.trim();
+                int eq = p.indexOf('=');
+                if (eq > 0 && !all.containsKey(p.substring(0, eq))) all.put(p.substring(0, eq), p.substring(eq + 1));
+            }
+        }
+        if (all.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : all.entrySet()) {
+            if (sb.length() > 0) sb.append("; ");
+            sb.append(e.getKey()).append('=').append(e.getValue());
+        }
+        return sb.toString();
     }
 
     static String cookieValue(String cookies, String name) {
@@ -73,6 +173,11 @@ final class MiCloudApi {
             if (eq > 0 && p.substring(0, eq).equals(name)) return p.substring(eq + 1);
         }
         return null;
+    }
+
+    static boolean hasSession(String cookies) {
+        String token = cookieValue(cookies, "serviceToken");
+        return token != null && !token.isEmpty() && !token.equals("\"\"");
     }
 
     /** The session's cookies as they are now (the site may have renewed them). */
@@ -95,19 +200,25 @@ final class MiCloudApi {
         Map<String, String> query = new LinkedHashMap<>();
         if (params != null) query.putAll(params);
         query.put("ts", String.valueOf(System.currentTimeMillis()));
-        return call("GET", base + path + "?" + encode(query), null);
+        return call("GET", path, base + path + "?" + encode(query), null);
     }
 
     /** POST [form] (+ serviceToken) to [path], the site's `data` object. */
     JSONObject post(String path, Map<String, String> form) throws IOException {
         Map<String, String> body = new LinkedHashMap<>(form);
         String token = serviceToken();
-        if (token == null) throw new SessionExpired("no serviceToken");
+        if (token == null) throw new SessionExpired(host, step("POST", path), "no serviceToken cookie");
         body.put("serviceToken", token);
-        return call("POST", base + path, encode(body).getBytes(StandardCharsets.UTF_8));
+        return call("POST", path, base + path, encode(body).getBytes(StandardCharsets.UTF_8));
     }
 
-    private JSONObject call(String method, String url, byte[] body) throws IOException {
+    /** "GET /note/note/<id>/" -- the call without ids, for messages and traces. */
+    static String step(String method, String path) {
+        return method + " " + path.replaceAll("/\\d{3,}", "/<id>");
+    }
+
+    private JSONObject call(String method, String path, String url, byte[] body) throws IOException {
+        String step = step(method, path);
         IOException last = null;
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
             HttpURLConnection c = open(url, true);
@@ -124,48 +235,94 @@ final class MiCloudApi {
                 }
                 int status = c.getResponseCode();
                 remember(c);
-                if (status == 401 || status == 403) throw new SessionExpired("HTTP " + status);
+                if (status == 401 || status == 403) {
+                    trace(step + " @" + host + " -> HTTP " + status);
+                    throw new SessionExpired(host, step, "HTTP " + status);
+                }
                 if (status >= 300 && status < 400) {
-                    // The site sends a signed-out caller to Xiaomi's sign-in page.
                     String location = c.getHeaderField("Location");
-                    if (location != null && (location.contains("serviceLogin") || location.contains("account.xiaomi.com"))) {
-                        throw new SessionExpired("redirected to sign-in");
+                    Uri to = location == null ? null : Uri.parse(new URL(new URL(url), location).toString());
+                    if (to != null && to.getHost() != null && !allowHttp && family(Uri.parse("https://" + to.getHost()), false)) {
+                        to = Uri.parse("https://" + to.getHost() + (to.getPath() == null ? "" : to.getPath()));
                     }
-                    throw new IOException("HTTP " + status + " for " + path(url));
+                    trace(step + " @" + host + " -> HTTP " + status + " to " + (to == null ? "nowhere" : to.getHost() + to.getPath()));
+                    if (to != null && family(to, allowHttp) && !origin(to).equalsIgnoreCase(base)) {
+                        throw new RegionMoved(host, step, origin(to));
+                    }
+                    if (to != null && (to.getPath() != null && to.getPath().contains("serviceLogin")
+                        || to.getHost() != null && to.getHost().endsWith("account.xiaomi.com"))) {
+                        throw new SessionExpired(host, step, "sent to sign-in");
+                    }
+                    throw new HttpError(host, step, status, "HTTP " + status);
                 }
                 if (status == 429 || status >= 500) {
-                    last = new IOException("HTTP " + status);
+                    trace(step + " @" + host + " -> HTTP " + status + " (try " + attempt + ")");
+                    last = new HttpError(host, step, status, "HTTP " + status);
                     pause(retryDelay(c, attempt));
                     continue;
                 }
-                if (status < 200 || status >= 300) throw new IOException("HTTP " + status + " for " + path(url));
+                if (status < 200 || status >= 300) {
+                    trace(step + " @" + host + " -> HTTP " + status);
+                    throw new HttpError(host, step, status, "HTTP " + status);
+                }
                 String text = new String(readAll(c.getInputStream(), 16L << 20), StandardCharsets.UTF_8);
-                return unwrap(text, url);
-            } catch (SessionExpired | ApiError e) {
+                return unwrap(text, step);
+            } catch (Failure e) {
                 throw e;
             } catch (IOException e) {
-                last = e;
+                trace(step + " @" + host + " -> " + e.getClass().getSimpleName() + " (try " + attempt + ")");
+                last = new Unreachable(host, step, e);
                 if (attempt == MAX_RETRIES) break;
                 pause(500L * attempt);
             } finally {
                 c.disconnect();
             }
         }
-        throw last != null ? last : new IOException("request failed");
+        throw last != null ? last : new HttpError(host, step, 0, "nothing");
     }
 
-    private static JSONObject unwrap(String text, String url) throws IOException {
+    private JSONObject unwrap(String text, String step) throws IOException {
         JSONObject json;
         try {
             json = new JSONObject(text);
         } catch (JSONException e) {
-            throw new IOException("not JSON from " + path(url));
+            String t = text.trim().toLowerCase(Locale.ROOT);
+            boolean page = t.startsWith("<") || t.contains("<html");
+            trace(step + " @" + host + " -> HTTP 200 " + (page ? "web page" : "not JSON") + " (" + text.length() + " bytes)");
+            throw new HttpError(host, step, 200, page ? "with a web page instead of data" : "with something that isn't data");
         }
-        if (!json.has("code")) return json;
-        int code = json.optInt("code", -1);
-        if (code != 0) throw new ApiError(code, "error " + code + " from " + path(url) + ": " + json.optString("description"));
-        JSONObject data = json.optJSONObject("data");
-        return data != null ? data : new JSONObject();
+        if (!json.has("code")) {
+            trace(step + " @" + host + " -> HTTP 200 (no code)");
+            return json;
+        }
+        Object rawCode = json.opt("code");
+        int code = json.optInt("code", Integer.MIN_VALUE);
+        trace(step + " @" + host + " -> HTTP 200 code " + rawCode);
+        if (code == 0) {
+            JSONObject data = json.optJSONObject("data");
+            return data != null ? data : new JSONObject();
+        }
+        if (code == 308) {
+            // The website's request helper: code 308 = this account lives on data.redirectUrl's host.
+            JSONObject data = json.optJSONObject("data");
+            String redirect = data != null ? data.optString("redirectUrl", "") : "";
+            if (redirect.isEmpty()) redirect = json.optString("redirectUrl", "");
+            Uri to = redirect.isEmpty() ? null : Uri.parse(redirect.contains("://") ? redirect : "https://" + redirect);
+            // The site always reloads on https://<that host>; only test runs keep a plain-HTTP address.
+            if (to != null && to.getHost() != null && !allowHttp) to = Uri.parse("https://" + to.getHost());
+            if (to != null && family(to, allowHttp) && !origin(to).equalsIgnoreCase(base)) {
+                trace(step + " @" + host + " -> region " + to.getHost());
+                throw new RegionMoved(host, step, origin(to));
+            }
+            throw new ApiError(host, step, 308, "308 (a region switch to " + (to == null ? "no host" : to.getHost()) + ")");
+        }
+        String description = json.optString("description", json.optString("reason", json.optString("result", "")));
+        if (description.length() > 80) description = description.substring(0, 80);
+        throw new ApiError(host, step, code == Integer.MIN_VALUE ? -1 : code, rawCode + (description.isEmpty() ? "" : " (" + description + ")"));
+    }
+
+    static void trace(String message) {
+        Log.i(TRACE, "micloud " + message);
     }
 
     /**
@@ -189,8 +346,14 @@ final class MiCloudApi {
                     if (!allowHttp && !url.startsWith("https://")) throw new IOException("refusing non-https redirect");
                     continue;
                 }
-                if (ours && (status == 401 || status == 403)) throw new SessionExpired("HTTP " + status);
-                if (status < 200 || status >= 300) throw new IOException("HTTP " + status + " for attachment");
+                if (ours && (status == 401 || status == 403)) {
+                    trace("GET /file/full @" + host + " -> HTTP " + status);
+                    throw new SessionExpired(host, "GET /file/full", "HTTP " + status);
+                }
+                if (status < 200 || status >= 300) {
+                    trace("GET /file/full @" + Uri.parse(url).getHost() + " -> HTTP " + status);
+                    throw new IOException("HTTP " + status + " for attachment");
+                }
                 File tmp = new File(dest.getPath() + ".part");
                 File dir = dest.getParentFile();
                 if (dir != null && !dir.isDirectory() && !dir.mkdirs()) throw new IOException("cannot create " + dir);
@@ -331,10 +494,6 @@ final class MiCloudApi {
             throw new IllegalStateException(e);
         }
         return sb.toString();
-    }
-
-    private static String path(String url) {
-        return Uri.parse(url).getPath();
     }
 
     static void log(String message) {

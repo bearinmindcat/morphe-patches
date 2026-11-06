@@ -34,7 +34,6 @@ import android.widget.TextView;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * "Import from Xiaomi Cloud" (Settings > Xiaomi Cloud). A consent line, then Xiaomi's own notes website in a WebView:
@@ -43,9 +42,6 @@ import java.util.regex.Pattern;
  * (CloudImporter). The session is forgotten afterwards unless the user ticks "Stay signed in".
  */
 public final class CloudImportActivity extends Activity {
-    static final String START_URL = "https://i.mi.com/note/h5";
-    /** Xiaomi Cloud's notes site: i.mi.com and its regional hosts (us.i.mi.com, ...). */
-    private static final Pattern NOTES_HOST = Pattern.compile("(?i)^([a-z0-9-]+\\.)?i\\.mi\\.com$");
 
     /** The screen on show, which gets an import's progress and result even if it was reopened meanwhile. */
     private static java.lang.ref.WeakReference<CloudImportActivity> current = new java.lang.ref.WeakReference<>(null);
@@ -77,15 +73,28 @@ public final class CloudImportActivity extends Activity {
     // ---- debug override (adb only)
 
     /**
-     * Tests point the importer at a local copy of the site: `adb shell setprop log.tag.UMiCloud DEBUG`, then start this
-     * screen with `--es debug_base http://10.0.2.2:PORT` (it is not exported, so only adb as root can). Without that
-     * property the extra and the stored value are ignored.
+     * Tests point the importer at a local copy of the site: `adb shell setprop log.tag.UMiCloud DEBUG`, then either
+     * `adb shell setprop debug.umicloud.base http://10.0.2.2:PORT` or start this screen with `--es debug_base ...` (it is
+     * not exported, so only adb as root can). Without the log.tag property both are ignored.
      */
     private String debugBase() {
         if (!Log.isLoggable(MiCloudApi.TAG, Log.DEBUG)) return null;
         String extra = getIntent() != null ? getIntent().getStringExtra("debug_base") : null;
+        if (extra == null) extra = property("debug.umicloud.base");
         if (extra != null) state.set("debugBase", extra.isEmpty() ? null : extra);
         return state.get("debugBase");
+    }
+
+    /** A system property (read with getprop, no hidden API), or null when unset. */
+    private static String property(String name) {
+        try {
+            Process p = new ProcessBuilder("getprop", name).redirectErrorStream(true).start();
+            String value = new String(MiCloudApi.readAll(p.getInputStream(), 4096), java.nio.charset.StandardCharsets.UTF_8).trim();
+            p.destroy();
+            return value.isEmpty() ? null : value;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ---- lifecycle
@@ -311,64 +320,77 @@ public final class CloudImportActivity extends Activity {
 
     private void showError(String message) {
         LinearLayout column = page();
-        text(column, message, 17, false);
+        // Selectable, so it can be copied as it is into a bug report.
+        text(column, message, 17, false).setTextIsSelectable(true);
         button(column, "Try again", true, v -> start());
         button(column, "Close", v -> finish());
     }
 
     // ---- sign-in
 
-    private String startUrl() {
-        return debugBase != null ? debugBase + "/note/h5" : START_URL;
+    private static final int MAX_REGION_MOVES = 3;
+    /** How long after Xiaomi's sign-in handed over to a notes host (its /sts page) a session cookie must exist. */
+    private static final long SESSION_GRACE = 12_000L;
+    private int regionMoves;
+    private String stsHost;
+    private long stsAt;
+    private final Runnable poll = this::pollSession;
+
+    private boolean debug() {
+        return debugBase != null;
+    }
+
+    private String startBase() {
+        return debugBase != null ? debugBase : "https://i.mi.com";
     }
 
     private boolean notesSite(Uri uri) {
-        if (uri == null || uri.getHost() == null) return false;
-        if (debugBase != null) {
-            Uri d = Uri.parse(debugBase);
-            if (uri.getHost().equalsIgnoreCase(d.getHost()) && uri.getPort() == d.getPort()) return true;
-        }
-        return "https".equals(uri.getScheme()) && NOTES_HOST.matcher(uri.getHost()).matches();
+        return MiCloudApi.family(uri, debug());
     }
 
-    /** With "Stay signed in", the kept session is tried first; otherwise (or if it has expired) Xiaomi's sign-in page. */
+    private static String hostOf(String base) {
+        Uri u = Uri.parse(base);
+        return u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
+    }
+
+    /** The session for [base]: what the WebView holds there, else what was kept from the last run. */
+    private String sessionFor(String base) {
+        String cookie = MiCloudApi.sessionCookies(base);
+        if (MiCloudApi.hasSession(cookie)) return cookie;
+        String kept = keepSession() && base.equals(state.get("sessionBase")) ? state.get("session") : null;
+        return MiCloudApi.hasSession(kept) ? kept : null;
+    }
+
+    /** With a kept session, its host is tried first; otherwise (or if it has expired) Xiaomi's sign-in page. */
     private void start() {
-        String cookie = keepSession() ? state.get("session") : null;
+        regionMoves = 0;
         String base = state.get("sessionBase");
-        if (cookie == null || base == null || !notesSite(Uri.parse(base + "/note"))) {
-            showWeb();
+        String cookie = base != null && notesSite(Uri.parse(base)) ? sessionFor(base) : null;
+        if (cookie == null) {
+            showWeb(null);
             return;
         }
-        showWork("Connecting…", 0, 0);
-        MiCloudApi api = new MiCloudApi(base, cookie, WebSettings.getDefaultUserAgent(this), debugBase != null, true);
-        new Thread(() -> {
-            boolean ok;
-            try {
-                api.get("/note/v2/hasData", null);
-                ok = true;
-            } catch (MiCloudApi.SessionExpired e) {
-                ok = false;
-            } catch (IOException e) {
-                ok = true;
-            }
-            boolean signedIn = ok;
-            main.post(() -> {
-                if (finished) return;
-                if (signedIn) startImport(api, MiCloudApi.cookieValue(cookie, "userId"));
-                else {
-                    state.set("session", null);
-                    showWeb();
-                }
-            });
-        }, "micloud-session").start();
+        showWork("Connecting to " + hostOf(base) + "…", 0, 0);
+        probe(base, cookie, false);
     }
 
-    private void showWeb() {
+    private void showWeb(String base) {
+        String target = (base != null ? base : startBase()) + "/note/h5";
+        String hintText = base == null ? "Sign in with your Xiaomi account"
+            : "Signing in to " + hostOf(base) + ", your account's region…";
+        if (web != null && web.getParent() != null) {
+            TextView hint = root.findViewWithTag("hint");
+            if (hint != null) hint.setText(hintText);
+            MiCloudApi.trace("web -> " + hostOf(target) + "/note/h5");
+            web.loadUrl(target);
+            return;
+        }
         root.removeAllViews();
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
         TextView hint = new TextView(this);
-        hint.setText("Sign in with your Xiaomi account");
+        hint.setTag("hint");
+        hint.setText(hintText);
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         hint.setTextColor(foreground());
         hint.setGravity(Gravity.CENTER_VERTICAL);
@@ -389,63 +411,185 @@ public final class CloudImportActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String scheme = request.getUrl().getScheme();
+                Uri u = request.getUrl();
+                if (navigating(u)) return true;
+                String scheme = u.getScheme();
                 // Stay in the page; app links (mimarket://, intent://) are not followed.
-                return !"https".equals(scheme) && !("http".equals(scheme) && debugBase != null);
+                return !"https".equals(scheme) && !("http".equals(scheme) && debug());
             }
 
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Uri u = Uri.parse(url);
-                if (u.getScheme() != null && u.getHost() != null) origins.add(u.getScheme() + "://" + u.getHost()
-                    + (u.getPort() > 0 ? ":" + u.getPort() : ""));
+                if (u.getScheme() != null && u.getHost() != null) origins.add(MiCloudApi.origin(u));
+                if (navigating(u)) view.stopLoading();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (!request.isForMainFrame()) return;
+                Uri u = request.getUrl();
+                MiCloudApi.trace("page " + u.getHost() + u.getPath() + " failed: " + error.getErrorCode() + " " + error.getDescription());
+                TextView hint = root.findViewWithTag("hint");
+                if (hint != null) hint.setText("Xiaomi's page didn't load (" + error.getDescription() + "). Check the connection, then go back and try again.");
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                MiCloudApi.log("page " + Uri.parse(url).getHost() + Uri.parse(url).getPath());
-                checkSignedIn(url);
+                Uri u = Uri.parse(url);
+                MiCloudApi.trace("page " + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "") + u.getPath());
+                pollSession();
             }
         });
         column.addView(web, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(column, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         probing = false;
         probedCookie = null;
-        web.loadUrl(startUrl());
+        stsHost = null;
+        handovers = 0;
+        MiCloudApi.trace("web -> " + hostOf(target) + "/note/h5");
+        web.loadUrl(target);
+        main.postDelayed(poll, 2000);
     }
 
-    /** On Xiaomi's notes site with a session cookie: check the session works, then import from that host. */
-    private void checkSignedIn(String url) {
-        Uri u = Uri.parse(url);
-        if (probing || CloudImporter.active() != null || !notesSite(u) || u.getPath() == null || !u.getPath().startsWith("/note")) return;
-        String base = u.getScheme() + "://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "");
-        String cookie = CookieManager.getInstance().getCookie(base);
-        if (MiCloudApi.cookieValue(cookie, "serviceToken") == null || MiCloudApi.cookieValue(cookie, "userId") == null) return;
-        if (cookie.equals(probedCookie)) return;
-        probing = true;
-        probedCookie = cookie;
-        String userAgent = WebSettings.getDefaultUserAgent(this);
-        boolean keep = keepSession();
-        MiCloudApi api = new MiCloudApi(base, cookie, userAgent, debugBase != null, keep);
-        new Thread(() -> {
-            boolean ok;
-            try {
-                api.get("/note/v2/hasData", null);
-                ok = true;
-            } catch (MiCloudApi.SessionExpired e) {
-                ok = false; // the page signs in again by itself
-            } catch (IOException e) {
-                ok = true; // the session is there; the importer reports real errors
+    /**
+     * Watches where the sign-in goes: remembers the notes host Xiaomi's sign-in hands the session to (/sts), and stops
+     * Google's sign-in, which Google does not allow inside apps. True to cancel the navigation.
+     */
+    private boolean navigating(Uri u) {
+        if (u == null || u.getHost() == null) return false;
+        String host = u.getHost().toLowerCase(java.util.Locale.ROOT);
+        if (host.equals("accounts.google.com") || host.endsWith(".accounts.google.com")) {
+            MiCloudApi.trace("google sign-in blocked");
+            TextView hint = root.findViewWithTag("hint");
+            if (hint != null) {
+                hint.setText("Google sign-in doesn't work inside apps. Sign in with your Xiaomi account ID, email or phone "
+                    + "and password (\"Forgot password?\" on Xiaomi's page sets one).");
+                hint.setTextColor(0xFFE0A000);
             }
-            boolean signedIn = ok;
+            return true;
+        }
+        if (notesSite(u) && u.getPath() != null && u.getPath().startsWith("/sts")) {
+            String origin = MiCloudApi.origin(u);
+            if (!origin.equals(stsHost)) {
+                stsHost = origin;
+                stsAt = android.os.SystemClock.elapsedRealtime();
+                handovers = 0;
+            }
+            handovers++;
+            MiCloudApi.trace("sign-in handed over to " + hostOf(stsHost) + (handovers > 1 ? " (" + handovers + ")" : ""));
+            // The site goes back to the sign-in again and again when its session cookie does not stick.
+            if (handovers >= 4 && !MiCloudApi.hasSession(MiCloudApi.sessionCookies(stsHost))) main.post(this::noSession);
+        }
+        return false;
+    }
+
+    private int handovers;
+
+    /** Xiaomi's sign-in finished, but the notes host it handed over to has no session cookie. */
+    private void noSession() {
+        if (stsHost == null || web == null) return;
+        String host = hostOf(stsHost);
+        MiCloudApi.trace("no serviceToken cookie @" + host + " after sign-in (" + handovers + " hand-overs, cookies there: "
+            + (MiCloudApi.sessionCookies(stsHost) == null ? "none" : "others") + ")");
+        stsHost = null;
+        showError("Signed in, but Xiaomi Cloud didn't return a session for " + host + ".");
+    }
+
+    /** While Xiaomi's page is open: once the notes host it shows has a session cookie, check it and import. */
+    private void pollSession() {
+        main.removeCallbacks(poll);
+        if (web == null || finished) return;
+        main.postDelayed(poll, 2000);
+        if (probing || CloudImporter.active() != null) return;
+        if (stsHost != null && android.os.SystemClock.elapsedRealtime() - stsAt > SESSION_GRACE
+            && !MiCloudApi.hasSession(MiCloudApi.sessionCookies(stsHost))) {
+            noSession();
+            return;
+        }
+        String url = web.getUrl();
+        Uri u = url == null ? null : Uri.parse(url);
+        if (u == null || !notesSite(u)) return;
+        String base = MiCloudApi.origin(u);
+        String cookie = MiCloudApi.sessionCookies(base);
+        if (!MiCloudApi.hasSession(cookie)) return;
+        if (cookie.equals(probedCookie)) return;
+        probedCookie = cookie;
+        MiCloudApi.trace("session cookie @" + hostOf(base) + (MiCloudApi.cookieValue(cookie, "userId") == null ? " (no userId)" : ""));
+        probe(base, cookie, true);
+    }
+
+    /**
+     * Checks the session on [base] the way the website starts (its format check, then one page of the note list, which
+     * is what tells a region apart) and imports from there.
+     */
+    private void probe(String base, String cookie, boolean fromWeb) {
+        MiCloudApi api;
+        try {
+            api = new MiCloudApi(base, cookie, WebSettings.getDefaultUserAgent(this), debug(), keepSession());
+        } catch (IllegalArgumentException e) {
+            showError("Couldn't import: " + e.getMessage());
+            return;
+        }
+        probing = true;
+        new Thread(() -> {
+            IOException failure = null;
+            try {
+                boolean v2;
+                try {
+                    v2 = api.get("/note/v2/hasData", null).optBoolean("hasData", false);
+                } catch (MiCloudApi.SessionExpired | MiCloudApi.RegionMoved | MiCloudApi.Unreachable e) {
+                    throw e;
+                } catch (IOException e) {
+                    v2 = false; // the website falls back to the original format too
+                }
+                api.get(v2 ? "/note/v2/full/page" : "/note/full/page", MiCloudApi.map("limit", "1"));
+            } catch (IOException e) {
+                failure = e;
+            }
+            IOException f = failure;
             main.post(() -> {
                 probing = false;
-                if (signedIn && !finished) {
-                    CookieManager.getInstance().flush();
-                    startImport(api, MiCloudApi.cookieValue(cookie, "userId"));
-                }
+                if (!finished) probed(api, cookie, f, fromWeb);
             });
         }, "micloud-probe").start();
+    }
+
+    private void probed(MiCloudApi api, String cookie, IOException failure, boolean fromWeb) {
+        if (failure == null) {
+            MiCloudApi.trace("session works @" + api.host);
+            CookieManager.getInstance().flush();
+            startImport(api, MiCloudApi.cookieValue(cookie, "userId"));
+            return;
+        }
+        MiCloudApi.trace("check @" + api.host + " failed: " + failure.getMessage());
+        if (failure instanceof MiCloudApi.RegionMoved) {
+            moveTo(((MiCloudApi.RegionMoved) failure).target);
+        } else if (failure instanceof MiCloudApi.SessionExpired) {
+            if (fromWeb) return; // not signed in on this host yet: Xiaomi's page signs in by itself
+            state.set("session", null);
+            showWeb(api.base);
+        } else {
+            showError(failure instanceof MiCloudApi.Failure ? failure.getMessage() : "Couldn't import: " + failure.getMessage());
+        }
+    }
+
+    /** The account lives on [target]: use the session the WebView already has there, else let the site sign in there. */
+    private void moveTo(String target) {
+        if (++regionMoves > MAX_REGION_MOVES) {
+            MiCloudApi.trace("too many region moves, last " + hostOf(target));
+            showError("Xiaomi Cloud kept moving this account between regions (last: " + hostOf(target) + ").");
+            return;
+        }
+        MiCloudApi.trace("region -> " + hostOf(target));
+        String cookie = MiCloudApi.sessionCookies(target);
+        if (MiCloudApi.hasSession(cookie)) {
+            if (web == null) showWork("Connecting to " + hostOf(target) + "…", 0, 0);
+            probedCookie = cookie;
+            probe(target, cookie, web != null);
+        } else {
+            showWeb(target);
+        }
     }
 
     private void startImport(MiCloudApi api, String userId) {
@@ -455,7 +599,7 @@ public final class CloudImportActivity extends Activity {
         showWork("Connecting…", 0, 0);
         Context app = getApplicationContext();
         new Thread(() -> {
-            String summary = null, error = null;
+            String summary = null, error = null, movedTo = null;
             CloudImporter job = null;
             try (NotesStore store = new NotesStore(app)) {
                 accountCheck(userId);
@@ -466,14 +610,20 @@ public final class CloudImportActivity extends Activity {
                     throw new IOException("Notes is already syncing with Xiaomi Cloud; try again in a moment.");
                 }
                 summary = sync ? summaryOf((CloudSync) job) : job.run().summary();
-            } catch (MiCloudApi.SessionExpired e) {
-                if (sync) state.set("needsSignIn", "1");
-                error = "Xiaomi Cloud ended the session. Sign in again to continue.";
+            } catch (MiCloudApi.RegionMoved e) {
+                movedTo = e.target;
             } catch (Throwable e) {
                 Log.w(MiCloudApi.TAG, sync ? "sync failed" : "import failed", e);
-                error = job != null && job.cancelled ? "Stopped. Notes copied so far are kept; running it again continues."
-                    : (sync ? "Couldn't sync: " : "Couldn't import: ") + e.getMessage();
-                if (sync) state.set("lastSyncError", String.valueOf(e.getMessage()));
+                if (job != null && job.cancelled) {
+                    error = "Stopped. Notes copied so far are kept; running it again continues.";
+                } else if (e instanceof MiCloudApi.Failure) {
+                    error = (sync ? "Couldn't sync. " : "Couldn't import. ") + e.getMessage();
+                    if (e instanceof MiCloudApi.SessionExpired && sync) state.set("needsSignIn", "1");
+                } else {
+                    error = (sync ? "Couldn't sync: " : "Couldn't import: ") + e.getMessage();
+                }
+                if (sync) state.set("lastSyncError", String.valueOf(error));
+                MiCloudApi.trace((sync ? "sync" : "import") + " failed @" + api.host + ": " + error);
             } finally {
                 if (job != null) CloudImporter.release(job);
                 // Keep the session (as the site last renewed it) only if the user asked to stay signed in or syncs.
@@ -482,7 +632,11 @@ public final class CloudImportActivity extends Activity {
                     state.set("sessionBase", api.base);
                 }
             }
-            String s = summary, err = error;
+            String s = summary, err = error, moved = movedTo;
+            if (moved != null) {
+                ui(a -> a.moveTo(moved));
+                return;
+            }
             main.post(this::endSession);
             ui(a -> {
                 if (s != null) a.showDone(s);
@@ -498,6 +652,7 @@ public final class CloudImportActivity extends Activity {
 
     /** Another account than last time: its notes have other ids, so the record of the old one does not apply. */
     private void accountCheck(String userId) {
+        if (userId == null || userId.isEmpty()) return;
         String id = State.hash(userId, "");
         String previous = state.get("account");
         if (previous != null && !previous.equals(id)) {
@@ -536,6 +691,7 @@ public final class CloudImportActivity extends Activity {
     }
 
     private void destroyWeb() {
+        main.removeCallbacks(poll);
         if (web == null) return;
         WebView w = web;
         web = null;
