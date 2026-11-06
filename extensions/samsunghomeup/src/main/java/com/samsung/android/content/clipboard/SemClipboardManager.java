@@ -1,0 +1,9 @@
+package com.samsung.android.content.clipboard;
+
+/** Generated stand-in (.github/scripts/samsung-standins): names and signatures Home Up uses, answering "absent" off One UI (no Samsung code). */
+public class SemClipboardManager {
+    public void registerClipboardEventListener(com.samsung.android.content.clipboard.SemClipboardEventListener p0) {
+    }
+    public void unregisterClipboardEventListener(com.samsung.android.content.clipboard.SemClipboardEventListener p0) {
+    }
+}

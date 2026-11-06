@@ -179,6 +179,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock',
         '<img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock',
     ),
+    "com.samsung.android.app.homestar": (
+        '<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up',
+        '<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up',
+    ),
     "com.miui.compass": (
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
         '<img src="docs/icons/xiaomi-compass.png" width="20" height="20" align="top"> Xiaomi Compass',
