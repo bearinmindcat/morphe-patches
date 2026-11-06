@@ -57,6 +57,8 @@ VENDOR_GROUPS = [
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
      ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ()),
+    # Sony's apps: Xperia's own (com.sonymobile.*) and the older Sony Ericsson names Album still carries.
+    ("Sony Apps", "sony ", ("com.sonymobile.", "com.sony.", "com.sonyericsson."), ()),
 ]
 
 
@@ -343,6 +345,11 @@ APP_RENAMES = {
     "net.oneplus.launcher": (
         '<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)',
         '<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)',
+    ),
+    # Sony Album (Xperia's gallery, sony-ports)
+    "com.sonyericsson.album": (
+        '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
+        '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
     ),
 }
 
