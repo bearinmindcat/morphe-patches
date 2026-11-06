@@ -27,6 +27,7 @@ import org.ungoogled.patches.maps.ui.applicationStartHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.ungoogled.patches.shared.MicrogRe
 import org.w3c.dom.Element
 
 /*
@@ -38,13 +39,11 @@ import org.w3c.dom.Element
  * account tokens it hands out are the ones Google issues to Maps.
  */
 
-/** The package microG installs as: MicroG-RE and ReVanced GmsCore both use it. */
-private const val MICROG_PACKAGE = "app.revanced.android.gms"
+private const val MICROG_PACKAGE = MicrogRe.PACKAGE
 private const val STOCK_PACKAGE = "com.google.android.apps.maps"
 /** Google Maps' signing certificate (SHA-1), which microG reports to Google for this app. */
 private const val STOCK_CERT_SHA1 = "38918a453d07199354f8b19af05ec6562ced5788"
-private const val VENDOR = "app.revanced"
-private const val C2DM = "$VENDOR.android.c2dm"
+private const val VENDOR = MicrogRe.VENDOR
 private const val MICROG_CLASS = "Lorg/ungoogled/ui/MicroG;"
 private const val LOCATION_ACTION = "com.google.android.location.internal.GoogleLocationManagerService.START"
 /** Location sharing's Play services services, which MicroG-RE answers only under app.revanced names. */
@@ -62,43 +61,15 @@ private const val USE_LOCATION_FAILED = "Failed to get 'Use Location for Service
 private const val MODULE_CLASS_FAILED = "Failed to instantiate module class: "
 private const val COULD_NOT_BIND = "Could not bind to service."
 
-/** Play services permissions microG declares under its own names. */
-private val PERMISSION_ROUTES = mapOf(
-    "com.google.android.c2dm.permission.RECEIVE" to "$C2DM.permission.RECEIVE",
-    "com.google.android.c2dm.permission.SEND" to "$C2DM.permission.SEND",
-    "com.google.android.providers.gsf.permission.READ_GSERVICES" to "$VENDOR.android.providers.gsf.permission.READ_GSERVICES",
-    "com.google.android.gms.permission.CAR_SPEED" to "$MICROG_PACKAGE.permission.CAR_SPEED",
-)
-
-/** Whole strings in Maps' code: the account type, Play services' package, its providers and permissions. */
-private val STRING_ROUTES = PERMISSION_ROUTES + mapOf(
-    "com.google" to VENDOR,
-    "subscribedfeeds" to "$VENDOR.subscribedfeeds",
-    "com.google.android.gms" to MICROG_PACKAGE,
-    "com.google.android.gms.auth.accounts" to "$MICROG_PACKAGE.auth.accounts",
-    "com.google.android.gms.chimera" to "$MICROG_PACKAGE.chimera",
-    "com.google.android.gms.fonts" to "$MICROG_PACKAGE.fonts",
-    "com.google.android.gms.phenotype" to "$MICROG_PACKAGE.phenotype",
-)
-
-/** Content URIs, by prefix. */
-private val URI_ROUTES = listOf(
-    "content://com.google.android.gms.phenotype" to "content://$MICROG_PACKAGE.phenotype",
-    "content://com.google.android.gsf.gservices" to "content://$VENDOR.android.gsf.gservices",
-    "content://com.google.settings" to "content://$VENDOR.settings",
-    "content://subscribedfeeds" to "content://$VENDOR.subscribedfeeds",
-)
+/** Play services permissions microG declares under its own names; Maps holds or uses all four. */
+private val PERMISSION_ROUTES = MicrogRe.PERMISSION_ROUTES
 
 /** A const-string (or /jumbo) loading [value]. */
 private fun com.android.tools.smali.dexlib2.iface.instruction.Instruction.isString(value: String) =
     (opcode == Opcode.CONST_STRING || opcode == Opcode.CONST_STRING_JUMBO) &&
         ((this as ReferenceInstruction).reference as StringReference).string == value
 
-private fun route(value: String): String? {
-    STRING_ROUTES[value]?.let { return it }
-    for ((from, to) in URI_ROUTES) if (value.startsWith(from)) return to + value.substring(from.length)
-    return null
-}
+private fun route(value: String): String? = MicrogRe.route(value)
 
 private val microgManifestPatch = resourcePatch(
     description = "Points the manifest's Play services permissions at microG and tells microG which app to vouch for.",
