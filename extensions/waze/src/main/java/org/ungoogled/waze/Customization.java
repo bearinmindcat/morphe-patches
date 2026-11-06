@@ -95,6 +95,8 @@ public final class Customization {
                 "Pure black night map"});
         LABELS.put("mapTheme", new String[]{"Map theme",
                 "Dark map by day or night, menus unchanged"});
+        LABELS.put("hideWork", new String[]{"Hide Work shortcut",
+                "No Work button when choosing a destination"});
         LABELS.put("speedLimitSign", new String[]{"Speed limit sign",
                 "One sign style in every country"});
         LABELS.put("shareAlerts", new String[]{"Share alerts with Maps",
@@ -533,6 +535,19 @@ public final class Customization {
     }
 
     // ---- features that are code, not configuration --------------------------------------------
+
+    /**
+     * Hide Work shortcut (issue #130): whether the Work button is left out now. Only the shortcut goes: the saved
+     * Work place stays, in Favorites and wherever Waze lists places.
+     */
+    public static boolean hideWork() {
+        return features().contains("hideWork") && on("hideWork");
+    }
+
+    /** The search screen's list getting its Work row (set or not): left out while Hide Work shortcut is on. */
+    public static boolean addWorkCell(List<Object> list, Object cell) {
+        return hideWork() ? false : list.add(cell);
+    }
 
     /** AdvilRequest.getPageUrl: no page for Waze's ad server while Hide ads is on. */
     public static String pageUrl(String url) {
