@@ -182,6 +182,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
         '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
     ),
+    "com.samsung.android.email.provider": (
+        '<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email',
+        '<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email',
+    ),
     "com.sec.android.app.launcher": (
         '<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home',
         '<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home',

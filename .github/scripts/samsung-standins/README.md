@@ -11,3 +11,9 @@
 #   for d in classes*.dex; do baksmali d -j 4 $d -o smali; done
 #   python3 analyze.py            # -> usage.json
 #   python3 gen.py <extension java src dir> "<app name>"
+#
+# Without baksmali (pure Python, little memory): python3 analyze_dex.py <apk> writes the same usage.json.
+# Samsung's repackaged BouncyCastle (com.android.sec.org.bouncycastle, S/MIME in Samsung Email) needs its class
+# hierarchy, or ART rejects app classes that pass one stand-in where its supertype is expected:
+#   python3 hierarchy.py <apk> bcprov-jdk15on-1.54.jar bcpkix-jdk15on-1.54.jar   # -> hierarchy.json, used by gen.py
+# (the jars are only read for superclass/interface names; nothing of them is copied).
