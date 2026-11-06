@@ -8,6 +8,7 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectToWrappers
 import org.ungoogled.patches.samsunggallery.SamsungGalleryConstants.COMPATIBILITY_SAMSUNG_GALLERY
 import org.w3c.dom.Element
@@ -24,6 +25,10 @@ private const val PREFERENCE_FEATURES = "Lcom/samsung/android/gallery/support/ut
 /** Gallery's Android-only answers to what One UI adds (used where SEM version is 0), unobfuscated. */
 private const val GED_API_COMPAT = "Lcom/samsung/android/gallery/support/library/v0/GedApiCompatImpl;"
 private const val ACTIVITY_STATE = "Lorg/ungoogled/samsunggallery/ActivityState;"
+private const val MIRRORED_PHOTOS = "Lorg/ungoogled/samsunggallery/MirroredPhotos;"
+private const val EXIF_INTERFACE = "Landroidx/exifinterface/media/ExifInterface;"
+/** Gallery's disk cache for thumbnails, unobfuscated. */
+private const val CACHE_MANAGER = "Lcom/samsung/android/gallery/support/cache/CacheManager;"
 
 /**
  * Off One UI the libraries Samsung's system provides are missing; Gallery asks for 45, one of them required
@@ -101,6 +106,32 @@ val enableNonOneUiPatch = bytecodePatch(
                 return v0
             """,
         ) ?: throw PatchException("Gallery's SUPPORT_SEC_MP_ORIENTATION_TAG feature has no getEnabling()")
+
+        // A mirrored photo's embedded EXIF thumbnail need not be mirrored the way the photo is (GrapheneOS Camera's
+        // selfies): the grid and the viewer's first frame, made from it, showed the selfie the other way round and the
+        // viewer flipped when the photo itself was decoded. Gallery gets no embedded thumbnail for mirrored photos (it
+        // decodes the photo instead), and their cached thumbnails get keys of their own.
+        val exifThumbnails = redirectCalls(
+            mapOf(
+                "$EXIF_INTERFACE->getThumbnail()[B" to "$MIRRORED_PHOTOS->thumbnail(Ljava/lang/Object;)[B",
+                "$EXIF_INTERFACE->getThumbnailBytes()[B" to "$MIRRORED_PHOTOS->thumbnailBytes(Ljava/lang/Object;)[B",
+                "$EXIF_INTERFACE->hasThumbnail()Z" to "$MIRRORED_PHOTOS->hasThumbnail(Ljava/lang/Object;)Z",
+            ),
+        )
+        // Measured against 15.9.01.7: the local and URI thumbnail loaders, the file browser and the EXIF details.
+        if (exifThumbnails < 3) throw PatchException("only $exifThumbnails EXIF thumbnail reads found")
+        java.util.logging.Logger.getLogger("SamsungGallery").info("EXIF thumbnail reads: $exifThumbnails")
+        (mutableClassDefByOrNull(CACHE_MANAGER) ?: throw PatchException("Samsung Gallery has no $CACHE_MANAGER"))
+            .methods.firstOrNull {
+                it.name == "generateKey" && it.parameterTypes == listOf("Ljava/lang/String;", "J") &&
+                    AccessFlags.STATIC.isSet(it.accessFlags)
+            }?.addInstructions(
+                0,
+                """
+                    invoke-static { p0 }, $MIRRORED_PHOTOS->cacheKey(Ljava/lang/String;)Ljava/lang/String;
+                    move-result-object p0
+                """,
+            ) ?: throw PatchException("no generateKey(String, long) in Gallery's thumbnail cache")
 
         // Gallery also queries MediaStore itself with Samsung's columns (media_id, cloud hashes ...), which Google's
         // MediaStore refuses with an exception Gallery does not catch: the viewer crashed whenever the media changed

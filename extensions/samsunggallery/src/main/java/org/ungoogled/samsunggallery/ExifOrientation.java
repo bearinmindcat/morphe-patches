@@ -75,10 +75,11 @@ final class ExifOrientation {
                 }
             }
         }
-        if (unread.isEmpty()) return;
         List<Photo> now = unread.subList(0, Math.min(AT_ONCE, unread.size()));
         for (Photo p : now) read(p);
-        store(d, table, now);
+        if (!now.isEmpty()) store(d, table, now);
+        publishMirrored(d);
+        if (unread.isEmpty()) return;
         List<Photo> later = new ArrayList<>(unread.subList(now.size(), unread.size()));
         // A read already running takes the rest when it ends.
         if (later.isEmpty() || !reading.compareAndSet(false, true)) return;
@@ -113,6 +114,16 @@ final class ExifOrientation {
             mirror.orientationsRead();
         }, "UA-exif");
         t.start();
+    }
+
+    /** Tells MirroredPhotos which photos are mirrored (their cached thumbnails get keys of their own). */
+    private static void publishMirrored(SQLiteDatabase d) {
+        Set<String> paths = new HashSet<>();
+        try (Cursor c = d.rawQuery("SELECT _data FROM files WHERE media_type = 1 AND orientation_tag IN (2, 4, 5, 7) "
+                + "AND _data IS NOT NULL", null)) {
+            while (c.moveToNext()) paths.add(c.getString(0));
+        }
+        MirroredPhotos.setPaths(paths);
     }
 
     static boolean isMirror(int tag) {
