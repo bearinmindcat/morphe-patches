@@ -188,8 +188,8 @@ private val HOME_STYLES_OFF = setOf(
 )
 
 /**
- * MagicOS's theme values and interpolators, the day/night theme of its screens, and the widget permission dialog's
- * host activity.
+ * MagicOS's theme values and interpolators, the day/night theme of its screens, the widget permission dialog's host
+ * activity, and a badge authority of its own (so it installs beside the OnePlus System Launcher port).
  */
 private val resourcesPatch = resourcePatch(
     description = "Gives Honor Home the sizes, colours, icons and day/night theme MagicOS would.",
@@ -254,9 +254,31 @@ private val resourcesPatch = resourcePatch(
             activity.setAttribute("android:excludeFromRecents", "true")
             activity.setAttribute("android:theme", "@android:style/Theme.Translucent.NoTitleBar")
             application.appendChild(activity)
+
+            // The launcher provider also answers OPPO's badge authority (com.android.badge), which the OnePlus System
+            // Launcher port declares as its own badge provider: two apps cannot both declare an authority, so the two
+            // ports could not be installed together. Honor Home's own code never uses it (its badges go through
+            // com.hihonor.android.launcher.settings); it gets a name of its own.
+            val providers = manifest.getElementsByTagName("provider")
+            var badge = 0
+            for (i in 0 until providers.length) {
+                val p = providers.item(i) as org.w3c.dom.Element
+                val authorities = p.getAttribute("android:authorities").split(";")
+                if (OPPO_BADGE_AUTHORITY !in authorities) continue
+                p.setAttribute(
+                    "android:authorities",
+                    authorities.joinToString(";") { if (it == OPPO_BADGE_AUTHORITY) HONOR_BADGE_AUTHORITY else it },
+                )
+                badge++
+            }
+            // Measured against 14.0.0.210: one, com.hihonor.android.launcher.LauncherProvider.
+            if (badge != 1) throw PatchException("providers with the $OPPO_BADGE_AUTHORITY authority: $badge")
         }
     }
 }
+
+private const val OPPO_BADGE_AUTHORITY = "com.android.badge"
+private const val HONOR_BADGE_AUTHORITY = "com.hihonor.android.launcher.badge"
 
 /**
  * System service calls that need a permission only the system holds (INTERACT_ACROSS_USERS); the member helper answers
