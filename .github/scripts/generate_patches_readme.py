@@ -44,6 +44,10 @@ def pkg_emoji(pkg):
 # Phone makers' own apps, each maker's listed together under one spoiler: (title, name prefix dropped when sorting,
 # package prefixes, packages without the maker's prefix).
 VENDOR_GROUPS = [
+    # Home screen apps from every vendor get one dropdown of their own, listed first,
+    # instead of sitting in their vendor's.
+    ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
+                           "com.nothing.launcher", "net.oneplus.launcher")),
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
@@ -53,9 +57,6 @@ VENDOR_GROUPS = [
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
      ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ()),
-    # Home screen apps from every vendor get one dropdown of their own instead of sitting in their vendor's.
-    ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
-                           "com.nothing.launcher", "net.oneplus.launcher")),
 ]
 
 
