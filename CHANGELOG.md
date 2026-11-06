@@ -1,3 +1,21 @@
+## [2.8.9](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.8...v2.8.9) (2026-11-06)
+
+### 🐛 Bug Fixes
+
+* add asus launcher non-zenui support ([db86170](https://github.com/bearinmindcat/morphe-patches/commit/db8617036372c2789d08d61e80ec566c9c982090))
+* add hyperos launcher non-hyperos support ([5585e01](https://github.com/bearinmindcat/morphe-patches/commit/5585e01afd905bbffd96542b086a08d04bf29ca8))
+* add moto app launcher non-motorola support ([ec19944](https://github.com/bearinmindcat/morphe-patches/commit/ec19944249d720627a4264d70149f2532c47a237))
+* add samsung keyboard non-one ui support; issue [#102](https://github.com/bearinmindcat/morphe-patches/issues/102) ([2dd5e1b](https://github.com/bearinmindcat/morphe-patches/commit/2dd5e1b424bced787beff06e50ef784c71014d15))
+* launchers can be installed together (badge provider) ([3323c96](https://github.com/bearinmindcat/morphe-patches/commit/3323c96ada56b3ff67dc46ef658c59cbb799ec85))
+* launchers start on android 16 and 17 ([128c5e1](https://github.com/bearinmindcat/morphe-patches/commit/128c5e11f2ce28414dd4cd83999d90b7b3c83cbd))
+* local saved lists can have their own emoji on the map; issue [#128](https://github.com/bearinmindcat/morphe-patches/issues/128) ([4176595](https://github.com/bearinmindcat/morphe-patches/commit/417659573dadaca56928c7957b3dea29ad558a62))
+* navigation media controls follow what jellyfin and similar apps are playing; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([12129ec](https://github.com/bearinmindcat/morphe-patches/commit/12129ec686e814b3ecb14830eae6a220d684e8f5))
+* nothing recorder can be installed with xiaomi recorder ([302b865](https://github.com/bearinmindcat/morphe-patches/commit/302b865aa26f0b0ee21097800bb6c408bc65efe5))
+* oneplus clock widgets load on other phones; issue [#129](https://github.com/bearinmindcat/morphe-patches/issues/129) ([c4ec78c](https://github.com/bearinmindcat/morphe-patches/commit/c4ec78c982044040ac769eb89231c473dde05f61))
+* samsung gallery can move and copy pictures between albums; issue [#133](https://github.com/bearinmindcat/morphe-patches/issues/133) ([4a352b5](https://github.com/bearinmindcat/morphe-patches/commit/4a352b5a6272d4217ab32f421422c4df89ecc074))
+* samsung gallery selfies no longer flip while opening; issue [#104](https://github.com/bearinmindcat/morphe-patches/issues/104) ([2d09b91](https://github.com/bearinmindcat/morphe-patches/commit/2d09b9102ef8f9f5bd034c3c447ff51ce8968fe7))
+* waze can hide the work shortcut; issue [#130](https://github.com/bearinmindcat/morphe-patches/issues/130) ([4c5115f](https://github.com/bearinmindcat/morphe-patches/commit/4c5115fa0fce70d203b1795b2e72aab4a842ae42))
+
 ## [2.8.8](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.7...v2.8.8) (2026-11-06)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.8](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.8)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;163 patches total
+> **[v2.8.9](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.9)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;168 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;31 patches</summary>
 <br>
@@ -105,7 +105,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;25 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;26 patches</summary>
 <br>
 
 **Supported version(s):** 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
@@ -120,6 +120,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change app name](#change-app-name) | Renames Waze. | • App name |
 | [Flock cameras](#flock-cameras) | Chime when a Flock camera is ahead, from OpenStreetMap. No map pins or routing. Off until switched on. |  |
 | [Full black](#full-black) | True black dark mode for AMOLED screens. | • Black night map |
+| [Hide Work shortcut](#hide-work-shortcut) | Removes the Work button when choosing a destination. |  |
 | [Hide ads](#hide-ads) | Removes sponsored pins, stop ads and ad tracking. |  |
 | [Map skin](#map-skin) | Bigger map labels, a wider arrow and a warm day background. | • Map labels: huge<br>• Map labels: big<br>• Map labels: medium<br>• Map labels: small<br>• Navigation arrow head width<br>• Day map background (hex) |
 | [Map theme](#map-theme) | Black or dark grey map by day and night. Menus keep their colours. | • Day map<br>• Night map |
@@ -152,9 +153,21 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;6 apps&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
 <blockquote>
+
+<details>
+<summary><img src="docs/icons/asus-launcher.png" width="20" height="20" align="top"> ASUS Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/asus-launcher.png" width="20" height="20" align="top"> ASUS Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 11.0.0.76_240920
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-ZenUI ROM support](#enable-non-zenui-rom-support) | Makes ASUS Launcher usable as a home screen on non-ZenUI ROMs. |  |
+
+</details>
 
 <details>
 <summary><img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
@@ -165,6 +178,30 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-MagicOS ROM support](#enable-non-magicos-rom-support) | Makes Honor Home usable as a home screen on non-Honor ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** RELEASE-7.50.06.2372-06261924
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-HyperOS ROM support](#enable-non-hyperos-rom-support) | Makes the HyperOS launcher usable as a home screen on non-Xiaomi ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 15
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Motorola ROM support](#enable-non-motorola-rom-support) | Makes Moto App Launcher usable as a home screen on non-Motorola ROMs. |  |
 
 </details>
 
@@ -232,7 +269,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;25 apps&nbsp;&nbsp;•&nbsp;&nbsp;43 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;25 apps&nbsp;&nbsp;•&nbsp;&nbsp;44 patches</summary>
 <br>
 <blockquote>
 
@@ -362,7 +399,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;10 patches</summary>
 <br>
 
 **Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
@@ -374,6 +411,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change app name](#change-app-name) | Renames Samsung Keyboard, so the two keyboards can be told apart. | • App name |
 | [Change package name](#change-package-name) | Installs next to the system Samsung Keyboard under its own package name. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports and typed-text collection. |  |
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Keyboard usable on non-One UI ROMs. |  |
 | [No GIF tracking](#no-gif-tracking) | Stops GIPHY and Tenor view and share pings. |  |
 | [Remove internet permission](#remove-internet-permission) | Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working. |  |
 | [Show GIFs in every region](#show-gifs-in-every-region) | Shows the GIF board where the phone's region turns it off. |  |
@@ -1047,6 +1085,8 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 </blockquote>
 </details>
+
+Can't find an APK in Morphe Manager? See [where to get each APK](docs/APK-SOURCES.md).
 
 <!-- PATCHES_END -->
 
