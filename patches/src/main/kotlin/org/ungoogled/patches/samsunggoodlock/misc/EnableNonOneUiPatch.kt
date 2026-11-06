@@ -1,0 +1,157 @@
+package org.ungoogled.patches.samsunggoodlock.misc
+
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
+import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import org.ungoogled.patches.samsung.redirectOneUiMembers
+import org.ungoogled.patches.samsunggoodlock.SamsungGoodLockConstants.COMPATIBILITY_SAMSUNG_GOOD_LOCK
+
+internal const val SAMSUNG_GOOD_LOCK_EXTENSION = "extensions/samsunggoodlock.mpe"
+
+private const val EXT = "Lorg/ungoogled/samsunggoodlock"
+
+private val log = java.util.logging.Logger.getLogger("GoodLock")
+
+/** Sends Good Lock's uses of One UI's additions to Android classes through OneUi (see redirectOneUiMembers). */
+private val oneUiMembersPatch = bytecodePatch(
+    description = "Answers One UI's additions to Android classes where the phone has none.",
+) {
+    extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
+
+    execute {
+        val (calls, fields) = redirectOneUiMembers("$EXT/OneUi;", "$EXT/Sem;")
+        log.info("One UI members: $calls calls, $fields fields")
+        if (calls == 0) throw PatchException("no One UI calls found")
+    }
+}
+
+/**
+ * Good Lock lists what the Galaxy Store offers the phone and installs modules from it. Off One UI it lists the modules
+ * that work there (see Modules) and sends downloads to APKMirror, to be patched with Morphe (see Store).
+ */
+private val modulesPatch = bytecodePatch(
+    description = "Lists the modules that work off One UI and opens their downloads on APKMirror.",
+) {
+    extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
+
+    execute {
+        // The merge of (module list, store entries, policies): both lists are replaced at its start.
+        val merge = PluginsMergeFingerprint.method
+        if (merge.parameterTypes.size < 2 || merge.parameterTypes[0] != "Ljava/util/List;" ||
+            merge.parameterTypes[1] != "Ljava/util/List;"
+        ) throw PatchException("the module merge does not take (List, List, ...)")
+        // The store entry class: what the merge casts the store list's items to, next to the "not found" check.
+        val entry = merge.implementation!!.instructions.filter { it.opcode == Opcode.CHECK_CAST }
+            .map { ((it as ReferenceInstruction).reference as TypeReference).type }
+            .firstOrNull { type ->
+                classDefByOrNull(type)?.fields?.any { it.name.isNotEmpty() && it.type == "Ljava/lang/Boolean;" } == true &&
+                    classDefByOrNull(type)?.methods?.any { it.name == "<init>" && it.parameterTypes.size == 11 } == true
+            } ?: throw PatchException("no store entry class in the module merge")
+        merge.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static/range { p1 .. p1 }, $EXT/Modules;->keep(Ljava/util/List;)Ljava/util/List;
+                move-result-object p1
+                move-object/from16 v0, p1
+                move-object/from16 v1, p2
+                const-class v2, $entry
+                invoke-static { v0, v1, v2 }, $EXT/Modules;->store(Ljava/util/List;Ljava/util/List;Ljava/lang/Class;)Ljava/util/List;
+                move-result-object p2
+            """,
+        )
+
+        // Without an answer from the Galaxy Store its cached entry list is null and Good Lock lists nothing: an empty
+        // list instead, so the modules come from Good Lock's own list (see Modules.store).
+        val load = PluginsLoadFingerprint.method
+        val loadCode = load.implementation!!.instructions.toList()
+        val listReads = loadCode.withIndex().filter { (index, insn) ->
+            if (insn.opcode != Opcode.CONST_STRING && insn.opcode != Opcode.CONST_STRING_JUMBO) return@filter false
+            ((insn as ReferenceInstruction).reference as StringReference).string == "storePlugins is null in local"
+        }.mapNotNull { (index, _) ->
+            (index downTo 0).firstOrNull { i ->
+                val field = (loadCode[i] as? ReferenceInstruction)?.reference as? FieldReference
+                loadCode[i].opcode == Opcode.IGET_OBJECT && field?.type == "Ljava/util/List;"
+            }
+        }.distinct().sortedDescending()
+        if (listReads.isEmpty()) throw PatchException("no Galaxy Store entry list read before \"storePlugins is null in local\"")
+        for (index in listReads) {
+            val register = (loadCode[index] as TwoRegisterInstruction).registerA
+            load.addInstructionsWithLabels(
+                index + 1,
+                """
+                    if-nez v$register, :present
+                    new-instance v$register, Ljava/util/ArrayList;
+                    invoke-direct/range { v$register .. v$register }, Ljava/util/ArrayList;-><init>()V
+                """,
+                ExternalLabel("present", load.getInstruction(index + 1)),
+            )
+        }
+        log.info("Galaxy Store list reads made null-safe: ${listReads.size}")
+
+        // Installs: open the module on APKMirror instead (Store.open answers false where the Galaxy Store is).
+        val install = InstallFingerprint.method
+        if (install.parameterTypes.firstOrNull() != "Ljava/lang/String;") throw PatchException("the install job takes no package name")
+        val suspended = install.implementation!!.instructions.firstNotNullOfOrNull { insn ->
+            val field = (insn as? ReferenceInstruction)?.reference as? FieldReference
+            if (insn.opcode == Opcode.SGET_OBJECT && field != null && field.type == field.definingClass) field else null
+        } ?: throw PatchException("the install job has no COROUTINE_SUSPENDED")
+        install.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static/range { p1 .. p1 }, $EXT/Store;->open(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :stock
+                sget-object v0, $suspended
+                return-object v0
+            """,
+            ExternalLabel("stock", install.getInstruction(0)),
+        )
+        val installNow = InstallNowFingerprint.method
+        installNow.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static/range { p1 .. p1 }, $EXT/Store;->open(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :stock
+                return-void
+            """,
+            ExternalLabel("stock", installNow.getInstruction(0)),
+        )
+
+        val page = StorePageFingerprint.method
+        if (page.parameterTypes.firstOrNull() != "Ljava/lang/String;") throw PatchException("the store page takes no package name")
+        page.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static/range { p1 .. p1 }, $EXT/Store;->open(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :stock
+                return-void
+            """,
+            ExternalLabel("stock", page.getInstruction(0)),
+        )
+    }
+}
+
+/**
+ * Off One UI Good Lock crashes when it opens a module (SemFloatingFeature, One UI's icon calls) and lists only what
+ * the Galaxy Store offers the phone. The extension carries stand-ins for the One UI classes it calls.
+ */
+@Suppress("unused")
+val enableNonOneUiPatch = bytecodePatch(
+    name = "Enable non-One UI ROM support",
+    description = "Runs Good Lock on non-One UI ROMs, listing the modules that work there.",
+    default = true,
+) {
+    compatibleWith(COMPATIBILITY_SAMSUNG_GOOD_LOCK)
+    dependsOn(oneUiMembersPatch, modulesPatch)
+    extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
+}
