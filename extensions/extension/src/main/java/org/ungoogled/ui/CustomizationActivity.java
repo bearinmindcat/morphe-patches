@@ -309,7 +309,8 @@ public final class CustomizationActivity extends Activity {
             boolean declared = Screens.declared(this, MediaListener.class);
             LinearLayout mediaRow = rowBase("Follow playing media", playingMediaSummary(declared));
             playingMediaSub = (TextView) ((LinearLayout) mediaRow.getChildAt(0)).getChildAt(1);
-            if (declared) mediaRow.setOnClickListener(v -> PlayingMedia.openAccess(this));
+            if (declared) mediaRow.setOnClickListener(v -> PlayingMedia.requestAccess(this,
+                    dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert));
             body.addView(mediaRow);
         }
     }

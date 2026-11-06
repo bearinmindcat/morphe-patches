@@ -9,12 +9,17 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.InstallSourceInfo;
+import android.content.pm.PackageInstaller;
+import android.content.pm.PackageManager;
 import android.media.browse.MediaBrowser;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -65,6 +70,8 @@ public final class PlayingMedia {
     }
 
     private static final String KEY_ASKED = "media_access_asked";
+    private static final String ASK = "Allow notification access so the media panel can show what any app is playing";
+    private static final String GREYED = "If it's greyed out: tap it once, then App info ⋮ > Allow restricted settings";
     private static boolean asking;
 
     /**
@@ -81,7 +88,7 @@ public final class PlayingMedia {
             SharedPreferences prefs = a.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE);
             if (prefs.getBoolean(KEY_ASKED, false)) return;
             asking = true;
-            MAIN.postDelayed(() -> ask(a, over, prefs, 0), 300);
+            MAIN.postDelayed(() -> ask(a, over, 0), 300);
         } catch (Throwable t) {
             asking = false;
             android.util.Log.w("UA", "media access", t);
@@ -89,33 +96,168 @@ public final class PlayingMedia {
     }
 
     /** Over Maps' own dialog, once that shows (it is shown right after it is made). */
-    private static void ask(Activity a, Dialog over, SharedPreferences prefs, int tries) {
+    private static void ask(Activity a, Dialog over, int tries) {
+        if (a.isFinishing() || a.isDestroyed() || (over != null && !over.isShowing() && tries >= 10)) {
+            asking = false;
+            return;
+        }
+        if (over != null && !over.isShowing()) {
+            MAIN.postDelayed(() -> ask(a, over, tries + 1), 200);
+            return;
+        }
+        if (!choose(a, 0, NONE)) asking = false;
+        android.util.Log.i("UA", "media: asked for notification access");
+    }
+
+    /** Customization's row: Android's page, or first what to do there while restricted settings may stand in the way. */
+    static void requestAccess(Activity a, int theme) {
+        if (!allowed(a) && restricted(a)) choose(a, theme, NONE);
+        else openAccess(a);
+    }
+
+    /** Where {@link #choose} sent the user last: nowhere yet, the notification access page, App info. */
+    private static final int NONE = 0, ACCESS = 1, APP_INFO = 2;
+
+    /**
+     * The question, and on the way back from Android's settings what is left. A sideloaded app's notification access
+     * is greyed out (Android 13+ restricted settings) until it is tapped once and App info's menu allows it; back
+     * from the access page that is App info next, back from App info the access page again.
+     */
+    private static boolean choose(Activity a, int theme, int back) {
         try {
-            if (a.isFinishing() || a.isDestroyed() || (over != null && !over.isShowing() && tries >= 10)) {
-                asking = false;
-                return;
-            }
-            if (over != null && !over.isShowing()) {
-                MAIN.postDelayed(() -> ask(a, over, prefs, tries + 1), 200);
-                return;
-            }
-            AlertDialog d = new AlertDialog.Builder(a)
-                    .setMessage("Allow notification access so the media panel can show what any app is playing")
-                    .setPositiveButton("Allow", (x, w) -> {
-                        prefs.edit().putBoolean(KEY_ASKED, true).apply();
-                        openAccess(a);
-                    })
+            if (a.isFinishing() || a.isDestroyed()) return false;
+            boolean restricted = restricted(a);
+            String message = !restricted || back == APP_INFO ? ASK : back == ACCESS ? GREYED : ASK + "\n\n" + GREYED;
+            SharedPreferences prefs = a.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE);
+            android.content.DialogInterface.OnClickListener access = (x, w) -> {
+                prefs.edit().putBoolean(KEY_ASKED, true).apply();
+                if (restricted) away(a, theme, ACCESS);
+                openAccess(a);
+            };
+            android.content.DialogInterface.OnClickListener appInfo = (x, w) -> {
+                prefs.edit().putBoolean(KEY_ASKED, true).apply();
+                away(a, theme, APP_INFO);
+                openAppInfo(a);
+            };
+            AlertDialog.Builder b = theme == 0 ? new AlertDialog.Builder(a) : new AlertDialog.Builder(a, theme);
+            b.setMessage(message)
                     .setNegativeButton("Not now", (x, w) -> prefs.edit().putBoolean(KEY_ASKED, true).apply())
                     .setOnCancelListener(x -> prefs.edit().putBoolean(KEY_ASKED, true).apply())
-                    .setOnDismissListener(x -> asking = false)
-                    .create();
+                    .setOnDismissListener(x -> asking = false);
+            if (restricted && back == ACCESS) b.setPositiveButton("App info", appInfo).setNeutralButton("Allow", access);
+            else if (restricted && back == NONE) b.setPositiveButton("Allow", access).setNeutralButton("App info", appInfo);
+            else b.setPositiveButton("Allow", access);
+            AlertDialog d = b.create();
             d.setCanceledOnTouchOutside(false);
             d.show();
-            android.util.Log.i("UA", "media: asked for notification access");
+            return true;
         } catch (Throwable t) {
-            asking = false;
             android.util.Log.w("UA", "media access", t);
+            return false;
         }
+    }
+
+    /** Sent to Android's settings from {@link #choose}: when the screen shows again without access, the next step. */
+    private static void away(Activity a, int theme, int to) {
+        a.registerActivityLifecycleCallbacks(new android.app.Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityResumed(Activity x) {
+                a.unregisterActivityLifecycleCallbacks(this);
+                MAIN.postDelayed(() -> {
+                    if (allowed(a)) return;
+                    android.util.Log.i("UA", "media: back without notification access");
+                    choose(a, theme, to);
+                }, 400);
+            }
+            @Override public void onActivityCreated(Activity x, android.os.Bundle s) {}
+            @Override public void onActivityStarted(Activity x) {}
+            @Override public void onActivityPaused(Activity x) {}
+            @Override public void onActivityStopped(Activity x) {}
+            @Override public void onActivitySaveInstanceState(Activity x, android.os.Bundle s) {}
+            @Override public void onActivityDestroyed(Activity x) {}
+        });
+    }
+
+    private static String lastRestricted;
+
+    /**
+     * Whether Android 13+ "restricted settings" may grey out this app's notification access. Settings decides by the
+     * app-op access_restricted_settings, which an app may not read (SecurityException without GET_APP_OPS_STATS), so
+     * this goes by what guards it: an install the package installer marked as from a file or a download (the op is
+     * set at install up to Android 15, decided from that source when asked with enhanced confirmation), and, once a
+     * device names trusted installers, an installer that is neither one of them nor preinstalled. It still says yes
+     * after the user allowed restricted settings, which is why the hint reads "if it's greyed out".
+     */
+    static boolean restricted(Context c) {
+        if (Build.VERSION.SDK_INT < 33) return false;
+        String why;
+        boolean r;
+        try {
+            InstallSourceInfo source = c.getPackageManager().getInstallSourceInfo(c.getPackageName());
+            why = "source " + source.getPackageSource() + ", installer " + source.getInstallingPackageName();
+            r = restricted(c, source);
+        } catch (Throwable t) {
+            why = String.valueOf(t);
+            r = false;
+        }
+        String seen = why + " -> " + r;
+        if (!seen.equals(lastRestricted)) {
+            lastRestricted = seen;
+            android.util.Log.i("UA", "media: restricted settings " + seen);
+        }
+        return r;
+    }
+
+    private static boolean restricted(Context c, InstallSourceInfo source) throws PackageManager.NameNotFoundException {
+        if ((c.getApplicationInfo().flags & ApplicationInfo.FLAG_SYSTEM) != 0) return false;
+        int from = source.getPackageSource();
+        if (from == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE || from == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE) return true;
+        if (Build.VERSION.SDK_INT < 35) return false;
+        Map<String, List<String>> named = trustedInstallers();
+        if (named.isEmpty()) return false;
+        String installer = source.getInstallingPackageName();
+        if (installer == null) return true;
+        PackageManager pm = c.getPackageManager();
+        if ((pm.getApplicationInfo(installer, 0).flags & ApplicationInfo.FLAG_SYSTEM) != 0) return false;
+        for (String digest : named.getOrDefault(installer, java.util.Collections.emptyList())) {
+            if (pm.hasSigningCertificate(installer, hex(digest), PackageManager.CERT_INPUT_SHA256)) return false;
+        }
+        return true;
+    }
+
+    /** The device's enhanced-confirmation-trusted-installer entries (package -> SHA-256 cert digests), from its sysconfig. */
+    private static Map<String, List<String>> trusted;
+
+    private static synchronized Map<String, List<String>> trustedInstallers() {
+        if (trusted != null) return trusted;
+        Map<String, List<String>> found = new HashMap<>();
+        for (String part : new String[] {"/system", "/system_ext", "/product", "/vendor", "/odm", "/oem"}) {
+            for (String dir : new String[] {"/etc/sysconfig", "/etc/permissions"}) {
+                java.io.File[] files = new java.io.File(part + dir).listFiles((d, n) -> n.endsWith(".xml"));
+                if (files == null) continue;
+                for (java.io.File f : files) {
+                    try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                        org.xmlpull.v1.XmlPullParser x = android.util.Xml.newPullParser();
+                        x.setInput(in, null);
+                        for (int e = x.next(); e != org.xmlpull.v1.XmlPullParser.END_DOCUMENT; e = x.next()) {
+                            if (e != org.xmlpull.v1.XmlPullParser.START_TAG || !"enhanced-confirmation-trusted-installer".equals(x.getName())) continue;
+                            String pkg = x.getAttributeValue(null, "package");
+                            String digest = x.getAttributeValue(null, "sha256-cert-digest");
+                            if (pkg != null && digest != null) found.computeIfAbsent(pkg, k -> new java.util.ArrayList<>()).add(digest);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        }
+        trusted = found;
+        return found;
+    }
+
+    private static byte[] hex(String digest) {
+        String s = digest.replace(":", "");
+        byte[] b = new byte[s.length() / 2];
+        for (int i = 0; i < b.length; i++) b[i] = (byte) Integer.parseInt(s.substring(2 * i, 2 * i + 2), 16);
+        return b;
     }
 
     /** Android's notification access page for Maps' listener, else the page listing every app's. */
@@ -131,6 +273,15 @@ public final class PlayingMedia {
                 c.startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").addFlags(flags));
             } catch (Throwable ignored) {
             }
+        }
+    }
+
+    /** App info, whose menu has "Allow restricted settings". */
+    private static void openAppInfo(Context c) {
+        try {
+            c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", c.getPackageName(), null)));
+        } catch (Throwable ignored) {
         }
     }
 
