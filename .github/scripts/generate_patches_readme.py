@@ -238,6 +238,10 @@ APP_RENAMES = {
         '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
         '<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder',
     ),
+    "com.nothing.ntscreenshot": (
+        '<img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot',
+        '<img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot',
+    ),
     "com.nothing.launcher": (
         '<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher',
         '<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher',
