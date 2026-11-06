@@ -18,6 +18,12 @@ public final class Store {
     private Store() {
     }
 
+    /** Whether the Galaxy Store is installed (Good Lock keeps its own way there). */
+    static boolean galaxyStore() {
+        Context context = App.context();
+        return context != null && hasGalaxyStore(context);
+    }
+
     private static boolean hasGalaxyStore(Context context) {
         try {
             context.getPackageManager().getPackageInfo(GALAXY_STORE, 0);

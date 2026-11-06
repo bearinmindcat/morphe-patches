@@ -1,5 +1,6 @@
 package org.ungoogled.patches.samsunggoodlock.misc
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.PatchException
@@ -142,6 +143,31 @@ private val modulesPatch = bytecodePatch(
 }
 
 /**
+ * Good Lock fetched its content files and asked the Galaxy Store for its own update (sending the phone's model) before
+ * the terms screen was answered. Every request goes through its HTTP client's engine, which now asks Consent first:
+ * nothing leaves before "Agree", and the Galaxy Store update check never does off One UI (Good Lock's own no-network
+ * path: no update).
+ */
+private val consentPatch = bytecodePatch(
+    description = "Sends nothing before the terms are agreed to and skips Galaxy Store update checks.",
+) {
+    extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
+
+    execute {
+        val engine = mutableClassDefBy(HttpEngineInitFingerprint.method.definingClass)
+        // execute(request, continuation): the engine's only two-argument method returning Object.
+        val execute = engine.methods.filter {
+            it.returnType == "Ljava/lang/Object;" && it.parameterTypes.size == 2 && it.implementation != null &&
+                !it.parameterTypes[0].startsWith("L" + "java/")
+        }.singleOrNull() ?: throw PatchException("no execute(request, continuation) in the HTTP client engine")
+        execute.addInstructions(
+            0,
+            "invoke-static/range { p1 .. p1 }, $EXT/Consent;->check(Ljava/lang/Object;)V",
+        )
+    }
+}
+
+/**
  * Off One UI Good Lock crashes when it opens a module (SemFloatingFeature, One UI's icon calls) and lists only what
  * the Galaxy Store offers the phone. The extension carries stand-ins for the One UI classes it calls.
  */
@@ -152,6 +178,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_GOOD_LOCK)
-    dependsOn(oneUiMembersPatch, modulesPatch)
+    dependsOn(oneUiMembersPatch, modulesPatch, consentPatch)
     extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
 }

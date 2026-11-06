@@ -33,3 +33,9 @@ internal object StorePageFingerprint : Fingerprint(
 internal object PluginsLoadFingerprint : Fingerprint(
     filters = listOf(string("storePlugins is null in local")),
 )
+
+/** The constructor of Good Lock's HTTP client engine (Ktor on OkHttp), which every request of the app goes through. */
+internal object HttpEngineInitFingerprint : Fingerprint(
+    name = "<init>",
+    filters = listOf(string("createOkHttpClient")),
+)
