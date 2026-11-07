@@ -23,6 +23,7 @@ import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.nothinglauncher.NothingLauncherConstants.COMPATIBILITY_NOTHING_LAUNCHER
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val NOTHING_LAUNCHER_EXTENSION = "extensions/nothinglauncher.mpe"
 
@@ -438,6 +439,9 @@ private val offlinePatch = bytecodePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_NOTHING_LAUNCHER)
+
 /**
  * Off Nothing OS the launcher dies at start: it reflects on Nothing OS framework classes only the ROM has
  * (com.nothing.NtFeaturesUtils, the online-config reader) and calls Nothing's analytics client. The extension carries
@@ -452,6 +456,6 @@ val enableNonNothingOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_NOTHING_LAUNCHER)
-    dependsOn(hiddenApisPatch, systemPrivilegesPatch, offlinePatch)
+    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, offlinePatch)
     extendWith(NOTHING_LAUNCHER_EXTENSION)
 }

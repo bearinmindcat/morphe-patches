@@ -27,17 +27,20 @@ public APK mirror.
 
 ## Launchers
 
+Each launcher needs the Android version its row names (the app itself refuses to install on older ones); the
+launcher ports are tested on Android 15 and newer.
+
 | App | Package | Version | Where to get it |
 |---|---|---|---|
-| ASUS Launcher | `com.asus.launcher` | 11.0.0.76_240920 | [APKMirror](https://www.apkmirror.com/apk/zenui-asus-computer-inc/asus-launcher/asus-launcher-11-0-0-76_240920-release/) |
-| Honor Home | `com.hihonor.android.launcher` | 14.0.0.210 | [APKMirror](https://www.apkmirror.com/apk/honor/honor-home/honor-home-14-0-0-210-release/) |
-| HyperOS Launcher | `com.miui.home` | RELEASE-7.50.06.2372-06261924 | [APKMirror](https://www.apkmirror.com/apk/xiaomi-inc/miui-launcher/xiaomi-system-launcher-release-7-50-06-2372-06261924-release/) (listed as "Xiaomi System Launcher"; the newer 8.x builds have no app code and can't be patched) |
-| Moto App Launcher | `com.motorola.launcher3` | 15 | [APKMirror](https://www.apkmirror.com/apk/motorola-mobility-llc/moto-app-launcher/moto-app-launcher-15-release/) (the release has two variants; take the first, "moto-app-launcher-15") |
+| ASUS Launcher | `com.asus.launcher` | 11.0.0.76_240920 | [APKMirror](https://www.apkmirror.com/apk/zenui-asus-computer-inc/asus-launcher/asus-launcher-11-0-0-76_240920-release/). Needs Android 13 or newer. |
+| Honor Home | `com.hihonor.android.launcher` | 14.0.0.210 | [APKMirror](https://www.apkmirror.com/apk/honor/honor-home/honor-home-14-0-0-210-release/). Needs Android 10 or newer. |
+| HyperOS Launcher | `com.miui.home` | RELEASE-7.50.06.2372-06261924 | [APKMirror](https://www.apkmirror.com/apk/xiaomi-inc/miui-launcher/xiaomi-system-launcher-release-7-50-06-2372-06261924-release/) (listed as "Xiaomi System Launcher"; the newer 8.x builds have no app code and can't be patched). Needs Android 14 or newer. |
+| Moto App Launcher | `com.motorola.launcher3` | 15 | [APKMirror](https://www.apkmirror.com/apk/motorola-mobility-llc/moto-app-launcher/moto-app-launcher-15-release/) (the release has two variants; take the first, "moto-app-launcher-15"). Needs Android 15 or newer. |
 | Nothing Launcher | `com.nothing.launcher` | 4.0.20 | [APKMirror](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-launcher/nothing-launcher-4-0-20-release/). Bundle. Needs Android 16 or newer. |
-| One UI Home | `com.sec.android.app.launcher` | 18.0.07.59 | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-experience-home-touchwiz-home/samsung-one-ui-home-18-0-07-59-release/) |
-| OnePlus Launcher (OxygenOS 11) | `net.oneplus.launcher` | 5.2.66 | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-launcher-2/oneplus-launcher-2-5-2-66-release/) |
-| OnePlus System Launcher | `com.android.launcher` | 16.4.30 | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/system-launcher-5/oneplus-system-launcher-16-4-30-release/) |
-| Xperia Home | `com.sonymobile.launcher` | 15 | [APKMirror](https://www.apkmirror.com/apk/sony-mobile-communications/xperia-home-3/xperia-home-15-release/) |
+| One UI Home | `com.sec.android.app.launcher` | 18.0.07.59 | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-experience-home-touchwiz-home/samsung-one-ui-home-18-0-07-59-release/). Needs Android 15 or newer. |
+| OnePlus Launcher (OxygenOS 11) | `net.oneplus.launcher` | 5.2.66 | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-launcher-2/oneplus-launcher-2-5-2-66-release/). Needs Android 10 or newer. |
+| OnePlus System Launcher | `com.android.launcher` | 16.4.30 | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/system-launcher-5/oneplus-system-launcher-16-4-30-release/). Needs Android 13 or newer. |
+| Xperia Home | `com.sonymobile.launcher` | 15 | [APKMirror](https://www.apkmirror.com/apk/sony-mobile-communications/xperia-home-3/xperia-home-15-release/). Needs Android 15 or newer. |
 
 ## Samsung
 

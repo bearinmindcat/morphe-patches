@@ -20,6 +20,7 @@ import org.ungoogled.patches.onepluslauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.onepluslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.onepluslauncher.OnePlusLauncherConstants.COMPATIBILITY_ONEPLUS_LAUNCHER
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val ONEPLUS_LAUNCHER_EXTENSION = "extensions/onepluslauncher.mpe"
 
@@ -270,6 +271,9 @@ private val hiddenApisPatch = bytecodePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_ONEPLUS_LAUNCHER)
+
 /**
  * Off OxygenOS the launcher stops at once (it is the OxygenOS 11 launcher of 2021, net.oneplus.launcher 5.2.66).
  * The extension carries stand-ins for the OnePlus / ColorOS framework classes it calls; on a OnePlus phone the
@@ -283,6 +287,6 @@ val enableNonOxygenOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ONEPLUS_LAUNCHER)
-    dependsOn(deviceCheckPatch, hiddenApisPatch, telemetryPatch)
+    dependsOn(versionCheckPatch, deviceCheckPatch, hiddenApisPatch, telemetryPatch)
     extendWith(ONEPLUS_LAUNCHER_EXTENSION)
 }

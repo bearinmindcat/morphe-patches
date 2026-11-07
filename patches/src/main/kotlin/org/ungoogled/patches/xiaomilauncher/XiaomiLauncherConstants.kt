@@ -16,7 +16,7 @@ object XiaomiLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xFF6900,
         targets = listOf(
-            AppTarget(version = "RELEASE-7.50.06.2372-06261924"),
+            AppTarget(version = "RELEASE-7.50.06.2372-06261924", minSdk = 34, description = "needs Android 14 or newer"),
         ),
     )
 }

@@ -15,7 +15,7 @@ object SonyLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x26C6DA,
         targets = listOf(
-            AppTarget(version = "15"),
+            AppTarget(version = "15", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

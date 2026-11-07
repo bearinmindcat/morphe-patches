@@ -15,7 +15,7 @@ object MotoLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x5C2D91,
         targets = listOf(
-            AppTarget(version = "15"),
+            AppTarget(version = "15", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

@@ -15,7 +15,7 @@ object NothingLauncherConstants {
         apkFileType = ApkFileType.APKM,
         appIconColor = 0xD71921,
         targets = listOf(
-            AppTarget(version = "4.0.20"),
+            AppTarget(version = "4.0.20", minSdk = 36, description = "needs Android 16 or newer"),
         ),
     )
 }

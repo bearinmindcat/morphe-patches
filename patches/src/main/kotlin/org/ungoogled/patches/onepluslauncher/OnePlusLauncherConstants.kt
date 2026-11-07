@@ -15,7 +15,7 @@ object OnePlusLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xEB0028,
         targets = listOf(
-            AppTarget(version = "5.2.66"),
+            AppTarget(version = "5.2.66", minSdk = 29, description = "needs Android 10 or newer"),
         ),
     )
 }

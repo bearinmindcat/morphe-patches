@@ -15,7 +15,7 @@ object ColorOsLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x1796FE,
         targets = listOf(
-            AppTarget(version = "16.4.30"),
+            AppTarget(version = "16.4.30", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }

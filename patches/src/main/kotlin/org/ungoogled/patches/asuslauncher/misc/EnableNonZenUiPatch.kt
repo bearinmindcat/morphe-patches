@@ -28,6 +28,7 @@ import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.coloroslauncher.misc.skipCastOfNull
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val ASUS_LAUNCHER_EXTENSION = "extensions/asuslauncher.mpe"
 
@@ -331,6 +332,9 @@ private val telemetryPatch = bytecodePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_ASUS_LAUNCHER)
+
 /**
  * Off ZenUI, ASUS Launcher dies on Android's hidden API, which only a system app may use (it has no ASUS framework
  * classes). The hidden API goes through Members (see hiddenApisPatch). Recents and navigation gestures stay the
@@ -343,6 +347,6 @@ val enableNonZenUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ASUS_LAUNCHER)
-    dependsOn(hiddenApisPatch, systemPrivilegesPatch, telemetryPatch)
+    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, telemetryPatch)
     extendWith(ASUS_LAUNCHER_EXTENSION)
 }

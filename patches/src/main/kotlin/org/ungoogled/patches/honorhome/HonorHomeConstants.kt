@@ -12,7 +12,7 @@ object HonorHomeConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x256FFF,
         targets = listOf(
-            AppTarget(version = "14.0.0.210"),
+            AppTarget(version = "14.0.0.210", minSdk = 29, description = "needs Android 10 or newer"),
         ),
     )
 }

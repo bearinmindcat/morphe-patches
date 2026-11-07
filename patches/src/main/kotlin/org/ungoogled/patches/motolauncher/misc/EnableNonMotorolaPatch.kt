@@ -29,6 +29,7 @@ import org.ungoogled.patches.motolauncher.MotoLauncherConstants.COMPATIBILITY_MO
 import org.ungoogled.patches.motolauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val MOTO_LAUNCHER_EXTENSION = "extensions/motolauncher.mpe"
 
@@ -334,6 +335,9 @@ private val librariesPatch = resourcePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_MOTO_LAUNCHER)
+
 /**
  * Off Motorola, Moto App Launcher is refused at install (it requires Motorola's libraries) and then dies on Android's
  * hidden API, which only a system app may use. Recents and navigation gestures stay the phone's own: Android gives
@@ -346,6 +350,6 @@ val enableNonMotorolaPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MOTO_LAUNCHER)
-    dependsOn(librariesPatch, hiddenApisPatch, systemPrivilegesPatch)
+    dependsOn(versionCheckPatch, librariesPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(MOTO_LAUNCHER_EXTENSION)
 }

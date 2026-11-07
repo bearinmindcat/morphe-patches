@@ -20,6 +20,7 @@ import org.ungoogled.patches.samsunglauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.samsunglauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.samsunglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.samsunglauncher.SamsungLauncherConstants.COMPATIBILITY_SAMSUNG_LAUNCHER
+import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val SAMSUNG_LAUNCHER_EXTENSION = "extensions/samsunglauncher.mpe"
 
@@ -357,6 +358,9 @@ private val systemPrivilegesPatch = bytecodePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_SAMSUNG_LAUNCHER)
+
 /**
  * Off One UI the home screen dies at once on SemFloatingFeature (a One UI class). The extension carries stand-ins for
  * the One UI classes it calls; on a Samsung phone the framework's own classes load first, so they never run there.
@@ -369,6 +373,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_LAUNCHER)
-    dependsOn(resourcesPatch, oneUiMembersPatch, hiddenApisPatch, systemPrivilegesPatch)
+    dependsOn(versionCheckPatch, resourcesPatch, oneUiMembersPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(SAMSUNG_LAUNCHER_EXTENSION)
 }

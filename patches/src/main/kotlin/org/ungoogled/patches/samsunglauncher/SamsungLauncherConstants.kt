@@ -15,7 +15,7 @@ object SamsungLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "18.0.07.59"),
+            AppTarget(version = "18.0.07.59", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

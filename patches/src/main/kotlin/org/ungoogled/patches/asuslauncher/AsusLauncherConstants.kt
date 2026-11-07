@@ -15,7 +15,7 @@ object AsusLauncherConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x1E88E5,
         targets = listOf(
-            AppTarget(version = "11.0.0.76_240920"),
+            AppTarget(version = "11.0.0.76_240920", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }
