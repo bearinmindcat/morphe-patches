@@ -118,4 +118,46 @@ public final class Launch {
             android.util.Log.w("UA", "delete observer not told: " + e);
         }
     }
+
+    /** Xiaomi's own action namespaces, in which the launcher's screens open each other. */
+    private static final String[] MIUI_ACTIONS = {"com.miui.", "miui.", "com.mi.", "com.xiaomi."};
+
+    /**
+     * An implicit intent with one of Xiaomi's actions that the launcher answers itself stays in the launcher. POCO
+     * Launcher (com.mi.android.globallauncher, MIUI's launcher under another package) answers the same actions
+     * (com.miui.home.Setting, the settings sub-pages, ...), so on a POCO phone every settings page opened Android's
+     * chooser between the two. Intents the launcher does not answer (other Xiaomi apps') are left as they are.
+     */
+    static android.content.Intent own(android.content.Context c, android.content.Intent intent) {
+        if (c == null || intent == null || intent.getComponent() != null || intent.getPackage() != null) return intent;
+        String action = intent.getAction();
+        if (action == null) return intent;
+        boolean miui = false;
+        for (String prefix : MIUI_ACTIONS) miui |= action.startsWith(prefix);
+        if (!miui) return intent;
+        android.content.Intent mine = new android.content.Intent(intent).setPackage(c.getPackageName());
+        try {
+            if (c.getPackageManager().resolveActivity(mine, 0) == null) return intent;
+        } catch (RuntimeException e) {
+            return intent;
+        }
+        return mine;
+    }
+
+    public static void startActivity(android.content.Context c, android.content.Intent intent) {
+        c.startActivity(own(c, intent));
+    }
+
+    public static void startActivity(android.content.Context c, android.content.Intent intent, android.os.Bundle options) {
+        c.startActivity(own(c, intent), options);
+    }
+
+    public static void startActivityForResult(android.app.Activity a, android.content.Intent intent, int request) {
+        a.startActivityForResult(own(a, intent), request);
+    }
+
+    public static void startActivityForResult(android.app.Activity a, android.content.Intent intent, int request,
+            android.os.Bundle options) {
+        a.startActivityForResult(own(a, intent), request, options);
+    }
 }

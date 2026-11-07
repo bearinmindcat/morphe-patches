@@ -401,6 +401,64 @@ private val manifestPatch = resourcePatch(
     }
 }
 
+private val CONTEXT_ROOTS = setOf(
+    "Landroid/content/Context;", "Landroid/content/ContextWrapper;", "Landroid/view/ContextThemeWrapper;",
+    "Landroid/app/Application;", "Landroid/app/Service;",
+)
+private val ACTIVITIES = setOf("Landroid/app/Activity;", "Landroid/app/ListActivity;", "Landroid/preference/PreferenceActivity;")
+private val STARTS = listOf("(Landroid/content/Intent;)V", "(Landroid/content/Intent;Landroid/os/Bundle;)V")
+private val STARTS_FOR_RESULT = listOf("(Landroid/content/Intent;I)V", "(Landroid/content/Intent;ILandroid/os/Bundle;)V")
+
+/**
+ * The launcher opens its own screens (settings and their sub-pages, ...) with implicit intents of Xiaomi's actions,
+ * which POCO Launcher answers too: on a POCO phone each opened Android's chooser. Every Context / Activity start goes
+ * through Launch, which keeps such an intent in the launcher when the launcher answers it (see Launch.own).
+ */
+private val ownScreensPatch = bytecodePatch(
+    description = "Opens the launcher's own screens without asking which launcher should open them.",
+) {
+    extendWith(XIAOMI_LAUNCHER_EXTENSION)
+
+    execute {
+        fun BytecodePatchContext.kind(type: String): String? {
+            var t: String? = type
+            repeat(32) {
+                if (t in ACTIVITIES) return "activity"
+                if (t in CONTEXT_ROOTS) return "context"
+                t = classDefByOrNull(t ?: return null)?.superclass ?: return null
+            }
+            return null
+        }
+        val owners = mutableSetOf<String>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (m in c.methods) {
+                for (insn in m.implementation?.instructions ?: continue) {
+                    if (insn.opcode != Opcode.INVOKE_VIRTUAL && insn.opcode != Opcode.INVOKE_VIRTUAL_RANGE) continue
+                    val r = (insn as ReferenceInstruction).reference as? MethodReference ?: continue
+                    if (r.name == "startActivity" || r.name == "startActivityForResult") owners += r.definingClass
+                }
+            }
+        }
+        val calls = mutableMapOf<String, String>()
+        for (owner in owners) {
+            val kind = kind(owner) ?: continue
+            for (shape in STARTS) {
+                calls["$owner->startActivity$shape"] = "$EXT/Launch;->startActivity(Landroid/content/Context;${shape.substring(1)}"
+            }
+            if (kind != "activity") continue
+            for (shape in STARTS_FOR_RESULT) {
+                calls["$owner->startActivityForResult$shape"] =
+                    "$EXT/Launch;->startActivityForResult(Landroid/app/Activity;${shape.substring(1)}"
+            }
+        }
+        val starts = redirectCalls(calls)
+        log.info("activity starts: $starts")
+        // Measured against 7.50.06.2372: 84.
+        if (starts < 50) throw PatchException("only $starts activity starts found")
+    }
+}
+
 /** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
 private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_XIAOMI_LAUNCHER)
 
@@ -420,6 +478,7 @@ val enableNonHyperOsLauncherPatch = bytecodePatch(
     dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, manifestPatch, offlinePatch)
     extendWith(XIAOMI_LAUNCHER_EXTENSION)
     // The file provider's authority is also built from the package name; on POCO phones the settings authority is POCO's.
+    dependsOn(ownScreensPatch)
     dependsOn(
         org.ungoogled.patches.shared.launcherCoexistencePatch(
             keep = setOf("com.miui.home.fileprovider"),
