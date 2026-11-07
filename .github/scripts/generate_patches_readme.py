@@ -374,6 +374,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents',
         '<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents',
     ),
+    # OnePlus Camera (the phone's own system camera, root mount install on OnePlus / OPPO phones)
+    "com.oplus.camera": (
+        '<img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera',
+        '<img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera',
+    ),
     # OnePlus System Launcher (ColorOS / OxygenOS 16 home screen, coloros-launcher)
     "com.android.launcher": (
         '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',

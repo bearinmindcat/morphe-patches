@@ -196,6 +196,7 @@ More detail (EROFS images, other partitions): [`tools/firmware/README.md`](../to
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|
+| OnePlus Camera | `com.oplus.camera` | any (the one on your phone) | 11+ | Your own phone: patch the installed camera in Morphe Manager (root mount install; a mount needs the exact version the phone has). Checked: 6.070.215 and 6.020.951 (Android 15+), 5.020.905 (Android 11+), also on [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-camera-2/) |
 | OnePlus Calculator | `com.oneplus.calculator` | 17.0.0 | 11+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-calculator/oneplus-calculator-17-0-0-release/) |
 | OnePlus Clock | `com.oneplus.deskclock` | 16.19.8 | 9+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-clock/oneplusclock-16-19-8-release/) |
 | OnePlus Compass | `com.coloros.compass2` | 17.0.0 | 10+ | [APKMirror](https://www.apkmirror.com/apk/oppo/compass-5/coloros-compass-17-0-0-release/) |
