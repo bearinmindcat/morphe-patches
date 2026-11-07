@@ -1,3 +1,17 @@
+## [2.8.11](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.10...v2.8.11) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* add change app name patch for gmail; issue [#143](https://github.com/bearinmindcat/morphe-patches/issues/143) ([78b1882](https://github.com/bearinmindcat/morphe-patches/commit/78b18825fb89bf8758419b466b83d29ed506fb90))
+* add sony music non-xperia support ([bf86225](https://github.com/bearinmindcat/morphe-patches/commit/bf86225b128ebaba4f5ef09635beff26dbd22d5b))
+* add xperia keyboard non-xperia support ([f5149be](https://github.com/bearinmindcat/morphe-patches/commit/f5149be3fbff686220911297923bdd7289685f2a))
+* launchers start on android 13 and one ui; issue [#142](https://github.com/bearinmindcat/morphe-patches/issues/142) ([081bc86](https://github.com/bearinmindcat/morphe-patches/commit/081bc86922ea8412da7575d0981aa8742270b314))
+* nothing gallery supports 3.1.4.1030 ([1551663](https://github.com/bearinmindcat/morphe-patches/commit/1551663e8a096dc0033e69cb1d5ec3c3f7d54eda))
+* nothing launcher runs on android 15 ([2b8a34c](https://github.com/bearinmindcat/morphe-patches/commit/2b8a34c9e2e1adea428ab4e00461991abf0ccf32))
+* oneplus launcher (oxygenos 11) opens apps; issue [#142](https://github.com/bearinmindcat/morphe-patches/issues/142) ([08328bc](https://github.com/bearinmindcat/morphe-patches/commit/08328bc2eb5f88264f3501b175877dfb0d210709))
+* oneplus system launcher runs on android 11; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([b392e3a](https://github.com/bearinmindcat/morphe-patches/commit/b392e3ac6dd723ba56e76583f80c3abc3bc88830))
+* samsung gallery selfies open without flipping; issue [#104](https://github.com/bearinmindcat/morphe-patches/issues/104) ([30ad8a1](https://github.com/bearinmindcat/morphe-patches/commit/30ad8a16664f60b6c8944a382124164be8c18330))
+
 ## [2.8.10](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.9...v2.8.10) (2026-11-07)
 
 ### 🐛 Bug Fixes

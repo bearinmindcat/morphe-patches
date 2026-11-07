@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.10](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.10)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;170 patches total
+> **[v2.8.11](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.11)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;173 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -86,7 +86,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;10 patches</summary>
 <br>
 
 **Supported version(s):** 2026.11.02.1012472355.Release
@@ -96,6 +96,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app that signs in to your Google account through microG-RE. Not for root installs. |  |
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
+| [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
 | [Hide AI](#hide-ai) | Hides Gemini, Help me write, Polish, summaries, the AI inbox and Gemini replies. |  |
 | [Hide ads](#hide-ads) | Removes sponsored mail from the inbox, Promotions and Social. |  |
 | [Hide upsells](#hide-upsells) | Hides storage nags and Google One, Gemini and Workspace upgrade offers. |  |
@@ -210,7 +211,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 4.0.20 — needs Android 16 or newer
+**Supported version(s):** 4.0.20 — needs Android 16 or newer, 3.3.14 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -246,7 +247,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.4.30 — needs Android 13 or newer
+**Supported version(s):** 16.4.30 — needs Android 13 or newer, 15.6.24 — needs Android 11 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -735,7 +736,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 3.1.3.1019 — needs Android 14 or newer
+**Supported version(s):** 3.1.4.1030 — needs Android 14 or newer, 3.1.3.1019 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -1080,7 +1081,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Sony Apps&nbsp;&nbsp;•&nbsp;&nbsp;1 app&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary>📱 Sony Apps&nbsp;&nbsp;•&nbsp;&nbsp;3 apps&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 <blockquote>
 
@@ -1093,6 +1094,30 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-Xperia ROM support](#enable-non-xperia-rom-support) | Makes Sony Album usable on non-Xperia ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/sony-music.png" width="20" height="20" align="top"> Sony Music&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/sony-music.png" width="20" height="20" align="top"> Sony Music&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 9.4.16.A.1.17 — needs Android 11 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Xperia ROM support](#enable-non-xperia-rom-support) | Makes Sony Music usable on non-Xperia ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/xperia-keyboard.png" width="20" height="20" align="top"> Xperia Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xperia-keyboard.png" width="20" height="20" align="top"> Xperia Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 8.1.A.0.12 — needs Android 4.4 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-Xperia ROM support](#enable-non-xperia-rom-support) | Makes Xperia Keyboard usable on non-Xperia ROMs. |  |
 
 </details>
 
