@@ -376,6 +376,11 @@ APP_RENAMES = {
         '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
         '<img src="docs/icons/sony-album.png" width="20" height="20" align="top"> Sony Album',
     ),
+    # Sony Music (Xperia's music player)
+    "com.sonyericsson.music": (
+        '<img src="docs/icons/sony-music.png" width="20" height="20" align="top"> Sony Music',
+        '<img src="docs/icons/sony-music.png" width="20" height="20" align="top"> Sony Music',
+    ),
     # Xperia Home (Sony's launcher, sony-ports): listed under Launchers.
     "com.sonymobile.launcher": (
         '<img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home',
