@@ -191,7 +191,8 @@ private val gmailMicrogResourcesPatch = resourcePatch(
 
             // The launcher and app-switcher name and icon.
             for (element in manifest.elements("*")) {
-                if (element.getAttribute("android:label") == STOCK_LABEL) {
+                // NEW_LABEL already: Change app name ran first and keeps its own name.
+                if (element.getAttribute("android:label") in setOf(STOCK_LABEL, NEW_LABEL)) {
                     element.setAttribute("android:label", NEW_LABEL)
                     count("label")
                 }
@@ -213,10 +214,12 @@ private val gmailMicrogResourcesPatch = resourcePatch(
                 string.textContent = to
                 count("own name in strings")
             }
-            strings.documentElement.appendChild(strings.createElement("string").apply {
-                setAttribute("name", NEW_LABEL.removePrefix("@string/"))
-                textContent = APP_NAME
-            })
+            if (strings.elements("string").none { it.getAttribute("name") == NEW_LABEL.removePrefix("@string/") }) {
+                strings.documentElement.appendChild(strings.createElement("string").apply {
+                    setAttribute("name", NEW_LABEL.removePrefix("@string/"))
+                    textContent = APP_NAME
+                })
+            }
         }
 
         // Sync adapters for Google accounts (microG's account type) and the launcher shortcuts' target package.
