@@ -53,7 +53,7 @@ VENDOR_GROUPS = [
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
     ("Honor Apps", "honor ", ("com.hihonor.",), ()),
     ("RedMagic Apps", "redmagic ", ("cn.nubia.",), ()),
-    ("LG Apps", "lg ", ("com.lge.",), ()),
+    ("LG Apps", "lg ", ("com.lge.",), ("com.android.gallery3d",)),
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
      ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ("com.android.contacts",)),
