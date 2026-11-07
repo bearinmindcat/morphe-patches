@@ -188,6 +188,7 @@ More detail (EROFS images, other partitions): [`tools/firmware/README.md`](../to
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|
+| LG Gallery | `com.android.gallery3d` | 9.60.32 | 11+ | [APKMirror](https://www.apkmirror.com/apk/lgelectronics/lg-gallery/lg-gallery-9-60-32-release/) |
 | LG Health | `com.lge.lifetracker` | 5.60.16 | 7+ | [APKMirror](https://www.apkmirror.com/apk/lgelectronics/lg-health/lg-health-5-60-16-release/) |
 | LG QuickMemo+ | `com.lge.qmemoplus` | 10.0.30 | 10+ | [APKMirror](https://www.apkmirror.com/apk/lgelectronics/quickmemo/quickmemo-10-0-30-release/) |
 

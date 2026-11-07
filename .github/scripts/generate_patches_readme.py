@@ -318,6 +318,10 @@ APP_RENAMES = {
         '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
         '<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health',
     ),
+    "com.android.gallery3d": (
+        '<img src="docs/icons/lg-gallery.png" width="20" height="20" align="top"> LG Gallery',
+        '<img src="docs/icons/lg-gallery.png" width="20" height="20" align="top"> LG Gallery',
+    ),
     "com.oneplus.calculator": (
         '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',
         '<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator',

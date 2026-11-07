@@ -35,6 +35,11 @@ public final class LgRes {
         // LG's white (light) dialog themes: Android's light ones.
         LG_NAMES.put("style/Theme.LGE.White.Dialog.Alert", "android:style/Theme.DeviceDefault.Light.Dialog.Alert");
         LG_NAMES.put("style/Theme.LGE.White.Dialog.MinWidth.Initial", "android:style/Theme.DeviceDefault.Light.Dialog.MinWidth");
+        // The action menu's end margin (Gallery's search bar), not in every LG UX version: an added size, 0.
+        LG_NAMES.put("dimen/action_menu_view_margin_end", "dimen/lg_action_menu_view_margin_end");
+        // LG colours that are LG theme colours (the port's copies, lg_<name>, follow dark mode).
+        LG_NAMES.put("color/list_separator_background_color", "color/lg_foreground_material_light");
+        LG_NAMES.put("color/action_bar_primary_text_default_material_light", "color/lg_color_accent_ui");
     }
     private static Context context;
 
@@ -62,6 +67,8 @@ public final class LgRes {
         else if (name != null && name.startsWith("com.lge:")) lgName = name.substring("com.lge:".length());
         if (lgName != null) {
             String answer = LG_NAMES.get(lgName);
+            // Other LG colours: the port's copy (lg_<name>, day and night) where it added one.
+            if (answer == null && lgName.startsWith("color/")) answer = "color/lg_" + lgName.substring("color/".length());
             return answer == null ? 0 : id(answer);
         }
         return resources.getIdentifier(name, type, pkg);

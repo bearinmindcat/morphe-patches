@@ -31,7 +31,7 @@ Runtime classes (`runtime/`, generated into each extension under its own package
   Android 15 for target-30 apps), else "absent".
 - `LgRes`: `id("type/name")` for resources a port adds (Morphe's bytecode patches cannot see resources added in the
   same run) and `getIdentifier` for `com.lge` names (LG's dialog layouts / FAB drawables / dialog themes -> the
-  port's `lg_*` copies or Android's).
+  port's `lg_*` copies or Android's; any other LG colour -> the port's `lg_<name>` copy where it added one).
 - `LgSettings`: `Settings.System.putInt/getInt` without WRITE_SETTINGS (LG apps write their own system keys) -- kept
   in the app's preferences when the system refuses.
 - `LgAlertTitle`: the title view of the port's copy of LG's alert dialog layout (carries Android's internal
@@ -70,5 +70,10 @@ Then in the patch (`patches/.../lg/`):
 - `makeLibrariesOptional()` (`samsung/OptionalLibraries.kt`) for a required LG `uses-library`.
 
 Hand-written stand-ins (functional SUI pickers and dialogs, lgdynamicactionbar layouts, `TopButtonLayout`) replace
-generated ones in the extension; keep a list of them when regenerating. Always run the ART verifier sweep
+generated ones in the extension; keep a list of them when regenerating. LG Gallery's: lgdynamicactionbar
+`AppBarLayout`/`CollapsingToolbarLayout`/`CoordinatorLayout` (always collapsed), `android.widget.HelperTextLayout`,
+`LGandroid.support.v4.widget.NestedScrollView`, `com.lge.app.permission.RequestPermissionsHelper` (closes the screen and
+asks on its own, as LG's does), `com.lge.lgdrm.DrmStream`, `com.lge.sysprop.ExportedVendorProperties`; regenerate with
+`--only '^L(com/lge/|android/|LGandroid/|com/android/internal/)'` and `--extends` "Lcom/lge/systemservice/core/LGContext;
+Ljava/lang/Object;" (a rethrown monitor register made it look like an exception). Always run the ART verifier sweep
 afterwards: 0 rejected classes.
