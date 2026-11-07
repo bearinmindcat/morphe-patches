@@ -22,8 +22,10 @@ import org.ungoogled.patches.coloroslauncher.misc.skipCastOfNull
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.motolauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.motolauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.motolauncher.MotoLauncherConstants.COMPATIBILITY_MOTO_LAUNCHER
 import org.ungoogled.patches.motolauncher.SUPER_CONSTRUCTORS
@@ -116,10 +118,10 @@ private val hiddenApisPatch = bytecodePatch(
 
     execute {
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)

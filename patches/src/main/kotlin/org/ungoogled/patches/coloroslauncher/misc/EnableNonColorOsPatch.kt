@@ -17,10 +17,12 @@ import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_13
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_13
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES_15
 import org.ungoogled.patches.coloroslauncher.INACCESSIBLE_INTERFACES_15
@@ -28,6 +30,7 @@ import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS_15
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.shared.addDefaultsForOlderAndroid
+import org.ungoogled.patches.shared.enablePageSizeCompat
 import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
 
@@ -113,7 +116,10 @@ private val GUARDED_CALLS = mapOf(
         "$EXT/Calls;->" + shape.replace("Landroid/provider/DeviceConfig\$OnPropertiesChangedListener;", "Ljava/lang/Object;")
 }
 
-/** The manifest's shared user id (oppo.uid.launcher) belongs to OPPO's signature: an installed copy goes without. */
+/**
+ * The manifest's shared user id (oppo.uid.launcher) belongs to OPPO's signature: an installed copy goes without. OPPO's
+ * image libraries are 4 KB aligned: page size compatibility mode on 16 KB phones (see enablePageSizeCompat).
+ */
 private val manifestPatch = resourcePatch {
     execute {
         document("AndroidManifest.xml").use { manifest ->
@@ -122,6 +128,7 @@ private val manifestPatch = resourcePatch {
             root.removeAttribute("android:sharedUserId")
             root.removeAttribute("android:sharedUserLabel")
         }
+        enablePageSizeCompat()
     }
 }
 
@@ -149,15 +156,16 @@ private class HiddenLists(
     val followMoves: Boolean = false,
 )
 
-/** 16.4.30's lists were checked against Android 15 (and 13, 16 / 17), 15.6.24's against Android 11, 15, 16 and 17. */
+/** 16.4.30's lists were checked against Android 15 (and 13, 16 / 17, canary), 15.6.24's against 11, 15, 16, 17, canary. */
 private fun hiddenLists(version: String) = when (version) {
     "15.6.24" -> HiddenLists(
         HIDDEN_MEMBERS_15, HIDDEN_CONSTRUCTORS_15, SUPER_CONSTRUCTORS_15, HIDDEN_SUPERCLASSES_15,
         INACCESSIBLE_INTERFACES_15, followMoves = true,
     )
     else -> HiddenLists(
-        HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13,
-        HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13, SUPER_CONSTRUCTORS, HIDDEN_SUPERCLASSES,
+        HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13 + HIDDEN_MEMBERS_CANARY,
+        HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13 + HIDDEN_CONSTRUCTORS_CANARY,
+        SUPER_CONSTRUCTORS, HIDDEN_SUPERCLASSES,
     )
 }
 

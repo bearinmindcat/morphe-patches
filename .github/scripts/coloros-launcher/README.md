@@ -26,7 +26,8 @@ ColorOS they need two kinds of help, both generated here so a new version is a r
 ```bash
 X=.github/scripts/xiaomi-standins; L=.github/scripts/coloros-launcher
 J=extensions/coloroslauncher/src/main/java; K=patches/src/main/kotlin/org/ungoogled/patches/coloroslauncher
-# each phone's boot classpath (adb pull every $BOOTCLASSPATH entry, see ../xiaomi-standins): a11/, a15/, a16/, a17/
+# each phone's boot classpath (adb pull every $BOOTCLASSPATH entry, see ../xiaomi-standins): a11/, a15/, a16/, a17/,
+# canary/ (the Android canary preview image; its boot jars are DEX 041 containers, which hidden.py reads)
 # stand-ins: one set for both versions, each against the oldest Android it runs on (and 15.6.24 against 15 as well)
 java -Xmx6g -cp "$CP" $X/Missing.java a15 16.4.30.apk w16a15/
 java -Xmx6g -cp "$CP" $X/Missing.java a11 15.6.24.apk w15a11/
@@ -38,8 +39,8 @@ git checkout $J/org                                                 # gen.py's C
 # hidden members: 16.4.30 against Android 15 (its Android 16/17 block was added by hand from the patched APK),
 # 15.6.24 against every Android it was checked on (a comma list gives the union)
 python3 $L/hidden.py a15 16.4.30.apk $J $K/ColorOsLauncherMembers.kt
-python3 $L/hidden.py a11,a15,a16,a17 15.6.24.apk $J $K/ColorOsLauncher15Members.kt "OnePlus System Launcher 15.6.24" \
-    --suffix _15 --android "Android 11, 15, 16 or 17"
+python3 $L/hidden.py a11,a15,a16,a17,canary 15.6.24.apk $J $K/ColorOsLauncher15Members.kt "OnePlus System Launcher 15.6.24" \
+    --suffix _15 --android "Android 11, 15, 16, 17 or the canary"
 ```
 
 Run the stand-ins first: `hidden.py` reads the extension to know which classes and members the stand-ins declare.

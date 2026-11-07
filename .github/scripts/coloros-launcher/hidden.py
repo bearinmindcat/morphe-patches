@@ -35,10 +35,11 @@ def uleb(b, o):
         if x < 0x80: return r, o
 
 class Dex:
-    def __init__(self, b):
-        self.b = b
+    def __init__(self, b, base=0):
+        # base: the header's offset (a DEX 041 container holds several; every offset is from the container's start)
+        self.b = b; self.base = base
         (self.ssz, self.soff, self.tsz, self.toff, self.psz, self.poff, self.fsz, self.foff, self.msz, self.moff,
-         self.csz, self.coff) = struct.unpack_from('<12I', b, 0x38)
+         self.csz, self.coff) = struct.unpack_from('<12I', b, base + 0x38)
         self._s = {}
         self.types = [self.s(struct.unpack_from('<I', b, self.toff + 4 * i)[0]) for i in range(self.tsz)]
         self._p = {}
@@ -92,16 +93,24 @@ class Dex:
         return out
 
     def hiddenapi(self):
-        mapoff = struct.unpack_from('<I', self.b, 0x34)[0]; cnt = struct.unpack_from('<I', self.b, mapoff)[0]
+        mapoff = struct.unpack_from('<I', self.b, self.base + 0x34)[0]; cnt = struct.unpack_from('<I', self.b, mapoff)[0]
         for i in range(cnt):
             t, _, _, off = struct.unpack_from('<HHII', self.b, mapoff + 4 + 12 * i)
             if t == 0xF000: return off
         return None
 
 def dexes(path):
+    # Android 17 QPR2 and the canary images ship boot jars as DEX 041 containers: one classes.dex, several dex headers
+    # back to back (file_size at 0x20 is each one's size).
     z = zipfile.ZipFile(path)
     for n in z.namelist():
-        if re.match(r'classes\d*\.dex$', n): yield Dex(z.read(n))
+        if not re.match(r'classes\d*\.dex$', n): continue
+        b = z.read(n); base = 0
+        while True:
+            yield Dex(b, base)
+            if b[4:7] != b'041': break
+            base += struct.unpack_from('<I', b, base + 0x20)[0]
+            if base >= len(b): break
 
 # --- the phone: classes, hierarchy, members with their hidden-API flags ----------------------------------------
 args = sys.argv[1:]

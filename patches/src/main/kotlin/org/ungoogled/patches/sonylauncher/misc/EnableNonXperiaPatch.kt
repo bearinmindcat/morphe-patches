@@ -27,8 +27,10 @@ import org.ungoogled.patches.sony.evenResourceEntryCounts
 import org.ungoogled.patches.sony.replacePrivateThemeColors
 import org.ungoogled.patches.sonylauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.sonylauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.sonylauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.sonylauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.sonylauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.sonylauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.sonylauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.sonylauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.sonylauncher.SonyLauncherConstants.COMPATIBILITY_XPERIA_HOME
@@ -184,10 +186,10 @@ private val hiddenApisPatch = bytecodePatch(
         if (debuggable == 0) throw PatchException("view capture debuggable check not found")
 
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val bases = HIDDEN_SUPERCLASSES.filterKeys { !it.startsWith("Landroid/tracing/perfetto/") } + EXTRA_SUPERCLASSES

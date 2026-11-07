@@ -18,9 +18,11 @@ import org.ungoogled.patches.asuslauncher.AsusLauncherConstants.COMPATIBILITY_AS
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_13
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_13
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.asuslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.asuslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloros.exportDynamicReceivers
@@ -131,10 +133,12 @@ private val hiddenApisPatch = bytecodePatch(
 
     execute {
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13,
+            "$EXT/Members;", "$EXT/Hidden;",
+            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13 + HIDDEN_MEMBERS_CANARY,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13,
+            "$EXT/Members;", "$EXT/Hidden;",
+            HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)

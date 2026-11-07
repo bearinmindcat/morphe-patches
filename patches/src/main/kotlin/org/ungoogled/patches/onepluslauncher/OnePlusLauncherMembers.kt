@@ -220,3 +220,21 @@ internal val HIDDEN_MEMBERS_16_17 = setOf(
 internal val HIDDEN_CONSTRUCTORS_16_17 = setOf(
     "Landroid/view/SurfaceControl;-><init>()V",
 )
+
+/* Android canary */
+/*
+ * Members and constructors the OnePlus Launcher (OxygenOS 11) references that the Android canary (the preview of the
+ * Android after 17, emulator build ZP11.260918.008, SDK 37.2) refuses or lacks although Android 17 allowed them. Found
+ * by checking the patched APK against that image's boot classpath and hidden API flags; they go through the same member
+ * helper (used where the phone has them, "absent" elsewhere).
+ */
+internal val HIDDEN_MEMBERS_CANARY = setOf(
+    "Landroid/telephony/TelephonyManager;->getIccAuthentication(IIILjava/lang/String;)Ljava/lang/String;",
+    "Landroid/view/IWindowManager;->overridePendingAppTransitionMultiThumbFuture(Landroid/view/IAppTransitionAnimationSpecsFuture;Landroid/os/IRemoteCallback;ZI)V",
+    "Landroid/view/IWindowManager;->overridePendingAppTransitionRemote(Landroid/view/RemoteAnimationAdapter;I)V",
+    "Landroid/view/inputmethod/InputMethodManager;->getInputMethodWindowVisibleHeight()I",
+)
+
+internal val HIDDEN_CONSTRUCTORS_CANARY = setOf(
+    "Landroid/view/InputChannel;-><init>()V",
+)

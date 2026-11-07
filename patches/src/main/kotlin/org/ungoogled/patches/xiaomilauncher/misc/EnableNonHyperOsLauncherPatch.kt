@@ -25,11 +25,14 @@ import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.xiaomilauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.xiaomilauncher.XiaomiLauncherConstants.COMPATIBILITY_XIAOMI_LAUNCHER
+import org.ungoogled.patches.shared.enablePageSizeCompat
 import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val XIAOMI_LAUNCHER_EXTENSION = "extensions/xiaomilauncher.mpe"
@@ -179,10 +182,10 @@ private val hiddenApisPatch = bytecodePatch(
     execute {
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/Members;", "$EXT/Hidden;",
-            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS,
+            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY + PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES + SUPERCLASSES_16_17)
@@ -384,7 +387,8 @@ private val offlinePatch = bytecodePatch(
 
 /**
  * Android's uninstall dialog (see Launch.deletePackage) only opens for apps that ask for REQUEST_DELETE_PACKAGES; the
- * widget permission dialog is asked for from an activity of the extension's (see Widgets).
+ * widget permission dialog is asked for from an activity of the extension's (see Widgets). The bundled filament and
+ * jniLibs libraries are 4 KB aligned: page size compatibility mode on 16 KB phones (see enablePageSizeCompat).
  */
 private val manifestPatch = resourcePatch(
     description = "Lets the launcher open Android's uninstall and widget permission dialogs.",
@@ -407,6 +411,7 @@ private val manifestPatch = resourcePatch(
                 root.insertBefore(permission, permissions.item(0))
             }
         }
+        enablePageSizeCompat()
     }
 }
 

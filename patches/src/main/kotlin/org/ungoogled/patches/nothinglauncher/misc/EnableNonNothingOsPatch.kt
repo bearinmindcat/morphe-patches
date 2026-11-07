@@ -21,13 +21,17 @@ import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.nothinglauncher.NothingLauncherConstants.COMPATIBILITY_NOTHING_LAUNCHER
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS as V3_HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS_16_17 as V3_HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS_CANARY as V3_HIDDEN_CONSTRUCTORS_CANARY
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_MEMBERS as V3_HIDDEN_MEMBERS
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_MEMBERS_16_17 as V3_HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_MEMBERS_CANARY as V3_HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_SUPERCLASSES as V3_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.nothinglauncher.v3.SUPER_CONSTRUCTORS as V3_SUPER_CONSTRUCTORS
 import org.ungoogled.patches.samsung.redirectCalls
@@ -165,12 +169,14 @@ private val hiddenApisPatch = bytecodePatch(
         if (displays == 0) throw PatchException("no Context.getDisplay calls found")
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/Members;", "$EXT/Hidden;",
-            (if (android15Build) V3_HIDDEN_MEMBERS + V3_HIDDEN_MEMBERS_16_17 else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17) +
+            (if (android15Build) V3_HIDDEN_MEMBERS + V3_HIDDEN_MEMBERS_16_17 + V3_HIDDEN_MEMBERS_CANARY
+            else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY) +
                 REFUSED_CALLS,
         )
         val constructors = redirectConstructors(
             "$EXT/Members;", "$EXT/Hidden;",
-            if (android15Build) V3_HIDDEN_CONSTRUCTORS + V3_HIDDEN_CONSTRUCTORS_16_17 else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            if (android15Build) V3_HIDDEN_CONSTRUCTORS + V3_HIDDEN_CONSTRUCTORS_16_17 + V3_HIDDEN_CONSTRUCTORS_CANARY
+            else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         // 3.3.14's widget host extends AppWidgetHost through a hidden constructor; the public one with the same first
         // arguments is used.
