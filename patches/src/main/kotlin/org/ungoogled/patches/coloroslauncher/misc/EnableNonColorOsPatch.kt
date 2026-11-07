@@ -10,10 +10,12 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.coloros.exportDynamicReceivers
@@ -297,6 +299,66 @@ private val wallpaperBrightnessPatch = bytecodePatch {
     }
 }
 
+/**
+ * The edit bar's Wallpapers, Icons and Personalization buttons open ColorOS's own apps and did nothing elsewhere:
+ * Wallpapers opens Android's wallpaper pickers, the other two are left out (see Personalization).
+ */
+private val personalizationPatch = bytecodePatch {
+    execute {
+        val adapter = mutableClassDefBy("Lcom/android/launcher/togglebar/adapter/ToggleBarMainUIAdapter;")
+        val wallpaper = adapter.methods.firstOrNull { method ->
+            method.returnType == "Landroid/content/Intent;" && method.implementation?.instructions?.any {
+                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "android.intent.action.SET_WALLPAPER"
+            } == true
+        } ?: throw PatchException("ToggleBarMainUIAdapter's wallpaper intent not found")
+        val pick = wallpaper.implementation!!.instructions.withIndex().filter { (_, insn) ->
+            ((insn as? ReferenceInstruction)?.reference as? StringReference)?.string == "com.oplus.wallpapers"
+        }
+        if (pick.size != 1) throw PatchException("the wallpaper intent names com.oplus.wallpapers ${pick.size} times")
+        val (index, insn) = pick.single()
+        val register = (insn as OneRegisterInstruction).registerA
+        wallpaper.addInstructions(
+            index + 1,
+            """
+                invoke-static { v$register }, $EXT/Personalization;->ifInstalled(Ljava/lang/String;)Ljava/lang/String;
+                move-result-object v$register
+            """,
+        )
+
+        // Every isIgnoreItem(simpleMode, viewId, wallpaperDisabled, launcher) answer is also asked of Personalization.
+        val controller = mutableClassDefBy("Lcom/android/launcher/togglebar/controller/ToggleBarMainUIController;")
+        val isIgnore = { r: MethodReference ->
+            r.definingClass == controller.type && r.name == "isIgnoreItem" && r.returnType == "Z" &&
+                r.parameterTypes.map { it.toString() } == listOf("Z", "I", "Z", "Lcom/android/launcher/Launcher;")
+        }
+        var calls = 0
+        for (method in controller.methods) {
+            val instructions = method.implementation?.instructions ?: continue
+            for (index in instructions.indices.reversed()) {
+                val call = instructions[index]
+                val r = (call as? ReferenceInstruction)?.reference as? MethodReference ?: continue
+                if (!isIgnore(r) || call !is FiveRegisterInstruction) continue
+                val result = instructions.getOrNull(index + 1)
+                if (result?.opcode != Opcode.MOVE_RESULT) throw PatchException("isIgnoreItem's answer is not kept")
+                val answer = (result as OneRegisterInstruction).registerA
+                val id = call.registerE // (this, simpleMode, viewId, wallpaperDisabled, launcher)
+                val launcher = call.registerG
+                if (maxOf(answer, id, launcher) > 15) throw PatchException("isIgnoreItem call uses high registers")
+                method.addInstructions(
+                    index + 2,
+                    """
+                        invoke-static { v$answer, v$id, v$launcher }, $EXT/Personalization;->ignore(ZILandroid/content/Context;)Z
+                        move-result v$answer
+                    """,
+                )
+                calls++
+            }
+        }
+        if (calls == 0) throw PatchException("no ToggleBarMainUIController.isIgnoreItem calls found")
+        log.info("edit bar: wallpaper intent, $calls item checks")
+    }
+}
+
 /** What a system home screen may do and an installed app may not. */
 private val systemPrivilegesPatch = bytecodePatch(
     description = "Keeps its options locally and registers widgets with Android's public calls.",
@@ -391,7 +453,7 @@ val enableNonColorOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
     dependsOn(
         versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch, workProfilePatch,
-        wallpaperBrightnessPatch,
+        wallpaperBrightnessPatch, personalizationPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
