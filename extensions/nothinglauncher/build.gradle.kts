@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.nothinglauncher"
 
     defaultConfig {
-        // Nothing Launcher 4.0.20 requires Android 16 (API 36).
-        minSdk = 36
+        // Nothing Launcher 3.3.14 requires Android 15 (API 35), 4.0.20 Android 16. Not higher: d8 drops SDK_INT checks
+        // below minSdk.
+        minSdk = 35
     }
 }
 

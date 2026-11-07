@@ -5,6 +5,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLa
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
@@ -17,13 +18,21 @@ import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
+import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.nothinglauncher.NothingLauncherConstants.COMPATIBILITY_NOTHING_LAUNCHER
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS as V3_HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS_16_17 as V3_HIDDEN_CONSTRUCTORS_16_17
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_MEMBERS as V3_HIDDEN_MEMBERS
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_MEMBERS_16_17 as V3_HIDDEN_MEMBERS_16_17
+import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_SUPERCLASSES as V3_HIDDEN_SUPERCLASSES
+import org.ungoogled.patches.nothinglauncher.v3.SUPER_CONSTRUCTORS as V3_SUPER_CONSTRUCTORS
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
+import org.ungoogled.patches.sony.replacePrivateThemeColors
 
 internal const val NOTHING_LAUNCHER_EXTENSION = "extensions/nothinglauncher.mpe"
 
@@ -36,9 +45,9 @@ private const val BINDER = "Landroid/os/Binder;"
 private const val OBJECT = "Ljava/lang/Object;"
 
 /**
- * Android classes the launcher extends whose constructor an installed app may not call: the public class each subclass
- * is rebased onto, and the interfaces it keeps. Subclasses only debug builds or TVs create (view capture tracing, TV
- * picture-in-picture) keep their base: they are never created here.
+ * Android classes 4.0.20 extends whose constructor an installed app may not call: the public class each subclass is
+ * rebased onto, and the interfaces it keeps. Subclasses only debug builds or TVs create (view capture tracing, TV
+ * picture-in-picture) keep their base: they are never created here. (3.3.14's come generated, see v3/.)
  */
 private val REBASES = mapOf(
     "Landroid/content/IIntentSender\$Stub;" to (BINDER to listOf("Landroid/content/IIntentSender;")),
@@ -84,6 +93,12 @@ private val SETTINGS_CALLS: Map<String, String> = buildMap {
     }
 }
 
+/**
+ * 3.3.14 (Android 15) is the older Launcher3: its lists are generated against Android 15 (v3/NothingLauncher3Members.kt),
+ * and a few of the launcher's own classes have an older shape.
+ */
+private fun isAndroid15Build(version: String?) = version == "3.3.14"
+
 /** Context.getDisplay() on contexts that are not visual (see Windows). */
 private val DISPLAY_CALLS = listOf("Landroid/content/Context;", "Landroid/content/ContextWrapper;").associate { owner ->
     "$owner->getDisplay()Landroid/view/Display;" to "$EXT/Windows;->getDisplay(${owner})Landroid/view/Display;"
@@ -112,6 +127,7 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(NOTHING_LAUNCHER_EXTENSION)
 
     execute {
+        val android15Build = isAndroid15Build(packageMetadata.versionName)
         // On a debuggable ROM the launcher records its views for debugging through system-only tracing (a window
         // manager and trace sources only the system may create); it now takes its release path there too.
         val viewCapture = mutableListOf<Pair<String, String>>()
@@ -138,25 +154,39 @@ private val hiddenApisPatch = bytecodePatch(
                 }
             }
         }
-        // Measured against 4.0.20: one check, in the view capture factory.
+        // Measured against 4.0.20 and 3.3.14: one check, in the view capture factory.
         if (debuggable == 0) throw PatchException("view capture debuggable check not found")
 
         // Settings first: some of its calls are hidden per-user ones, which LocalSettings answers for the app's user.
         val settings = redirectCalls(SETTINGS_CALLS)
         val displays = redirectCalls(DISPLAY_CALLS)
         log.info("display lookups: $displays")
-        // Measured against 4.0.20: 32, the home screen preview's (Customization > Home screen layout) among them.
+        // Measured against 4.0.20: 32, the home screen preview's (Customization > Home screen layout) among them; 3.3.14: 24.
         if (displays == 0) throw PatchException("no Context.getDisplay calls found")
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS,
+            "$EXT/Members;", "$EXT/Hidden;",
+            (if (android15Build) V3_HIDDEN_MEMBERS + V3_HIDDEN_MEMBERS_16_17 else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17) +
+                REFUSED_CALLS,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;",
+            if (android15Build) V3_HIDDEN_CONSTRUCTORS + V3_HIDDEN_CONSTRUCTORS_16_17 else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
         )
-        val rebased = rebaseSubclasses(REBASES)
+        // 3.3.14's widget host extends AppWidgetHost through a hidden constructor; the public one with the same first
+        // arguments is used.
+        val superCalls = if (android15Build) substituteSuperConstructors(V3_SUPER_CONSTRUCTORS) else 0
+        // The view capture's trace sources (perfetto) keep their base, as in 4.0.20: only debug builds create them.
+        val rebased = rebaseSubclasses(
+            if (android15Build) V3_HIDDEN_SUPERCLASSES.filterKeys { !it.startsWith("Landroid/tracing/perfetto/") } else REBASES,
+        )
         skipCastOfNull("$EXT/Hidden;")
-        log.info("settings calls: $settings; hidden members: $calls calls, $fields fields; constructors: $constructors; rebased: $rebased")
-        // Measured against 4.0.20: 63 settings calls, 1,446 calls, 332 field accesses, 90 constructors, 20 rebased classes.
+        log.info(
+            "settings calls: $settings; hidden members: $calls calls, $fields fields; constructors: $constructors; " +
+                "super calls: $superCalls; rebased: $rebased",
+        )
+        // Measured against 4.0.20: 63 settings calls, 1,446 calls, 332 field accesses, 90 constructors, 20 rebased classes;
+        // 3.3.14: 60 settings calls, 1,166 calls, 212 field accesses, 78 constructors, 1 super call, 10 rebased classes.
+        if (android15Build && superCalls == 0) throw PatchException("AppWidgetHost super constructor call not found")
         if (settings < 10) throw PatchException("only $settings settings calls found")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0 || rebased == 0) throw PatchException("hidden constructors not found")
@@ -199,10 +229,9 @@ private val hiddenApisPatch = bytecodePatch(
         // The system launcher reads the window's size, rotation and cutout from hidden parts of the configuration;
         // Launcher3's own answers, made for launchers that are not the system's, are used instead.
         val proxy = mutableClassDefBy("Lcom/android/quickstep/util/SystemWindowManagerProxy;")
-        val own = setOf(
-            "estimateInternalDisplayBounds", "getCurrentBounds", "getRotation", "getStatusBarHeight", "rotateCutout",
-            "showDesktopTaskbarForFreeformDisplay", "showLockedTaskbarOnHome",
-        )
+        val own = setOf("estimateInternalDisplayBounds", "getCurrentBounds", "getRotation", "getStatusBarHeight", "rotateCutout") +
+            // 4.0.20's taskbar answers (3.3.14 has none).
+            if (android15Build) emptySet() else setOf("showDesktopTaskbarForFreeformDisplay", "showLockedTaskbarOnHome")
         val before = proxy.methods.size
         proxy.methods.removeIf { it.name in own }
         if (before - proxy.methods.size != own.size) {
@@ -221,11 +250,14 @@ private val systemPrivilegesPatch = bytecodePatch(
     extendWith(NOTHING_LAUNCHER_EXTENSION)
 
     execute {
+        val android15Build = isAndroid15Build(packageMetadata.versionName)
         val manager = "Lcom/android/launcher3/QuickstepTransitionManager;"
         val wrapper = "Lcom/android/launcher3/util/ActivityOptionsWrapper;"
         val runnables = "Lcom/android/launcher3/util/RunnableList;"
+        // 4.0.20 takes (View, ItemInfo), 3.3.14 the View alone.
         val launchOptions = mutableClassDefBy(manager).methods.firstOrNull {
-            it.name == "getActivityLaunchOptions" && it.parameterTypes.size == 2 && it.returnType == wrapper
+            it.name == "getActivityLaunchOptions" && it.parameterTypes.size in 1..2 &&
+                it.parameterTypes.first().toString() == "Landroid/view/View;" && it.returnType == wrapper
         } ?: throw PatchException("QuickstepTransitionManager.getActivityLaunchOptions not found")
         launchOptions.addInstructionsWithLabels(
             0,
@@ -280,41 +312,64 @@ private val systemPrivilegesPatch = bytecodePatch(
             }
         }
         log.info("app prediction lookups: $gated")
-        // Measured against 4.0.20: 4 lookups.
+        // Measured against 4.0.20 and 3.3.14: 4 lookups.
         if (gated == 0) throw PatchException("no app prediction service lookups found")
 
         // Widgets: the system launcher's widget holder routes each widget's updates through a listener only the system
         // may register, so every widget stayed "Loading...". Without it the launcher uses Launcher3's own holder, which
         // gets its updates the way any home app does (same widget host id, 1024).
         val holder = "Lcom/android/launcher3/widget/LauncherWidgetHolder;"
-        val factory = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder_QuickstepWidgetHolderFactory_Impl;")
-        val bridge = factory.methods.firstOrNull {
-            it.name == "newInstance" && it.returnType == holder && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/content/Context;")
-        } ?: throw PatchException("QuickstepWidgetHolder factory newInstance not found")
-        factory.methods.remove(bridge)
-        factory.methods.add(
-            ImmutableMethod(
-                bridge.definingClass, bridge.name, listOf(ImmutableMethodParameter("Landroid/content/Context;", null, null)),
-                bridge.returnType, bridge.accessFlags, null, null, MutableMethodImplementation(4),
-            ).toMutable().apply {
-                addInstructionsWithLabels(
-                    0,
-                    """
-                        invoke-static { }, $EXT/Launch;->widgetListener()Z
-                        move-result v0
-                        if-eqz v0, :own
-                        invoke-virtual { p0, p1 }, ${factory.type}->newInstance(Landroid/content/Context;)Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder;
-                        move-result-object v0
-                        return-object v0
-                        :own
-                        new-instance v0, $holder
-                        const/16 v1, 0x400
-                        invoke-direct { v0, p1, v1 }, $holder-><init>(Landroid/content/Context;I)V
-                        return-object v0
-                    """,
-                )
-            },
-        )
+        if (android15Build) {
+            // 3.3.14 picks the holder by a feature flag (widget updates in the background): it now also needs the listener.
+            val oldFactory = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder\$QuickstepHolderFactory;")
+            val pick = oldFactory.methods.firstOrNull {
+                it.name == "newInstance" && it.returnType == holder && it.parameterTypes.size == 3
+            } ?: throw PatchException("QuickstepHolderFactory.newInstance not found")
+            val instructions = pick.implementation!!.instructions.toList()
+            val flag = instructions.indexOfFirst {
+                it.opcode == Opcode.SGET_OBJECT &&
+                    ((it as ReferenceInstruction).reference as FieldReference).name == "ENABLE_WIDGET_HOST_IN_BACKGROUND"
+            }
+            val result = (flag + 1 until instructions.size).firstOrNull { instructions[it].opcode == Opcode.MOVE_RESULT }
+            if (flag < 0 || result == null) throw PatchException("QuickstepHolderFactory: background widget host flag not found")
+            val r = (instructions[result] as OneRegisterInstruction).registerA
+            pick.addInstructions(
+                result + 1,
+                """
+                    invoke-static/range { v$r .. v$r }, $EXT/Launch;->widgetHostInBackground(Z)Z
+                    move-result v$r
+                """,
+            )
+        } else {
+            val factory = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder_QuickstepWidgetHolderFactory_Impl;")
+            val bridge = factory.methods.firstOrNull {
+                it.name == "newInstance" && it.returnType == holder && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/content/Context;")
+            } ?: throw PatchException("QuickstepWidgetHolder factory newInstance not found")
+            factory.methods.remove(bridge)
+            factory.methods.add(
+                ImmutableMethod(
+                    bridge.definingClass, bridge.name, listOf(ImmutableMethodParameter("Landroid/content/Context;", null, null)),
+                    bridge.returnType, bridge.accessFlags, null, null, MutableMethodImplementation(4),
+                ).toMutable().apply {
+                    addInstructionsWithLabels(
+                        0,
+                        """
+                            invoke-static { }, $EXT/Launch;->widgetListener()Z
+                            move-result v0
+                            if-eqz v0, :own
+                            invoke-virtual { p0, p1 }, ${factory.type}->newInstance(Landroid/content/Context;)Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder;
+                            move-result-object v0
+                            return-object v0
+                            :own
+                            new-instance v0, $holder
+                            const/16 v1, 0x400
+                            invoke-direct { v0, p1, v1 }, $holder-><init>(Landroid/content/Context;I)V
+                            return-object v0
+                        """,
+                    )
+                },
+            )
+        }
 
         // The home screen menu's "Customization" opens Nothing's wallpaper app, which links to the launcher's own
         // Customization page (grid, icon pack, wallpaper scrolling). Without that app it opens that page directly. The
@@ -328,7 +383,8 @@ private val systemPrivilegesPatch = bytecodePatch(
                 }
             ) jumpers += c.type
         }
-        // Measured against 4.0.20: one, Nothing's activity starter (Launcher3's own OptionsPopupView copy is unused).
+        // Measured against 4.0.20 and 3.3.14: one, Nothing's activity starter (in 4.0.20 Launcher3's own OptionsPopupView
+        // copy has the string too, unused).
         val jumperType = jumpers.singleOrNull()
             ?: throw PatchException("expected one wallpaper intent helper (app_launched_launcher), found $jumpers")
         val jumperClass = mutableClassDefBy(jumperType)
@@ -344,7 +400,7 @@ private val systemPrivilegesPatch = bytecodePatch(
                         ?.let { r -> r.definingClass == jumperType && r.name == wallpaperIntent.name } == true
                 } == true
         }
-        // Measured against 4.0.20: one, the menu's (the Customization page's own entry takes a Context).
+        // Measured against 4.0.20 and 3.3.14: one, the menu's (the Customization page's own entry takes a Context).
         if (menuEntry.size != 1) throw PatchException("expected one Customization menu entry in $jumperType, found ${menuEntry.size}")
         val entry = menuEntry.single()
         val view = if (com.android.tools.smali.dexlib2.AccessFlags.STATIC.isSet(entry.accessFlags)) "p0" else "p1"
@@ -387,12 +443,40 @@ private val systemPrivilegesPatch = bytecodePatch(
 /**
  * Smart App Drawer sorts apps into categories from a database it carries, and asks Nothing's server about the apps that
  * database lacks, sending the app list. Off Nothing OS nobody agreed to that: the server is no longer asked (it answers
- * "nothing new"), and such apps go to "Others".
+ * "nothing new"), and such apps go to "Others". 3.3.14 also carries Firebase (4.0.20 does not): at start it registers
+ * a Firebase installation, Analytics collects on its own and the app uploads the Nothing OS version and build as user
+ * properties. Firebase is no longer started, and that upload is skipped.
  */
 private val offlinePatch = bytecodePatch(
-    description = "Keeps the launcher offline: Smart App Drawer sorts apps on the phone only.",
+    description = "Keeps the launcher offline: Smart App Drawer sorts apps on the phone only, no Firebase.",
 ) {
     execute {
+        if (isAndroid15Build(packageMetadata.versionName)) {
+            // Firebase starts from its content provider (FirebaseApp.initializeApp, which starts Analytics, the
+            // installation and messaging); the provider now starts nothing.
+            val init = mutableClassDefBy("Lcom/google/firebase/provider/FirebaseInitProvider;").methods.firstOrNull {
+                it.name == "onCreate" && it.parameterTypes.isEmpty() && it.returnType == "Z"
+            } ?: throw PatchException("FirebaseInitProvider.onCreate not found")
+            init.addInstructions(0, "const/4 v0, 0x0\nreturn v0")
+
+            val uploads = mutableListOf<Pair<String, String>>()
+            classDefForEach { c ->
+                for (m in c.methods) {
+                    if (m.returnType == "V" && m.implementation?.instructions?.any {
+                            ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "nothing_os_build_number"
+                        } == true
+                    ) uploads += c.type to "${m.name}${m.parameterTypes.joinToString("", "(", ")")}V"
+                }
+            }
+            // The upload would now fail on the missing FirebaseApp (caught); it is skipped before that. Measured against
+            // 3.3.14: one, the Firebase helper's property upload run from the Application.
+            if (uploads.size != 1) throw PatchException("expected one analytics property upload, found ${uploads.size}")
+            val (type, signature) = uploads.single()
+            mutableClassDefBy(type).methods.first {
+                "${it.name}${it.parameterTypes.joinToString("", "(", ")")}${it.returnType}" == signature
+            }.addInstructions(0, "return-void")
+        }
+
         // The Retrofit interface method annotated with the category endpoint.
         var query: Pair<String, String>? = null
         classDefForEach { c ->
@@ -421,7 +505,7 @@ private val offlinePatch = bytecodePatch(
                 ) callers += c.type to "${m.name}${m.parameterTypes.joinToString("", "(", ")")}${m.returnType}"
             }
         }
-        // Measured against 4.0.20: one caller, a suspend function answering a Map of package name to category.
+        // Measured against 4.0.20 and 3.3.14: one caller, a suspend function answering a Map of package name to category.
         if (callers.size != 1) throw PatchException("expected one category request caller, found ${callers.size}")
         val (type, signature) = callers.single()
         val method = mutableClassDefBy(type).methods.first {
@@ -436,6 +520,23 @@ private val offlinePatch = bytecodePatch(
                 return-object v0
             """,
         )
+    }
+}
+
+/**
+ * 3.3.14's layouts and styles name Android 15's private theme colors, which Android 16 and 17 no longer have: it
+ * stopped at start there (the overview's clear-all button). They become colors of the app's own, as for Xperia Home
+ * (see replacePrivateThemeColors; its resource table has 32-bit entry offsets, so Xperia Home's even entry counts are
+ * not needed). 4.0.20 is built for Android 16 and is left as it is.
+ */
+private val themeColorsPatch = resourcePatch(
+    description = "Makes Nothing Launcher 3.3.14's theme colors work on Android 16 and 17.",
+) {
+    execute {
+        if (!isAndroid15Build(packageMetadata.versionName)) return@execute
+        val colors = replacePrivateThemeColors()
+        log.info("private theme colors: $colors")
+        if (colors == 0) throw PatchException("no private theme colors found")
     }
 }
 
@@ -456,6 +557,6 @@ val enableNonNothingOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_NOTHING_LAUNCHER)
-    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, offlinePatch)
+    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, offlinePatch, themeColorsPatch)
     extendWith(NOTHING_LAUNCHER_EXTENSION)
 }

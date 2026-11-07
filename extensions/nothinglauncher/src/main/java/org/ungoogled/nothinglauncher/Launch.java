@@ -77,6 +77,14 @@ public final class Launch {
     }
 
     /**
+     * 3.3.14 (Android 15) chooses the system holder by a feature flag ("widget host in background"): it is used only
+     * where its update listener works, else Launcher3's own holder.
+     */
+    public static boolean widgetHostInBackground(boolean flag) {
+        return flag && widgetListener();
+    }
+
+    /**
      * Whether widget colors can be derived from the wallpaper: the launcher uses Android's hidden color-science class
      * (Cam) and the wallpaper's full color histogram (WallpaperColors.getAllColors), which only the system may use.
      */
