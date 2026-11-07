@@ -126,7 +126,7 @@ of the phone stays on its One UI version.
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|
-| Nothing Gallery | `com.nothing.gallery` | 3.1.3.1019 | 14+ | [APKMirror](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-gallery/nothing-gallery-3-1-3-1019-release/). Bundle. |
+| Nothing Gallery | `com.nothing.gallery` | 3.1.4.1030, 3.1.3.1019 | 14+ | [APKMirror 3.1.4.1030](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-gallery/nothing-gallery-3-1-4-1030-release/), [APKMirror 3.1.3.1019](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-gallery/nothing-gallery-3-1-3-1019-release/). Bundle. |
 | Nothing Recorder | `com.nothing.soundrecorder` | 4.0.0 | 14+ | [APKMirror](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-recorder/nothing-recorder-4-0-0-release/) |
 | Nothing Screenshot | `com.nothing.ntscreenshot` | 14.0.0 | 14+ | [APKMirror](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-screenshot/nothing-screenshot-14-0-0-release/) |
 
