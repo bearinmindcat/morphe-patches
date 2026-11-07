@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.9.3",
+  "version": "2.9.4",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -2002,6 +2002,8 @@
         "BytecodePatch",
         "ResourcePatch",
         "ResourcePatch",
+        "BytecodePatch",
+        "BytecodePatch",
         "BytecodePatch",
         "BytecodePatch",
         "BytecodePatch",
@@ -4758,6 +4760,62 @@
       "options": []
     },
     {
+      "name": "Hide scrollbar option",
+      "description": "Brings back the setting to hide the scroll bar.",
+      "default": true,
+      "category": null,
+      "dependencies": [
+        "ResourcePatch"
+      ],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Hide update badge",
+      "description": "Removes the update red dot from the menu and Settings.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Hide upsells",
       "description": "Hides storage nags and Google One, Gemini and Workspace upgrade offers.",
       "default": true,
@@ -5701,6 +5759,33 @@
       "options": []
     },
     {
+      "name": "Remove address bar blur",
+      "description": "Solid address and bottom bars instead of the blurred gradient.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Remove internet permission",
       "description": "Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working.",
       "default": false,
@@ -5935,6 +6020,33 @@
       "options": []
     },
     {
+      "name": "Remove tab limit",
+      "description": "Removes the 99-tab limit.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Remove telemetry",
       "description": "Stops usage statistics and automatic log reports to OPPO. Root (mount) install only.",
       "default": true,
@@ -6042,6 +6154,33 @@
               "isExperimental": false,
               "minSdk": null,
               "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Remove telemetry",
+      "description": "Stops Samsung's usage logs, analytics, crash reports and autofill crowdsourcing.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
             }
           ]
         }
@@ -6885,6 +7024,33 @@
               "isExperimental": false,
               "minSdk": null,
               "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Theme color on bottom bar",
+      "description": "The page's theme color also colors the bottom address bar and bottom bar.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "com.sec.android.app.sbrowser",
+          "name": "Samsung Internet",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#4049EA",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "31.0.0.79",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 30,
+              "description": "needs Android 11 or newer"
             }
           ]
         }

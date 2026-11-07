@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;180 patches total
+> **[v2.9.4](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;186 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -272,7 +272,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;27 apps&nbsp;&nbsp;•&nbsp;&nbsp;47 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;28 apps&nbsp;&nbsp;•&nbsp;&nbsp;53 patches</summary>
 <br>
 <blockquote>
 
@@ -411,6 +411,23 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Home Up on non-One UI ROMs together with the patched One UI Home. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-internet.png" width="20" height="20" align="top"> Samsung Internet&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-internet.png" width="20" height="20" align="top"> Samsung Internet&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<br>
+
+**Supported version(s):** 31.0.0.79 — needs Android 11 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Hide scrollbar option](#hide-scrollbar-option) | Brings back the setting to hide the scroll bar. |  |
+| [Hide update badge](#hide-update-badge) | Removes the update red dot from the menu and Settings. |  |
+| [Remove address bar blur](#remove-address-bar-blur) | Solid address and bottom bars instead of the blurred gradient. |  |
+| [Remove tab limit](#remove-tab-limit) | Removes the 99-tab limit. |  |
+| [Remove telemetry](#remove-telemetry) | Stops Samsung's usage logs, analytics, crash reports and autofill crowdsourcing. |  |
+| [Theme color on bottom bar](#theme-color-on-bottom-bar) | The page's theme color also colors the bottom address bar and bottom bar. |  |
 
 </details>
 

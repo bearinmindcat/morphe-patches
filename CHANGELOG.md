@@ -1,3 +1,13 @@
+## [2.9.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.3...v2.9.4) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* add samsung internet patches; issue [#152](https://github.com/bearinmindcat/morphe-patches/issues/152) ([1fd1b59](https://github.com/bearinmindcat/morphe-patches/commit/1fd1b59ee06aeeaef5c8b972e36be65537feac13))
+* oneplus system launcher drag and drop on android 11; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([c5de3be](https://github.com/bearinmindcat/morphe-patches/commit/c5de3beb4ebf65cd799bf1584371e7ce6976aaaa))
+* oneplus system launcher keeps the navigation bar on android 11; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([cdf2bf5](https://github.com/bearinmindcat/morphe-patches/commit/cdf2bf5a4ffb60055d2e8ea10a2fa540f1093617))
+* oneplus system launcher wallpaper and icon options; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([ba83bd7](https://github.com/bearinmindcat/morphe-patches/commit/ba83bd7150037633ffe922fc9b1475ab3df2c15d))
+* samsung capture lets touches through while recording on galaxy phones; issue [#145](https://github.com/bearinmindcat/morphe-patches/issues/145) ([b5f73bd](https://github.com/bearinmindcat/morphe-patches/commit/b5f73bd0e2f7ef855b48ed32518866b1e1cf43ba))
+
 ## [2.9.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.2...v2.9.3) (2026-11-07)
 
 ### 🐛 Bug Fixes
