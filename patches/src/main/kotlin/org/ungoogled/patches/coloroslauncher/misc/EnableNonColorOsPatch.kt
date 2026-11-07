@@ -303,4 +303,13 @@ val enableNonColorOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
     dependsOn(versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(COLOROS_LAUNCHER_EXTENSION)
+    // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
+    dependsOn(
+        org.ungoogled.patches.shared.launcherCoexistencePatch(
+            keep = setOf(
+                "com.android.badge", "com.android.launcher.epona", "com.android.launcher.custom.DictProvider",
+                "com.android.launcher.upk.FileProvider",
+            ),
+        ),
+    )
 }

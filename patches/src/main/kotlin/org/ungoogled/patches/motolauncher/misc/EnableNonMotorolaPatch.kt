@@ -352,4 +352,5 @@ val enableNonMotorolaPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_MOTO_LAUNCHER)
     dependsOn(versionCheckPatch, librariesPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(MOTO_LAUNCHER_EXTENSION)
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 }

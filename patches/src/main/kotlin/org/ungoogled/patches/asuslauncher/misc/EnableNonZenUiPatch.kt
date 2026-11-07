@@ -369,4 +369,5 @@ val enableNonZenUiPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_ASUS_LAUNCHER)
     dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, telemetryPatch)
     extendWith(ASUS_LAUNCHER_EXTENSION)
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 }

@@ -447,4 +447,6 @@ val enableNonXperiaPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_XPERIA_HOME)
     dependsOn(versionCheckPatch, librariesPatch, hiddenApisPatch, systemPrivilegesPatch, telemetryPatch)
     extendWith(XPERIA_HOME_EXTENSION)
+    // Sony's badge provider and permissions, which other apps use to show counts on icons.
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch(keep = setOf("com.sonymobile.home.")))
 }

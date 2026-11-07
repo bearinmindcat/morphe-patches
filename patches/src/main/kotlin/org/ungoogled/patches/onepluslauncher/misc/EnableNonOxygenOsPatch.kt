@@ -289,4 +289,5 @@ val enableNonOxygenOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_ONEPLUS_LAUNCHER)
     dependsOn(versionCheckPatch, deviceCheckPatch, hiddenApisPatch, telemetryPatch)
     extendWith(ONEPLUS_LAUNCHER_EXTENSION)
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 }

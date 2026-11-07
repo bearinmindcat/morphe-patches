@@ -375,4 +375,6 @@ val enableNonOneUiPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_SAMSUNG_LAUNCHER)
     dependsOn(versionCheckPatch, resourcesPatch, oneUiMembersPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(SAMSUNG_LAUNCHER_EXTENSION)
+    // Samsung's names exist only on Samsung phones, which have this package themselves; Home Up uses them.
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch(keep = setOf("com.samsung.", "com.sec.", "com.honeyspace.")))
 }

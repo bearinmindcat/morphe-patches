@@ -559,4 +559,5 @@ val enableNonNothingOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_NOTHING_LAUNCHER)
     dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, offlinePatch, themeColorsPatch)
     extendWith(NOTHING_LAUNCHER_EXTENSION)
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 }

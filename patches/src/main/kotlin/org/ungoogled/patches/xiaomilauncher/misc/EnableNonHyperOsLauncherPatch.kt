@@ -419,4 +419,11 @@ val enableNonHyperOsLauncherPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_XIAOMI_LAUNCHER)
     dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, manifestPatch, offlinePatch)
     extendWith(XIAOMI_LAUNCHER_EXTENSION)
+    // The file provider's authority is also built from the package name; on POCO phones the settings authority is POCO's.
+    dependsOn(
+        org.ungoogled.patches.shared.launcherCoexistencePatch(
+            keep = setOf("com.miui.home.fileprovider"),
+            aliases = mapOf("com.mi.android.globallauncher.launcher.settings" to "com.miui.home.launcher.settings"),
+        ),
+    )
 }

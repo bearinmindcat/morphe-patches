@@ -549,6 +549,7 @@ val enableNonMagicOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_HONOR_HOME)
     dependsOn(versionCheckPatch, resourcesPatch, hiddenApisPatch, systemPrivilegesPatch, storagePatch, iconShapePatch, homeStylePatch)
     extendWith(HONOR_HOME_EXTENSION)
+    dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 
     execute {
         val replaced = replaceMagicFrameworkIds("$EXT/Magic;", HOME_CODE_ANSWERS)
