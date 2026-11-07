@@ -12,7 +12,7 @@ object SamsungOneHandConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x22BDC5,
         targets = listOf(
-            AppTarget(version = "9.3.13.0"),
+            AppTarget(version = "9.3.13.0", minSdk = 34, description = "needs Android 14 or newer"),
         ),
     )
 }
