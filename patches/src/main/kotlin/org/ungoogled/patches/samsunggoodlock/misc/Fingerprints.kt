@@ -39,3 +39,8 @@ internal object HttpEngineInitFingerprint : Fingerprint(
     name = "<init>",
     filters = listOf(string("createOkHttpClient")),
 )
+
+/** Hands a downloaded Discover wallpaper to One UI's "Wallpaper and style" (launched for a result). */
+internal object SetAsWallpaperFingerprint : Fingerprint(
+    filters = listOf(string("com.samsung.android.app.dressroom.action.SET_AS_WALLPAPER"), string("hide_chooser")),
+)

@@ -5,19 +5,25 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLa
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsunggoodlock.SamsungGoodLockConstants.COMPATIBILITY_SAMSUNG_GOOD_LOCK
+import org.w3c.dom.Element
 
 internal const val SAMSUNG_GOOD_LOCK_EXTENSION = "extensions/samsunggoodlock.mpe"
 
 private const val EXT = "Lorg/ungoogled/samsunggoodlock"
+private const val EXT_CLASSES = "org.ungoogled.samsunggoodlock"
 
 private val log = java.util.logging.Logger.getLogger("GoodLock")
 
@@ -167,9 +173,78 @@ private val consentPatch = bytecodePatch(
     }
 }
 
+/** Declares WallpaperActivity (see wallpapersPatch) and the permission WallpaperManager needs. */
+private val wallpaperManifestPatch = resourcePatch {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val root = manifest.documentElement
+            val permissions = manifest.getElementsByTagName("uses-permission")
+            val declared = (0 until permissions.length).map { (permissions.item(it) as Element).getAttribute("android:name") }
+            if ("android.permission.SET_WALLPAPER" !in declared) {
+                root.insertBefore(
+                    manifest.createElement("uses-permission").apply { setAttribute("android:name", "android.permission.SET_WALLPAPER") },
+                    manifest.getElementsByTagName("application").item(0),
+                )
+            }
+            val application = manifest.getElementsByTagName("application").item(0) as Element
+            application.appendChild(
+                manifest.createElement("activity").apply {
+                    setAttribute("android:name", "$EXT_CLASSES.WallpaperActivity")
+                    setAttribute("android:exported", "false")
+                    setAttribute("android:excludeFromRecents", "true")
+                    setAttribute("android:theme", "@android:style/Theme.Translucent.NoTitleBar")
+                    setAttribute("android:configChanges", "orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density")
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Discover's wallpapers went to One UI's "Wallpaper and style" (com.samsung.android.app.dressroom), which other phones
+ * do not have: "No Activity found to handle Intent". The intent now goes through Wallpapers.route, which sends it to
+ * WallpaperActivity (Android's WallpaperManager, on the screens picked in Good Lock) where nothing answers it.
+ */
+private val wallpapersPatch = bytecodePatch(
+    description = "Sets Discover wallpapers through Android's wallpaper manager.",
+) {
+    extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
+    dependsOn(wallpaperManifestPatch)
+
+    execute {
+        val method = SetAsWallpaperFingerprint.method
+        val code = method.implementation!!.instructions.toList()
+        // The intent is complete after addFlags; the launcher's launch(intent) is the next non-Android call taking it.
+        val addFlags = code.indexOfLast {
+            val ref = (it as? ReferenceInstruction)?.reference as? MethodReference
+            ref?.definingClass == "Landroid/content/Intent;" && ref.name == "addFlags"
+        }
+        if (addFlags < 0 || code.getOrNull(addFlags + 1)?.opcode != Opcode.MOVE_RESULT_OBJECT) {
+            throw PatchException("no Intent.addFlags(...) in the wallpaper hand-over")
+        }
+        val intent = (code[addFlags + 1] as OneRegisterInstruction).registerA
+        val launch = (addFlags + 2 until code.size).firstOrNull { i ->
+            val insn = code[i]
+            val ref = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: return@firstOrNull false
+            (insn.opcode == Opcode.INVOKE_VIRTUAL || insn.opcode == Opcode.INVOKE_INTERFACE) &&
+                (insn as FiveRegisterInstruction).registerCount == 2 && insn.registerD == intent &&
+                ref.returnType == "V" && ref.parameterTypes.size == 1 &&
+                !ref.definingClass.startsWith("Landroid/") && !ref.definingClass.startsWith("Ljava/")
+        } ?: throw PatchException("no launch(intent) after the wallpaper intent is built")
+        method.addInstructions(
+            launch,
+            """
+                invoke-static/range { v$intent .. v$intent }, $EXT/Wallpapers;->route(Landroid/content/Intent;)Landroid/content/Intent;
+                move-result-object v$intent
+            """,
+        )
+    }
+}
+
 /**
  * Off One UI Good Lock crashes when it opens a module (SemFloatingFeature, One UI's icon calls) and lists only what
- * the Galaxy Store offers the phone. The extension carries stand-ins for the One UI classes it calls.
+ * the Galaxy Store offers the phone. The extension carries stand-ins for the One UI classes it calls. Discover's
+ * wallpapers are set through Android's wallpaper manager (see wallpapersPatch).
  */
 @Suppress("unused")
 val enableNonOneUiPatch = bytecodePatch(
@@ -178,6 +253,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_GOOD_LOCK)
-    dependsOn(oneUiMembersPatch, modulesPatch, consentPatch)
+    dependsOn(oneUiMembersPatch, modulesPatch, consentPatch, wallpapersPatch)
     extendWith(SAMSUNG_GOOD_LOCK_EXTENSION)
 }
