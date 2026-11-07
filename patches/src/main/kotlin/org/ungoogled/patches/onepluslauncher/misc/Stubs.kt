@@ -56,6 +56,14 @@ private fun stubStart(instructions: List<Instruction>): Int {
     return -1
 }
 
+/**
+ * A `synchronized` stub takes its lock before the throw: `monitor-enter p0`, or for a static one `const-class` of its
+ * class and `monitor-enter` on that (getInstance() of OplusResourceManager and 32 more).
+ */
+private fun lockOnly(prologue: List<Instruction>) = prologue.isNotEmpty() &&
+    prologue.last().opcode == Opcode.MONITOR_ENTER &&
+    prologue.all { it.opcode == Opcode.CONST_CLASS || it.opcode == Opcode.MONITOR_ENTER }
+
 /** Smali that zeroes the registers from v1 on for [types], and those registers as a list (after "v0"). */
 private fun zeroArguments(types: List<String>): Pair<String, String> {
     val code = StringBuilder()
@@ -130,10 +138,10 @@ internal fun BytecodePatchContext.neutralizeStubs(): Int {
             val instructions = m.implementation?.instructions?.toList() ?: continue
             val start = stubStart(instructions)
             if (start < 0) continue
-            // Only whole-body stubs: nothing before the throw but a constructor's super() call.
+            // Only whole-body stubs: nothing before the throw but a constructor's super() call or a method's lock.
             if (m.name == "<init>") {
                 if (instructions.take(start).any { it.opcode != Opcode.INVOKE_DIRECT && it.opcode != Opcode.INVOKE_DIRECT_RANGE }) continue
-            } else if (start != 0) continue
+            } else if (start != 0 && !lockOnly(instructions.take(start))) continue
             targets += c.type to m
         }
     }

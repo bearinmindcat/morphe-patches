@@ -187,7 +187,7 @@ private val hiddenApisPatch = bytecodePatch(
         // The OPLUS SDK compile-time stubs the APK carries (846 classes) answer "absent" instead of throwing.
         val stubs = neutralizeStubs()
         log.info("stub methods: $stubs")
-        // Measured against 5.2.66: 7,287 stub methods.
+        // Measured against 5.2.66: 7,320 stub methods.
         if (stubs < 1000) throw PatchException("only $stubs stub methods found")
         // Settings first: some of its calls are hidden per-user ones, which LocalSettings answers for the app's user.
         val settings = redirectCalls(SETTINGS_CALLS)
