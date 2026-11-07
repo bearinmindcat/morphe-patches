@@ -38,6 +38,9 @@ final class Fallbacks {
                     return ((PackageManager) receiver).getApplicationIcon((ApplicationInfo) args[0]);
                 case "Landroid/content/Context;->semCreatePackageContextAsUser(Ljava/lang/String;ILandroid/os/UserHandle;)Landroid/content/Context;":
                     return ((Context) receiver).createPackageContext((String) args[0], (Integer) args[1]);
+                case "Landroid/app/admin/DevicePolicyManager;->semGetAllowStorageCard(Landroid/content/ComponentName;)Z":
+                    // Knox's "SD card allowed" policy; "not allowed" hid every SD card. Android enforces its own.
+                    return Boolean.TRUE;
             }
         } catch (PackageManager.NameNotFoundException | SecurityException | ClassCastException e) {
             return NONE;
