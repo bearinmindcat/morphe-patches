@@ -1,3 +1,9 @@
+## [2.9.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.0...v2.9.1) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* add oneplus documents non-coloros support; issue [#149](https://github.com/bearinmindcat/morphe-patches/issues/149) ([02e71d5](https://github.com/bearinmindcat/morphe-patches/commit/02e71d578db50ef777984d8a4e253e94912eb302))
+
 ## [2.9.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.11...v2.9.0) (2026-11-07)
 
 ### 🐛 Bug Fixes

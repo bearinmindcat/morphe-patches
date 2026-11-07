@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;177 patches total
+> **[v2.9.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;178 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -978,7 +978,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;10 apps&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
+<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;11 apps&nbsp;&nbsp;•&nbsp;&nbsp;12 patches</summary>
 <br>
 <blockquote>
 
@@ -1028,6 +1028,18 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Change package name](#change-package-name) | Installs next to the phone's own Contacts app under its own package name. | • Package name |
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Runs OnePlus Contacts on non-ColorOS ROMs; your default phone app still handles calls. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 17.1.26 — needs Android 15 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Documents installable and usable on non-ColorOS ROMs. |  |
 
 </details>
 

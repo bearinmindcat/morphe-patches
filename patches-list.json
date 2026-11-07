@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. This file is automatically updated when semantic release (release.yml) runs. Manually editing this file can break your releases and break third party tools that use this file.",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "patches": [
     {
       "name": "120 refresh rate",
@@ -1916,6 +1916,33 @@
           "targets": [
             {
               "version": "16.80.15",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 35,
+              "description": "needs Android 15 or newer"
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Enable non-ColorOS ROM support",
+      "description": "Makes OnePlus Documents installable and usable on non-ColorOS ROMs.",
+      "default": true,
+      "category": null,
+      "dependencies": [],
+      "compatiblePackages": [
+        {
+          "packageName": "andes.oplus.documentsreader",
+          "name": "OnePlus Documents",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#26B0F4",
+          "signatures": null,
+          "targets": [
+            {
+              "version": "17.1.26",
               "versionCodes": null,
               "isExperimental": false,
               "minSdk": 35,
