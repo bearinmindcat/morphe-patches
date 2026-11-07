@@ -391,6 +391,37 @@ private val windowsPatch = bytecodePatch(
             addInstruction(add + 1, "invoke-static {}, $EXT/Windows;->raiseRecorderToolbar()V")
         }
 
+        // Window frames: other apps take touches beside the recorder's windows (see Windows.addFittedView).
+        val viewManager = "Landroid/view/ViewManager;"
+        val layoutShape = "(Landroid/view/View;Landroid/view/ViewGroup\$LayoutParams;)V"
+        val windowOwners = mapOf(
+            "$RECORDER/view/FloatingButtonView" to "addFittedView",
+            "$RECORDER/profile/view/camera/FloatingCameraView" to "addFittedView",
+            "$RECORDER/view/RecordedAreaBoundary" to "addFittedView",
+            "$RECORDER/view/CountdownView" to "addPassThroughView",
+            "$RECORDER/partial/PartialRecordingController" to "addPassThroughView",
+        )
+        val windowCalls = mutableMapOf<String, Int>()
+        for ((owner, add) in windowOwners) {
+            val types = mutableListOf<String>()
+            classDefForEach { if (it.type == "$owner;" || it.type.startsWith("$owner\$")) types += it.type }
+            if (types.isEmpty()) throw PatchException("$owner not found")
+            for (type in types) {
+                mapOf(
+                    add to ("$viewManager->addView$layoutShape" to "$EXT/Windows;->$add($viewManager${layoutShape.substring(1)}"),
+                    "update" to ("$viewManager->updateViewLayout$layoutShape" to "$EXT/Windows;->updateViewLayout($viewManager${layoutShape.substring(1)}"),
+                    "remove" to ("$viewManager->removeView(Landroid/view/View;)V" to "$EXT/Windows;->removeView(${viewManager}Landroid/view/View;)V"),
+                    "removeNow" to ("Landroid/view/WindowManager;->removeViewImmediate(Landroid/view/View;)V" to
+                        "$EXT/Windows;->removeViewImmediate(Landroid/view/WindowManager;Landroid/view/View;)V"),
+                ).forEach { (kind, call) -> windowCalls[kind] = (windowCalls[kind] ?: 0) + redirectIn(type, call.first, call.second) }
+            }
+        }
+        log.info("Window calls: $windowCalls")
+        // Measured against 6.2.12: toolbar, pointer tour, selfie view, flex-mode boundary; countdown, partial screen.
+        if ((windowCalls["addFittedView"] ?: 0) < 3 || (windowCalls["addPassThroughView"] ?: 0) < 2) {
+            throw PatchException("recorder windows not found: $windowCalls")
+        }
+
         log.info("Touchable-area listeners: $touchable of ${listeners.size}")
         // Measured against 6.2.12: recorder toolbar, countdown, selfie view, partial recording, pin, GIF crop.
         if (touchable < 3) throw PatchException("only $touchable touchable-area listeners found")
