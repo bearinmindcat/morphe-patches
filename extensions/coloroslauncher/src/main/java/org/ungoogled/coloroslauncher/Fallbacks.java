@@ -39,6 +39,24 @@ final class Fallbacks {
         return Process.myUserHandle().hashCode();
     }
 
+    /**
+     * A UserInfo for a profile of the app's own user: id, empty name, and only the work profile flag (0x20,
+     * FLAG_MANAGED_PROFILE, which makes isManagedProfile() true), from UserManager.isManagedProfile(int), which an
+     * app may ask about its own profiles. Other users: NONE (absent).
+     */
+    private static Object profileInfo(android.os.UserManager users, int id) {
+        boolean own = false;
+        for (UserHandle h : users.getUserProfiles()) own |= h.hashCode() == id;
+        if (!own) return NONE;
+        try {
+            boolean managed = (Boolean) android.os.UserManager.class.getMethod("isManagedProfile", int.class).invoke(users, id);
+            return Class.forName("android.content.pm.UserInfo").getConstructor(int.class, String.class, int.class)
+                    .newInstance(id, "", managed ? 0x20 : 0);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return NONE;
+        }
+    }
+
     private static int displayId(Context c) {
         android.view.Display d = Windows.getDisplay(c);
         return d == null ? android.view.Display.DEFAULT_DISPLAY : d.getDisplayId();
@@ -74,6 +92,10 @@ final class Fallbacks {
                 case "Landroid/content/ContextWrapper;->getUserId()I":
                 case "Landroid/os/UserManager;->getProcessUserId()I":
                     return myUserId();
+                // Any user's details need QUERY_USERS: the launcher asks about each profile (work profile, private
+                // space) at start, to find the work profile. Profiles of the app's own user from public answers.
+                case "Landroid/os/UserManager;->getUserInfo(I)Landroid/content/pm/UserInfo;":
+                    return profileInfo((android.os.UserManager) receiver, (Integer) args[0]);
                 case "Landroid/content/Context;->getDisplayId()I":
                 case "Landroid/content/ContextWrapper;->getDisplayId()I":
                 case "Landroid/app/Activity;->getDisplayId()I":

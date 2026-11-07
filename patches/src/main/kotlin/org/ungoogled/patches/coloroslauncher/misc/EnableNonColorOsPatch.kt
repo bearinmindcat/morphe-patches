@@ -1,5 +1,6 @@
 package org.ungoogled.patches.coloroslauncher.misc
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
@@ -145,6 +146,13 @@ private val olderAndroidResourcesPatch = resourcePatch {
     }
 }
 
+/**
+ * UserManager.getUserInfo needs QUERY_USERS for any user: 16.4.30 asks it about each profile at start (looking for a work
+ * profile) and crashed in a loop on phones with a work profile or private space. It goes through Members, which answers
+ * a profile of the app's own user from public calls (see Fallbacks.profileInfo).
+ */
+private val REFUSED_USER_CALLS = setOf("Landroid/os/UserManager;->getUserInfo(I)Landroid/content/pm/UserInfo;")
+
 /** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
 private class HiddenLists(
     val members: Set<String>,
@@ -201,7 +209,7 @@ private val hiddenApisPatch = bytecodePatch(
         // answer those "absent" where the phone lacks them.
         val java = redirectNewerJavaCalls("$EXT/Java21;")
         if (java == 0) throw PatchException("no newer Java library calls found")
-        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", lists.members)
+        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", lists.members + REFUSED_USER_CALLS)
         val constructors = redirectConstructors(
             "$EXT/Members;", "$EXT/Hidden;", lists.constructors, followMoves = lists.followMoves,
         )
@@ -214,6 +222,21 @@ private val hiddenApisPatch = bytecodePatch(
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0) throw PatchException("hidden constructors not found")
         if (rebased == 0) throw PatchException("no subclasses of hidden Android classes found")
+    }
+}
+
+/**
+ * On a phone with a work profile 16.4.30's first start switches it to drawer mode for OPPO's managed-device (COPE)
+ * layout, without building the drawer's tables: its loader then died on every start and the home screen stayed empty.
+ * It keeps the mode it is in. (15.6.24 builds them: unchanged.)
+ */
+private val workProfilePatch = bytecodePatch {
+    execute {
+        if (packageMetadata.versionName == "15.6.24") return@execute
+        val switch = mutableClassDefBy("Lcom/android/launcher3/aer/ProvisionManager;").methods.firstOrNull {
+            it.name == "switchDrawerModeWhenFirstCOPE" && it.returnType == "V" && it.parameterTypes.isEmpty()
+        } ?: throw PatchException("ProvisionManager.switchDrawerModeWhenFirstCOPE() not found")
+        switch.addInstructions(0, "return-void")
     }
 }
 
@@ -309,7 +332,9 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
-    dependsOn(versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch)
+    dependsOn(
+        versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch, workProfilePatch,
+    )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
     dependsOn(
