@@ -301,7 +301,8 @@ val gmailMicrogSupportPatch = bytecodePatch(
     availability(AvailabilityResolver { installer, _ ->
         if (installer == InstallerType.MOUNT) PatchAvailability.UNAVAILABLE else PatchAvailability.DISABLED
     })
-    dependsOn(gmailMicrogResourcesPatch)
+    // Google's "isn't Play Protect certified" verdict shut microG Gmail down (issue #70).
+    dependsOn(gmailMicrogResourcesPatch, gmailPlayProtectScreenCorePatch)
     extendWith(GMAIL_EXTENSION)
 
     execute {
