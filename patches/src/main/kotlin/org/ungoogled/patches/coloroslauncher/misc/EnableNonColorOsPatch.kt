@@ -2,13 +2,17 @@ package org.ungoogled.patches.coloroslauncher.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
@@ -240,6 +244,59 @@ private val workProfilePatch = bytecodePatch {
     }
 }
 
+/**
+ * Dark or light system bar icons, labels and page dots follow the wallpaper. ColorOS's own system UI shades the
+ * navigation bar to the wallpaper: the launcher never sets its light-bar flag itself, so elsewhere the buttons stayed
+ * white on any wallpaper and looked gone on a light one. Its nav bar check now sets it from the bottom of the wallpaper
+ * (Wallpapers.navigationBar), and its theme follows the wallpaper's dark-text hint on Android 11 as from 12 on. Labels,
+ * page dots and the status bar come from the wallpaper image, which Android doesn't let an installed app read: it gets
+ * one of the wallpaper's colors instead (Wallpapers.getDrawable).
+ */
+private val wallpaperBrightnessPatch = bytecodePatch {
+    execute {
+        val themes = mutableClassDefBy("Lcom/android/launcher3/util/Themes;")
+        val pick = themes.methods.firstOrNull {
+            it.name == "getActivityThemeRes" && it.returnType == "I" &&
+                it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/content/Context;", "I")
+        } ?: throw PatchException("Themes.getActivityThemeRes(Context, int) not found")
+        val gate = pick.implementation!!.instructions.withIndex().filter { (_, insn) ->
+            insn.opcode == Opcode.SGET_BOOLEAN &&
+                ((insn as ReferenceInstruction).reference as FieldReference).let {
+                    it.definingClass == "Lcom/android/launcher3/Utilities;" && it.name == "ATLEAST_S"
+                }
+        }
+        if (gate.size != 1) throw PatchException("Themes.getActivityThemeRes reads Utilities.ATLEAST_S ${gate.size} times")
+        val (index, insn) = gate.single()
+        val register = (insn as OneRegisterInstruction).registerA
+        pick.replaceInstruction(index, if (register < 16) "const/4 v$register, 0x1" else "const/16 v$register, 0x1")
+
+        val resolver = mutableClassDefBy("Lcom/android/launcher/wallpaper/WallpaperResolver;")
+        if (resolver.fields.none { it.name == "mIsNavigationBarBright" } || resolver.fields.none { it.name == "mNavBarHeight" }) {
+            throw PatchException("WallpaperResolver has no mIsNavigationBarBright / mNavBarHeight")
+        }
+        val navigationBar = resolver.methods.firstOrNull {
+            it.name == "resolveNavigationBarBrightness" && it.returnType == "V" &&
+                it.parameterTypes.map { t -> t.toString() } == listOf("Lcom/android/launcher/Launcher;", "Landroid/graphics/Bitmap;")
+        } ?: throw PatchException("WallpaperResolver.resolveNavigationBarBrightness(Launcher, Bitmap) not found")
+        navigationBar.addInstructions(
+            0,
+            """
+                invoke-static { p0, p1, p2 }, $EXT/Wallpapers;->navigationBar(Ljava/lang/Object;Landroid/app/Activity;Landroid/graphics/Bitmap;)V
+                return-void
+            """,
+        )
+
+        val images = redirectCalls(
+            mapOf(
+                "Landroid/app/WallpaperManager;->getDrawable()Landroid/graphics/drawable/Drawable;" to
+                    "$EXT/Wallpapers;->getDrawable(Landroid/app/WallpaperManager;)Landroid/graphics/drawable/Drawable;",
+            ),
+        )
+        log.info("wallpaper images: $images")
+        if (images == 0) throw PatchException("no WallpaperManager.getDrawable() calls found")
+    }
+}
+
 /** What a system home screen may do and an installed app may not. */
 private val systemPrivilegesPatch = bytecodePatch(
     description = "Keeps its options locally and registers widgets with Android's public calls.",
@@ -334,6 +391,7 @@ val enableNonColorOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
     dependsOn(
         versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch, workProfilePatch,
+        wallpaperBrightnessPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.

@@ -166,6 +166,9 @@ final class Older {
                 float one = android.util.TypedValue.applyDimension((Integer) args[0], 1f, (android.util.DisplayMetrics) args[2]);
                 return one == 0f ? 0f : (Float) args[1] / one;
             }
+            // The wallpaper image (Android 14's getDrawable(which); see Wallpapers).
+            case "Landroid/app/WallpaperManager;->getDrawable(I)Landroid/graphics/drawable/Drawable;":
+                return Wallpapers.getDrawable((android.app.WallpaperManager) receiver, (Integer) args[0]);
             // Drawing.
             case "Landroid/graphics/Rect;->inset(Landroid/graphics/Insets;)V": {
                 android.graphics.Rect r = (android.graphics.Rect) receiver;
@@ -190,8 +193,6 @@ final class Older {
             case "Landroid/app/AlarmManager;->canScheduleExactAlarms()Z":
             case "Landroid/os/UserManager;->isUserForeground()Z":
                 return true;
-            case "Landroid/app/WallpaperManager;->getDrawable(I)Landroid/graphics/drawable/Drawable;":
-                return ((android.app.WallpaperManager) receiver).getDrawable();
             case "Landroid/app/WallpaperManager;->getWallpaperInfo(I)Landroid/app/WallpaperInfo;":
                 return ((android.app.WallpaperManager) receiver).getWallpaperInfo();
             case "Landroid/media/session/PlaybackState;->isActive()Z": {
