@@ -107,10 +107,11 @@ val enableNonOneUiPatch = bytecodePatch(
             """,
         ) ?: throw PatchException("Gallery's SUPPORT_SEC_MP_ORIENTATION_TAG feature has no getEnabling()")
 
-        // A mirrored photo's embedded EXIF thumbnail need not be mirrored the way the photo is (GrapheneOS Camera's
-        // selfies): the grid and the viewer's first frame, made from it, showed the selfie the other way round and the
-        // viewer flipped when the photo itself was decoded. Gallery gets no embedded thumbnail for mirrored photos (it
-        // decodes the photo instead), and their cached thumbnails get keys of their own.
+        // A selfie's embedded EXIF thumbnail need not be mirrored the way the photo is (GrapheneOS Camera mirrors by EXIF
+        // orientation, other cameras mirror the pixels but keep an unmirrored thumbnail): the grid and the viewer's first
+        // frame, made from it, showed the selfie the other way round and the viewer flipped when the photo itself was
+        // decoded. Gallery gets no embedded thumbnail for photos saved mirrored or whose thumbnail does not match the
+        // photo (it decodes the photo instead), and cached thumbnails of JPEGs get keys of their own.
         val exifThumbnails = redirectCalls(
             mapOf(
                 "$EXIF_INTERFACE->getThumbnail()[B" to "$MIRRORED_PHOTOS->thumbnail(Ljava/lang/Object;)[B",
