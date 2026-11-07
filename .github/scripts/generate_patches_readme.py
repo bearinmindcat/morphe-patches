@@ -56,7 +56,7 @@ VENDOR_GROUPS = [
     ("LG Apps", "lg ", ("com.lge.",), ("com.android.gallery3d",)),
     # OPPO's ColorOS, also OnePlus's OxygenOS and realme UI: apps carry the OnePlus or OPPO name.
     ("ColorOS Apps", ("oneplus ", "oppo ", "coloros ", "realme "),
-     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo."), ("com.android.contacts",)),
+     ("com.oneplus.", "net.oneplus.", "com.coloros.", "com.oplus.", "com.oppo.", "andes.oplus."), ("com.android.contacts",)),
     # Sony's apps: Xperia's own (com.sonymobile.*) and the older Sony Ericsson names Album still carries.
     ("Sony Apps", "sony ", ("com.sonymobile.", "com.sony.", "com.sonyericsson."), ()),
 ]
