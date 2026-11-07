@@ -10,11 +10,16 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * What One UI adds to Android's own classes (methods and fields named sem..., SEM_...), used where the phone has
- * it and answered as "not there" where it does not: a skipped call, 0 / false / null, or for a call that returns
- * its own object (a builder) that object. The patch sends every such call and field access in the app here, through
- * a small generated method per member; the key names the member as dex does: "Lowner;->name(params)return" or
- * "Lowner;->name:type".
+ * What One UI adds to Android's own classes (methods and fields named sem..., SEM_...) and One UI's own framework
+ * classes (SemStatusBarManager, SemDvfsManager, ...), used where the phone has them and answered as "not there" where
+ * it does not: a skipped call, 0 / false / null, or for a call that returns its own object (a builder) that object.
+ * The patch sends every such call and field access in the app here, through a small generated method per member; the
+ * key names the member as dex does: "Lowner;->name(params)return" or "Lowner;->name:type".
+ *
+ * On a Galaxy phone the members are there, but this copy is a regular app signed with another key: what needs
+ * Samsung's signature or a privileged permission is refused (SecurityException). Such members are never used
+ * (Fallbacks.always: this copy's own way, as everywhere else), and any other refused call answers as if the member
+ * were missing, instead of stopping the app.
  */
 public final class OneUi {
     private static final String TAG = "UA";
@@ -105,23 +110,34 @@ public final class OneUi {
         return null;
     }
 
-    private static RuntimeException rethrow(InvocationTargetException e) {
-        Throwable cause = e.getCause();
-        if (cause instanceof RuntimeException) return (RuntimeException) cause;
-        if (cause instanceof Error) throw (Error) cause;
-        return new RuntimeException(cause);
+    private static final java.util.Set<String> REFUSED = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    /** Throws [t] as it is, checked or not, so the app's own catch blocks see what a direct call would have thrown. */
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> RuntimeException sneaky(Throwable t) throws T {
+        throw (T) t;
+    }
+
+    private static Object missing(Object receiver, String key, Object[] args) {
+        Object answer = Fallbacks.call(receiver, key, args);
+        return answer != Fallbacks.NONE ? answer : absent(receiver, key);
     }
 
     public static Object call(Object receiver, String key, Object[] args) {
+        Object always = Fallbacks.always(receiver, key, args);
+        if (always != Fallbacks.NONE) return always;
         Object m = member(key);
-        if (m == MISSING) {
-            Object answer = Fallbacks.call(receiver, key, args);
-            return answer != Fallbacks.NONE ? answer : absent(receiver, key);
-        }
+        if (m == MISSING) return missing(receiver, key, args);
         try {
             return ((Method) m).invoke(receiver, args);
         } catch (InvocationTargetException e) {
-            throw rethrow(e);
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof SecurityException) {
+                // Samsung's own copy may; this one may not.
+                if (REFUSED.add(key)) Log.w(Projection.TAG, "One UI refused " + key + ": " + cause.getMessage());
+                return missing(receiver, key, args);
+            }
+            throw OneUi.<RuntimeException>sneaky(cause);
         } catch (IllegalAccessException e) {
             return absent(receiver, key);
         }

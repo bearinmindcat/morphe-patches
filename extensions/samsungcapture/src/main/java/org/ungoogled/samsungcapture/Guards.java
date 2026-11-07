@@ -1,12 +1,19 @@
 package org.ungoogled.samsungcapture;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.UserHandle;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-/** Calls One UI lets its preinstalled Samsung capture make and Android refuses a regular app. */
+/**
+ * Calls One UI lets its preinstalled Samsung capture make and Android refuses a regular app. On a Galaxy phone
+ * Samsung's services (AI, Bixby, OCR, capture plugin, ...) are there but bound to Samsung's signature: starting or
+ * binding one throws SecurityException for this copy, which is now the same as their being absent.
+ */
 public final class Guards {
     private Guards() {
     }
@@ -53,5 +60,54 @@ public final class Guards {
         } catch (SecurityException e) {
             return TelephonyManager.CALL_STATE_IDLE;
         }
+    }
+
+    private static void refused(String what, Intent intent, SecurityException e) {
+        ComponentName component = intent == null ? null : intent.getComponent();
+        Log.w(Projection.TAG, what + " refused: " + (component != null ? component.flattenToShortString()
+                : intent != null ? intent.getAction() + " " + intent.getPackage() : null) + ": " + e.getMessage());
+    }
+
+    public static ComponentName startService(Context context, Intent intent) {
+        try {
+            return context.startService(intent);
+        } catch (SecurityException e) {
+            refused("startService", intent, e);
+            return null;
+        }
+    }
+
+    public static ComponentName startForegroundService(Context context, Intent intent) {
+        try {
+            return context.startForegroundService(intent);
+        } catch (SecurityException e) {
+            refused("startForegroundService", intent, e);
+            return null;
+        }
+    }
+
+    public static boolean bindService(Context context, Intent intent, ServiceConnection connection, int flags) {
+        try {
+            return context.bindService(intent, connection, flags);
+        } catch (SecurityException e) {
+            refused("bindService", intent, e);
+            return false;
+        }
+    }
+
+    public static boolean bindService(Context context, Intent intent, int flags, java.util.concurrent.Executor executor,
+                                      ServiceConnection connection) {
+        try {
+            return context.bindService(intent, flags, executor, connection);
+        } catch (SecurityException e) {
+            refused("bindService", intent, e);
+            return false;
+        }
+    }
+
+    /** Context.bindServiceAsUser (hidden): this copy's own user is the only one it may bind in. */
+    public static boolean bindServiceAsUser(Context context, Intent intent, ServiceConnection connection, int flags,
+                                            UserHandle user) {
+        return bindService(context, intent, connection, flags);
     }
 }

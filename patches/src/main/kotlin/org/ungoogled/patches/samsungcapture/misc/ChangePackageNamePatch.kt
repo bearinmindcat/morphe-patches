@@ -24,9 +24,9 @@ private val renamed = mutableMapOf<String, String>()
  * a build without the screen recorder), and a re-signed copy can't replace it. This installs the patched one next to
  * it under its own package name.
  *
- * Moves with the package: the package itself (and the process named after it), the provider authorities and the
- * permissions it declares (and their uses), and in code every string that names one of those or the package, so the
- * app still finds its own components and providers rather than the system copy's. Component class names stay, since
+ * Moves with the package: the package itself (and the processes named after it), the provider authorities and the
+ * permissions it declares (and their uses), and in code every string that names one of those, the package or one of
+ * its processes, so the app still finds its own components, processes and providers rather than the system copy's. Component class names stay, since
  * the classes do not move.
  */
 @Suppress("unused")
@@ -112,9 +112,14 @@ val changePackageNamePatch = bytecodePatch(
     )
 
     execute {
-        // Exact names, and content:// URIs built on them.
+        val old = STOCK_PACKAGE
+        val new = renamed.getValue(old)
+        // Exact names, content:// URIs built on them, the app's process names ("<package>:screenrecorder") and its
+        // android.resource:// URIs.
         fun rename(s: String): String? {
             renamed[s]?.let { return it }
+            if (s.startsWith("$old:")) return new + s.substring(old.length)
+            if (s.startsWith("android.resource://$old/")) return "android.resource://$new/" + s.substring("android.resource://$old/".length)
             if (s.startsWith("content://")) {
                 val rest = s.removePrefix("content://")
                 val hit = renamed.keys.filter { rest == it || rest.startsWith("$it/") }.maxByOrNull { it.length } ?: return null

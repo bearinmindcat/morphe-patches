@@ -2,6 +2,9 @@ package org.ungoogled.samsungcapture;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.database.ContentObserver;
+import android.database.Cursor;
+import android.os.CancellationSignal;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -11,8 +14,9 @@ import android.util.Log;
  * Writes and calls to content providers in Samsung capture. Several are One UI's own (Samsung's media provider
  * "secmedia", which the editor tells about every saved picture; Bixby, Routines and settings providers): off One UI
  * they are missing and Android throws ("Unknown URL"), which crashed the editor right after it had saved; on a One UI
- * phone some refuse an app that is not Samsung's. Such a write or call is now skipped (null / 0); Android's own
- * providers (MediaStore, where recordings and pictures are saved) answer as before.
+ * phone they are there but refuse an app that is not Samsung's (SecurityException). Such a query, write or call is now
+ * skipped (null / 0), and a refused watch is not set up; Android's own providers (MediaStore, where recordings and
+ * pictures are saved) answer as before.
  */
 public final class Providers {
     private Providers() {
@@ -60,6 +64,36 @@ public final class Providers {
         } catch (IllegalArgumentException | SecurityException e) {
             if (skippable(uri, e)) return null;
             throw e;
+        }
+    }
+
+    public static Cursor query(ContentResolver resolver, Uri uri, String[] projection, String selection, String[] args,
+                               String order) {
+        try {
+            return resolver.query(uri, projection, selection, args, order);
+        } catch (IllegalArgumentException | SecurityException e) {
+            if (skippable(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    public static Cursor query(ContentResolver resolver, Uri uri, String[] projection, Bundle queryArgs,
+                               CancellationSignal signal) {
+        try {
+            return resolver.query(uri, projection, queryArgs, signal);
+        } catch (IllegalArgumentException | SecurityException e) {
+            if (skippable(uri, e)) return null;
+            throw e;
+        }
+    }
+
+    /** Since Android 14 watching a provider the app may not read (or that is missing) throws. */
+    public static void registerContentObserver(ContentResolver resolver, Uri uri, boolean descendants,
+                                               ContentObserver observer) {
+        try {
+            resolver.registerContentObserver(uri, descendants, observer);
+        } catch (SecurityException e) {
+            Log.w(Projection.TAG, "provider " + (uri == null ? null : uri.getAuthority()) + " not watched: " + e.getMessage());
         }
     }
 }

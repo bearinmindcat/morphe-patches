@@ -11,11 +11,13 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.samsung.redirectMembers
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsungcapture.SamsungCaptureConstants.COMPATIBILITY_SAMSUNG_CAPTURE
@@ -156,6 +158,55 @@ private val oneUiMembersPatch = bytecodePatch(
     }
 }
 
+/** One UI's own framework classes the app uses (stand-ins in the extension off One UI, Samsung's own on a Galaxy). */
+private val ONE_UI_CLASS = Regex(
+    "^L(com/samsung/(advmmutils|audio|objectremovallib)/|com/samsung/android/(app/Sem|cocktailbar/|content/smartclip/|" +
+        "cover/|desktopmode/|feature/|infoextraction/|knox/|media/|os/|sume/|tsp/|view/Sem|widget/Sem)|" +
+        "android/[a-z/]+/(Sem|[A-Za-z]+\\\$Sem))",
+)
+
+/**
+ * On a Galaxy phone One UI's framework classes are Samsung's own, and several of their calls answer only Samsung's
+ * signature or privileged permissions: closing the shade (SemStatusBarManager, STATUS_BAR), watching tasks
+ * (SemActivityTaskManager), performance boosts (SemDvfsManager), playback-capture volume (SemHiddenSoundManager), ...
+ * Each refusal (SecurityException) stopped the app; off One UI the stand-ins never refuse. Every call into those
+ * classes now goes through OneUi (see redirectMembers), which answers a refused call as if the class had nothing to
+ * offer. Classes the app itself extends or implements keep their direct calls (super calls must stay).
+ */
+private val oneUiClassesPatch = bytecodePatch(
+    description = "Keeps One UI's framework classes from stopping the app where they refuse it.",
+) {
+    dependsOn(oneUiMembersPatch)
+    extendWith(SAMSUNG_CAPTURE_EXTENSION)
+
+    execute {
+        fun framework(type: String) = ONE_UI_CLASS.containsMatchIn(type)
+        val inherited = mutableSetOf<String>()
+        val virtual = mutableSetOf<String>()
+        val superCalls = mutableSetOf<String>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/") || framework(c.type)) return@classDefForEach
+            (listOfNotNull(c.superclass) + c.interfaces).filter(::framework).forEach { inherited += it }
+            for (m in c.methods) {
+                for (insn in m.implementation?.instructions ?: continue) {
+                    val ref = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: continue
+                    if (!framework(ref.definingClass) || ref.name == "<init>") continue
+                    val key = "${ref.definingClass}->${ref.name}(${ref.parameterTypes.joinToString("")})${ref.returnType}"
+                    when (insn.opcode) {
+                        Opcode.INVOKE_SUPER, Opcode.INVOKE_SUPER_RANGE, Opcode.INVOKE_DIRECT, Opcode.INVOKE_DIRECT_RANGE -> superCalls += key
+                        else -> virtual += key
+                    }
+                }
+            }
+        }
+        val keys = virtual.filter { key -> key !in superCalls && inherited.none { key.startsWith("$it->") } }.toSet()
+        val (calls, _) = redirectMembers("$EXT/OneUi;", "$EXT/SamsungClasses;", keys) { _, _ -> false }
+        log.info("One UI framework class calls: $calls (${keys.size} members)")
+        // Measured against 6.2.12: 516 calls to 189 members.
+        if (calls < 300) throw PatchException("only $calls calls into One UI framework classes found")
+    }
+}
+
 private fun BytecodePatchContext.method(type: String, name: String, predicate: (MutableMethod) -> Boolean = { true }) =
     (mutableClassDefByOrNull(type) ?: throw PatchException("$type not found")).methods
         .firstOrNull { it.name == name && predicate(it) } ?: throw PatchException("$type.$name not found")
@@ -265,6 +316,12 @@ private val recordingPatch = bytecodePatch(
             )
         }
         method(RECORDER_SERVICE, "onDestroy").addInstruction(0, "invoke-static {}, $PROJECTION->release()V")
+
+        // Partial-screen recording (One UI 8.5 and newer) first fits its frame to what is on screen, from a screenshot
+        // only the system may take: off One UI the screenshot is missing, on a Galaxy phone refused, and the empty
+        // picture stopped the recorder. The frame now starts where Samsung puts it without that hint.
+        method("$RECORDER/partial/PartialRecordingController;", "extractHeroRect") { it.parameterTypes.isEmpty() }
+            .addInstruction(0, "return-void")
     }
 }
 
@@ -345,8 +402,9 @@ private val windowsPatch = bytecodePatch(
  * Calls One UI allows its preinstalled Samsung capture and Android refuses a regular app (extension Guards):
  * CLOSE_SYSTEM_DIALOGS broadcasts (system only since Android 12; the editor sent one opening) are skipped, and the
  * recorder's call-state watch (READ_PHONE_STATE; starting a recording crashed) is skipped where it is refused, and
- * writes to One UI's own providers the phone lacks or refuses (Samsung's media provider: the editor crashed after
- * saving) are skipped (extension Providers).
+ * queries, writes and watches of One UI's own providers the phone lacks or refuses (Samsung's media provider: the
+ * editor crashed after saving) are skipped (extension Providers). On a Galaxy phone One UI's services and providers
+ * are there but answer only Samsung's own signature: a refused start, bind, query or watch now counts as absent.
  */
 private val guardsPatch = bytecodePatch(
     description = "Keeps Samsung capture's system-only calls from crashing it.",
@@ -366,6 +424,22 @@ private val guardsPatch = bytecodePatch(
                     "$EXT/Guards;->getCallState(Landroid/telephony/TelephonyManager;)I",
             ),
         )
+        val context = "Landroid/content/Context;"
+        val services = redirectCalls(
+            listOf(
+                "startService(Landroid/content/Intent;)Landroid/content/ComponentName;",
+                "startForegroundService(Landroid/content/Intent;)Landroid/content/ComponentName;",
+                "bindService(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z",
+                "bindService(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z",
+                "bindServiceAsUser(Landroid/content/Intent;Landroid/content/ServiceConnection;ILandroid/os/UserHandle;)Z",
+            ).associate { shape ->
+                "$context->$shape" to "$EXT/Guards;->${shape.substringBefore('(')}($context${shape.substringAfter('(')}"
+            },
+        )
+        log.info("Service starts and binds: $services")
+        // Measured against 6.2.12: 44 service starts and binds.
+        if (services < 30) throw PatchException("only $services service starts and binds found")
+
         val resolver = "Landroid/content/ContentResolver;"
         val providers = redirectCalls(
             listOf(
@@ -373,13 +447,16 @@ private val guardsPatch = bytecodePatch(
                 "update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I",
                 "delete(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I",
                 "call(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Landroid/os/Bundle;",
+                "query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;",
+                "query(Landroid/net/Uri;[Ljava/lang/String;Landroid/os/Bundle;Landroid/os/CancellationSignal;)Landroid/database/Cursor;",
+                "registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V",
             ).associate { shape ->
                 "$resolver->$shape" to "$EXT/Providers;->${shape.substringBefore('(')}($resolver${shape.substringAfter('(')}"
             },
         )
         log.info("Provider writes and calls: $providers")
-        // Measured against 6.2.12: 21 inserts, 12 updates, 10 deletes, 48 calls.
-        if (providers < 40) throw PatchException("only $providers provider writes and calls found")
+        // Measured against 6.2.12: 158 (21 inserts, 12 updates, 10 deletes, 48 calls, the rest queries and watches).
+        if (providers < 100) throw PatchException("only $providers provider queries, writes, calls and watches found")
         log.info("Guarded calls: $guarded")
         // Measured against 6.2.12: 50 broadcasts, 6 call-state watches, 4 call-state reads.
         if (guarded < 30) throw PatchException("only $guarded guarded calls found")
@@ -493,6 +570,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_CAPTURE)
-    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, settingsPatch, recordingPatch, windowsPatch, guardsPatch, telemetryPatch)
+    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, oneUiClassesPatch, settingsPatch, recordingPatch, windowsPatch, guardsPatch, telemetryPatch)
     extendWith(SAMSUNG_CAPTURE_EXTENSION)
 }
