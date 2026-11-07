@@ -48,9 +48,36 @@ final class Fallbacks {
         }
     }
 
+    /**
+     * The running tasks the system's task manager would list: an installed app gets them from ActivityManager, which
+     * lists its own (the home screen asks whether it is itself in front).
+     */
+    private static Object runningTasks(int max) {
+        Context c = App.context();
+        android.app.ActivityManager am = c == null ? null : c.getSystemService(android.app.ActivityManager.class);
+        return am == null ? new ArrayList<>() : am.getRunningTasks(max);
+    }
+
+    private static android.util.Size windowSize() {
+        Context c = App.context();
+        android.view.WindowManager wm = c == null ? null : c.getSystemService(android.view.WindowManager.class);
+        if (wm == null) return new android.util.Size(0, 0);
+        android.graphics.Rect bounds = wm.getMaximumWindowMetrics().getBounds();
+        return new android.util.Size(bounds.width(), bounds.height());
+    }
+
     static Object call(Object receiver, String key, Object[] args) {
         try {
             switch (key) {
+                case "Landroid/view/WindowInsets;->getFrame()Landroid/util/Size;":
+                    // Android 14's size of the window the insets belong to: on Android 13 the home screen's window,
+                    // which fills the display.
+                    return windowSize();
+                case "Landroid/app/ActivityTaskManager;->getTasks(I)Ljava/util/List;":
+                case "Landroid/app/ActivityTaskManager;->getTasks(IZ)Ljava/util/List;":
+                case "Landroid/app/ActivityTaskManager;->getTasks(IZZ)Ljava/util/List;":
+                case "Landroid/app/ActivityTaskManager;->getTasks(IZZI)Ljava/util/List;":
+                    return runningTasks((Integer) args[0]);
                 case "Landroid/os/UserHandle;->semGetMyUserId()I":
                 case "Landroid/app/ActivityManager;->semGetCurrentUser()I":
                     return Process.myUid() / 100000;
@@ -122,6 +149,20 @@ final class Fallbacks {
         return NONE;
     }
 
+    /**
+     * Calls that must not reach the phone with what the port could give them: a fold state listener only the system may
+     * create is null here (One UI Home 16.0 registers it directly), and the device state service would call it.
+     */
+    static boolean skipped(String key, Object[] args) {
+        switch (key) {
+            case "Landroid/hardware/devicestate/DeviceStateManager;->registerCallback(Ljava/util/concurrent/Executor;Landroid/hardware/devicestate/DeviceStateManager$DeviceStateCallback;)V":
+                return args[1] == null;
+            case "Landroid/hardware/devicestate/DeviceStateManager;->unregisterCallback(Landroid/hardware/devicestate/DeviceStateManager$DeviceStateCallback;)V":
+                return args[0] == null;
+        }
+        return false;
+    }
+
     /** Objects of classes an installed app may not construct, from their public equivalents. */
     static Object construct(String key, Object[] args) {
         switch (key) {
@@ -133,8 +174,12 @@ final class Fallbacks {
         return NONE;
     }
 
-    static Object get(String key) {
+    static Object get(Object receiver, String key) {
         switch (key) {
+            case "Landroid/app/ActivityManager$MemoryInfo;->advertisedMem:J":
+                // Android 14's "memory on the box"; Android 13 has only the total the system sees (without it the home
+                // screen took every phone for a low-memory one).
+                return ((android.app.ActivityManager.MemoryInfo) receiver).totalMem;
             case "Landroid/os/UserHandle;->SEM_ALL:Landroid/os/UserHandle;":
                 return user(-1);
             case "Landroid/os/UserHandle;->SEM_CURRENT:Landroid/os/UserHandle;":

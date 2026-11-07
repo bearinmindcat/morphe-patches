@@ -4,6 +4,10 @@ package com.android.app.tracing;
 public class TraceUtilsKt {
     public static void beginSlice(long p0, java.lang.String p1) {
     }
+    public static void beginSlice(java.lang.String p0) {
+    }
+    public static void endSlice() {
+    }
     public static void endSlice(long p0) {
     }
 }

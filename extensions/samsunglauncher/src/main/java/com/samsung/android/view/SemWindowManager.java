@@ -20,6 +20,9 @@ public class SemWindowManager {
     }
     public void registerSystemKeyEvent(int p0, android.content.ComponentName p1, int p2) {
     }
+    public boolean requestSystemKeyEvent(int p0, android.content.ComponentName p1, boolean p2) {
+        return false;
+    }
     public android.graphics.Bitmap screenshot(int p0, int p1, boolean p2, android.graphics.Rect p3, int p4, int p5, boolean p6) {
         return null;
     }

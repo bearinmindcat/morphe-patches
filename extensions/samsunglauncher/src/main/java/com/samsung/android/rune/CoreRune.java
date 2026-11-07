@@ -7,6 +7,7 @@ public class CoreRune {
     public static boolean FW_SHELL_TRANSITION_RAPID_LAUNCH;
     public static boolean FW_SHELL_TRANSITION_REMOTE;
     public static boolean FW_SHELL_TRANSITION_TRANSIENT_LAUNCH_OVERLAY;
+    public static boolean FW_WORKAROUND_RESPONSE_SPEED;
     public static boolean MW_MULTI_SPLIT_RECENT_TASKS;
     public static boolean MW_PARALLEL_MULTI_SPLIT;
     public static boolean MW_PIP_BUG_FIX;

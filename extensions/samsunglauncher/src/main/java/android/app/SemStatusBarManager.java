@@ -4,6 +4,8 @@ package android.app;
 public class SemStatusBarManager {
     public void collapsePanels() {
     }
+    public void disable(int p0) {
+    }
     public boolean isPanelExpanded() {
         return false;
     }

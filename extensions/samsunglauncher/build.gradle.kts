@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.samsunglauncher"
 
     defaultConfig {
-        // One UI Home 18.0 itself requires Android 15 (API 35).
-        minSdk = 35
+        // One UI Home 16.0 runs on Android 13 (API 33), 18.0 on Android 15. Not higher: the dexer drops version checks
+        // below minSdk.
+        minSdk = 33
     }
 }
 

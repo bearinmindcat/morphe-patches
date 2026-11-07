@@ -7,6 +7,9 @@ public class SemUiSupportService extends android.app.Service {
     }
     public SemUiSupportService() {
     }
+    public android.view.WindowManager.LayoutParams createLayoutParams() {
+        return null;
+    }
     public boolean dispatchGenericMotionEvent(android.view.MotionEvent p0) {
         return false;
     }
@@ -25,5 +28,7 @@ public class SemUiSupportService extends android.app.Service {
     public void onCreate() {
     }
     public void setContentView(android.view.View p0) {
+    }
+    public void stopUiSupportService() {
     }
 }

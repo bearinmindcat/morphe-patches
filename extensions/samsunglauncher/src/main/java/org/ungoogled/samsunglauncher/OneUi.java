@@ -113,6 +113,7 @@ public final class OneUi {
     }
 
     public static Object call(Object receiver, String key, Object[] args) {
+        if (Fallbacks.skipped(key, args)) return absent(receiver, key);
         Object m = member(key);
         if (m == MISSING) {
             Object answer = Fallbacks.call(receiver, key, args);
@@ -137,7 +138,7 @@ public final class OneUi {
     public static Object get(Object receiver, String key) {
         Object f = member(key);
         if (f == MISSING) {
-            Object answer = Fallbacks.get(key);
+            Object answer = Fallbacks.get(receiver, key);
             return answer != Fallbacks.NONE ? answer : absent(receiver, key);
         }
         try {

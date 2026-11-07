@@ -2,6 +2,8 @@ package com.samsung.android.widget;
 
 /** Generated stand-in (.github/scripts/samsung-standins): names and signatures One UI Home uses, answering "absent" off One UI (no Samsung code). */
 public class SemTipPopup {
+    public SemTipPopup(android.view.View p0) {
+    }
     public SemTipPopup(android.view.View p0, int p1) {
     }
     public void dismiss(boolean p0) {
