@@ -369,6 +369,11 @@ APP_RENAMES = {
         '<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts',
         '<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts',
     ),
+    # OnePlus Documents (ColorOS / OxygenOS documents reader, issue #149)
+    "andes.oplus.documentsreader": (
+        '<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents',
+        '<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents',
+    ),
     # OnePlus System Launcher (ColorOS / OxygenOS 16 home screen, coloros-launcher)
     "com.android.launcher": (
         '<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher',

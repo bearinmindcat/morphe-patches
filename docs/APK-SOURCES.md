@@ -200,6 +200,7 @@ More detail (EROFS images, other partitions): [`tools/firmware/README.md`](../to
 | OnePlus Clock | `com.oneplus.deskclock` | 16.19.8 | 9+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-clock/oneplusclock-16-19-8-release/) |
 | OnePlus Compass | `com.coloros.compass2` | 17.0.0 | 10+ | [APKMirror](https://www.apkmirror.com/apk/oppo/compass-5/coloros-compass-17-0-0-release/) |
 | OnePlus Contacts | `com.android.contacts` | 16.80.15 | 15+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-contacts-4/oneplus-contacts-16-80-15-release/) (not the Xiaomi app with the same package name) |
+| OnePlus Documents | `andes.oplus.documentsreader` | 17.1.26 | 15+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/quick-preview/documents-17-1-26-release/documents-17-1-26-android-apk-download/) (the international build, uploaded October 24, 2026; the release's other 17.1.26 variant is the China build, which works too) |
 | OnePlus My Files | `com.oneplus.filemanager` | 16.12.4 | 10+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-file-manager/oneplus-my-files-16-12-4-release/) |
 | OnePlus Notes | `com.oneplus.note` | 16.6.14 | 12+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-notes/oneplus-notes-16-6-14-release/) |
 | OnePlus Photos | `com.oneplus.gallery` | 16.45.2 | 13+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-gallery/oneplus-photos-16-45-2-release/) |
