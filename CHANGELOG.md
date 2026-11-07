@@ -1,3 +1,9 @@
+## [2.9.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.2...v2.9.3) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* oneplus camera without telemetry or background running (root mount install) ([725b8c6](https://github.com/bearinmindcat/morphe-patches/commit/725b8c6aac9adbbd62497409316479d25062d6e7))
+
 ## [2.9.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.1...v2.9.2) (2026-11-07)
 
 ### 🐛 Bug Fixes

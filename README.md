@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;178 patches total
+> **[v2.9.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;180 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -978,7 +978,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;11 apps&nbsp;&nbsp;•&nbsp;&nbsp;12 patches</summary>
+<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;12 apps&nbsp;&nbsp;•&nbsp;&nbsp;14 patches</summary>
 <br>
 <blockquote>
 
@@ -991,6 +991,17 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Calculator installable and usable on non-ColorOS ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [No background running](#no-background-running) | Stops the camera's processing service once photos are saved. Root (mount) install only. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics and automatic log reports to OPPO. Root (mount) install only. |  |
 
 </details>
 
