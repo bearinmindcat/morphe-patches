@@ -10,6 +10,9 @@ public class OplusZoomWindowManager {
     public static com.oplus.zoomwindow.OplusZoomWindowManager getInstance() {
         return new com.oplus.zoomwindow.OplusZoomWindowManager();
     }
+    public boolean isSupportZoomMode(java.lang.String p0, int p1, java.lang.String p2, android.os.Bundle p3) {
+        return false;
+    }
     public boolean isSupportZoomWindowMode() {
         return false;
     }

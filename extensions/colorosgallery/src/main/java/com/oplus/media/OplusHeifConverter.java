@@ -10,6 +10,9 @@ public class OplusHeifConverter {
     public boolean createDecoder() {
         return false;
     }
+    public com.oplus.media.OplusHeifConverter.HeifDecodedFrame decode(java.io.FileDescriptor p0, int p1, boolean p2) {
+        return null;
+    }
     public com.oplus.media.OplusHeifConverter.HeifDecodedFrame decode(java.io.InputStream p0, int p1, boolean p2) {
         return null;
     }

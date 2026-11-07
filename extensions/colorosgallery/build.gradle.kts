@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.colorosgallery"
 
     defaultConfig {
-        // OnePlus Photos 16.45 itself requires Android 13 (API 33).
-        minSdk = 33
+        // OnePlus Photos 15.33.40 runs on Android 11 (API 30); 16.45.2 needs 13. Not higher: the dexer would drop the
+        // extension's checks for newer Android.
+        minSdk = 30
     }
 }
 

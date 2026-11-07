@@ -24,6 +24,7 @@ public final class Photos {
     /**
      * ColorOS's share-sheet item (com.oplus.widget.OplusItem) for an app that can receive the share: its icon and
      * label from Android's own ResolveInfo, as ColorOS's OplusGalleryLoadIconHelper would give them. Null if it fails.
+     * The item's second label stays empty: 15.33.40 shows it as a second line under the name (16.45.2 does not).
      */
     public static Object resolverItem(android.content.Intent intent, android.content.pm.ResolveInfo info,
                                       android.content.pm.PackageManager pm) {
@@ -34,7 +35,6 @@ public final class Photos {
             String label = String.valueOf(info.loadLabel(pm));
             type.getMethod("setIcon", android.graphics.drawable.Drawable.class).invoke(item, info.loadIcon(pm));
             type.getMethod("setText", String.class).invoke(item, label);
-            type.getMethod("setLabel", String.class).invoke(item, label);
             return item;
         } catch (ReflectiveOperationException | RuntimeException e) {
             return null;

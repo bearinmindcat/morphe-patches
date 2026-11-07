@@ -5,6 +5,9 @@ public class IJobInfoExt {
     public static class JobBuilderExt {
         public JobBuilderExt() {
         }
+        public boolean mHasProtectSceneConstraint;
+        public boolean mIsOplusJob;
+        public int mProtectScene;
         public android.app.job.IJobInfoExt.JobBuilderExt setRequiresBattIdle(boolean p0, int p1) {
             return this;
         }

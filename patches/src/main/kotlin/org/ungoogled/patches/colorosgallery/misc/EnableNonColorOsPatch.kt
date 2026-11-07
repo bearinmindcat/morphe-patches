@@ -21,16 +21,36 @@ import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.colorosgallery.ColorOsGalleryConstants.COMPATIBILITY_COLOROS_GALLERY
 import org.ungoogled.patches.samsung.makeLibrariesOptional
+import org.ungoogled.patches.shared.supportedVersionCheck
+import org.w3c.dom.Element
 
 internal const val COLOROS_GALLERY_EXTENSION = "extensions/colorosgallery.mpe"
 
 private const val RUNTIME = "Lorg/ungoogled/colorosgallery/ColorOS;"
 private const val PHOTOS = "Lorg/ungoogled/colorosgallery/Photos;"
 
-/** Photos requires libOpenCL.so, which most phones' vendor partitions have and others (the emulator) do not. */
+private const val ALL_FILES_ACCESS = "android.permission.MANAGE_EXTERNAL_STORAGE"
+
+/**
+ * Photos requires libOpenCL.so, which most phones' vendor partitions have and others (the emulator) do not. 15.33.40
+ * also does not declare All files access, which its system-app install on ColorOS does not need: without it Android's
+ * Settings cannot grant it (the switch is greyed out) and Photos could not delete, edit or move photos.
+ */
 private val manifestPatch = resourcePatch {
     execute {
         if (makeLibrariesOptional() == 0) throw PatchException("no required library in the manifest")
+        document("AndroidManifest.xml").use { manifest ->
+            val root = manifest.documentElement
+            val declared = (0 until root.childNodes.length).mapNotNull { root.childNodes.item(it) as? Element }
+                .any { it.tagName == "uses-permission" && it.getAttribute("android:name") == ALL_FILES_ACCESS }
+            if (declared) return@use
+            val application = manifest.getElementsByTagName("application").item(0)
+                ?: throw PatchException("no <application> in the manifest")
+            root.insertBefore(
+                manifest.createElement("uses-permission").apply { setAttribute("android:name", ALL_FILES_ACCESS) },
+                application,
+            )
+        }
     }
 }
 
@@ -123,7 +143,14 @@ private val agreementPatch = bytecodePatch(
     description = "Keeps Photos off OPPO's servers unless its statement was agreed to.",
 ) {
     execute {
-        // ConfigAbilityWrapper's boolean getter, as Photos itself reads the answer: (group 4, key, default) -> Z.
+        // ConfigAbilityWrapper's boolean getter, as Photos itself reads the answer: (group 4, key, default) -> Z in
+        // 16.45.2, (key, default, fallback, default-argument mask 4) -> Z in 15.33.40.
+        val shapes = mapOf(
+            listOf("I", "Ljava/lang/String;", "Z") to
+                listOf("const/4 v0, 0x4", "const-string v1, \"$AGREEMENT_KEY\"", "const/4 v2, 0x0"),
+            listOf("Ljava/lang/String;", "Z", "Z", "I") to
+                listOf("const-string v0, \"$AGREEMENT_KEY\"", "const/4 v1, 0x0", "const/4 v2, 0x0", "const/4 v3, 0x4"),
+        )
         var getter: MethodReference? = null
         classDefForEach { c ->
             if (getter != null || !c.type.startsWith("Lcom/oplus/")) return@classDefForEach
@@ -133,24 +160,26 @@ private val agreementPatch = bytecodePatch(
                     if (((insns[i] as? ReferenceInstruction)?.reference as? StringReference)?.string != AGREEMENT_KEY) continue
                     val call = insns.drop(i + 1).take(3).firstOrNull { it.opcode == Opcode.INVOKE_STATIC } ?: continue
                     val r = (call as ReferenceInstruction).reference as MethodReference
-                    if (r.parameterTypes.map(CharSequence::toString) == listOf("I", "Ljava/lang/String;", "Z") &&
-                        r.returnType == "Z") { getter = r; return@classDefForEach }
+                    if (r.parameterTypes.map(CharSequence::toString) in shapes && r.returnType == "Z") {
+                        getter = r; return@classDefForEach
+                    }
                 }
             }
         }
         val read = getter ?: throw PatchException("no reader of $AGREEMENT_KEY")
-        val call = "${read.definingClass}->${read.name}(ILjava/lang/String;Z)Z"
+        val parameters = read.parameterTypes.map(CharSequence::toString)
+        val setup = shapes.getValue(parameters)
+        val call = "${read.definingClass}->${read.name}(${parameters.joinToString("")})Z"
+        val arguments = setup.indices.joinToString(", ") { "v$it" }
 
         OpenNetworkFingerprint.method.apply {
             val locals = implementation!!.registerCount
-            if (locals < 3) throw PatchException("NetworkPermissionManager: only $locals registers")
+            if (locals < setup.size) throw PatchException("NetworkPermissionManager: only $locals registers")
             addInstructionsWithLabels(
                 0,
                 """
-                    const/4 v0, 0x4
-                    const-string v1, "$AGREEMENT_KEY"
-                    const/4 v2, 0x0
-                    invoke-static {v0, v1, v2}, $call
+                    ${setup.joinToString("\n")}
+                    invoke-static {$arguments}, $call
                     move-result v0
                     if-nez v0, :agreed
                     const/4 v0, 0x0
@@ -159,7 +188,9 @@ private val agreementPatch = bytecodePatch(
                 ExternalLabel("agreed", getInstruction(0)),
             )
         }
-        // The cloud check asks the (now agreement-aware) network setting first.
+        // The cloud check asks the (now agreement-aware) network setting first. 15.33.40 has no such check at start
+        // (nothing in it calls judgeOCloudState).
+        if (packageMetadata.versionName == "15.33.40") return@execute
         val network = OpenNetworkFingerprint.method.let { "${it.definingClass}->${it.name}()Z" }
         CloudStateFingerprint.method.apply {
             addInstructionsWithLabels(
@@ -226,6 +257,12 @@ private val shareSheetPatch = bytecodePatch(
     }
 }
 
+/** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
+private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_COLOROS_GALLERY)
+
+/** registerReceiver calls without an export flag, measured per version. */
+private val RECEIVER_CALLS = mapOf("16.45.2" to 60, "15.33.40" to 68)
+
 /**
  * Off ColorOS Photos cannot even be installed (it requires libOpenCL.so) and then dies at start on ColorOS framework
  * classes and on broadcast receivers registered without an export flag. The extension carries stand-ins for the ColorOS
@@ -239,14 +276,14 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_GALLERY)
-    dependsOn(manifestPatch, statementPatch, agreementPatch, shareSheetPatch)
+    dependsOn(versionCheckPatch, manifestPatch, statementPatch, agreementPatch, shareSheetPatch)
     extendWith(COLOROS_GALLERY_EXTENSION)
 
     execute {
         val receivers = exportDynamicReceivers(RUNTIME)
         java.util.logging.Logger.getLogger("OnePlusPhotos").info("registerReceiver calls through ColorOS: $receivers")
-        // Measured against 16.45.2: 60 calls.
-        if (receivers < 60) throw PatchException("only $receivers registerReceiver calls found")
+        val expected = RECEIVER_CALLS.getValue(packageMetadata.versionName)
+        if (receivers < expected) throw PatchException("only $receivers registerReceiver calls found (expected $expected)")
 
         // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
         val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
