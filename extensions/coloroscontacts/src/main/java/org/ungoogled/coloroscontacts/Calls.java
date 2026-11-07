@@ -61,6 +61,7 @@ public final class Calls {
             call(context, intent);
             return;
         }
+        intent = own(context, intent);
         try {
             context.startActivity(intent);
         } catch (ActivityNotFoundException e) {
@@ -75,6 +76,7 @@ public final class Calls {
             call(context, intent);
             return;
         }
+        intent = own(context, intent);
         try {
             context.startActivity(intent, options);
         } catch (ActivityNotFoundException e) {
@@ -89,6 +91,7 @@ public final class Calls {
             call(activity, intent);
             return;
         }
+        intent = own(activity, intent);
         try {
             activity.startActivityForResult(intent, request);
         } catch (ActivityNotFoundException e) {
@@ -101,11 +104,38 @@ public final class Calls {
             call(activity, intent);
             return;
         }
+        intent = own(activity, intent);
         try {
             activity.startActivityForResult(intent, request, options);
         } catch (ActivityNotFoundException e) {
             activity.startActivityForResult(elsewhere(activity, intent, e), request, options);
         }
+    }
+
+    /** ColorOS's own actions (and the app's), which its screens use to open each other. */
+    private static final String[] OWN_ACTIONS = {
+            "com.oplus.", "com.oppo.", "com.coloros.", "oplus.", "oppo.", "com.android.contacts.",
+    };
+
+    /**
+     * An implicit intent with one of ColorOS's own actions that this app answers stays in this app. On an OPPO,
+     * OnePlus or realme phone the phone's own Contacts app (com.android.contacts) answers the same actions, and the
+     * app's own screens (editing a contact, ...) opened a chooser between the two copies.
+     */
+    static Intent own(Context context, Intent intent) {
+        if (intent == null || intent.getComponent() != null || intent.getPackage() != null) return intent;
+        String action = intent.getAction();
+        if (action == null) return intent;
+        boolean colorOs = false;
+        for (String prefix : OWN_ACTIONS) colorOs |= action.startsWith(prefix);
+        if (!colorOs) return intent;
+        Intent mine = new Intent(intent).setPackage(context.getPackageName());
+        try {
+            if (context.getPackageManager().resolveActivity(mine, 0) == null) return intent;
+        } catch (RuntimeException e) {
+            return intent;
+        }
+        return mine;
     }
 
     /**

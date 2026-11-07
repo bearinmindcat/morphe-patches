@@ -94,13 +94,30 @@ private fun BytecodePatchContext.moveOwnPackageLiterals(new: String): Int {
 }
 
 /**
+ * A name of the app's own moved under [new]: one under the package keeps its suffix, any other gets the new package in
+ * front (OxygenOS's build declares providers outside its package, e.g. com.android.dialer.vvm.gretting).
+ */
+private fun moved(value: String, new: String): String = when {
+    value.startsWith("$STOCK_PACKAGE.") -> new + value.substring(STOCK_PACKAGE.length)
+    value.startsWith("com.android.") -> "$new." + value.removePrefix("com.")
+    else -> "$new.$value"
+}
+
+/** Manifest attributes that name a permission (a declaration, a request, a component's guard). */
+private val PERMISSION_ATTRIBUTES = listOf("android:permission", "android:readPermission", "android:writePermission")
+private val DECLARATIONS = setOf("permission", "permission-group", "permission-tree")
+
+/**
  * Installs OnePlus Contacts as its own app: "com.android.contacts" is also the package of the contacts app on
- * Android's own ROMs (LineageOS and other custom ROMs, Xiaomi, ColorOS itself), which a re-signed copy can neither
- * replace nor sit beside.
+ * Android's own ROMs (LineageOS and other custom ROMs, Xiaomi) and on ColorOS / OxygenOS / realme UI themselves, where
+ * that app stays installed. Android refuses a second app that declares a provider authority, permission or permission
+ * group another app already has, so everything the manifest declares moves with the package.
  *
- * Moves with the package: the package itself, the app's own provider authorities and permission, and in code the
- * literals of those authorities and the few literals that name the app itself. Android's contacts provider
- * ("com.android.contacts") stays. Component class names stay, since the classes do not move.
+ * Moves: the package itself, every provider authority of the app, every permission, permission group and permission
+ * tree it declares (and their uses), the launcher shortcuts' target package, and in code the literals of those names
+ * (also as content:// URIs) and the few literals that name the app itself. Android's contacts provider and call log
+ * ("com.android.contacts", "call_log") stay: they are the phone's. Component class names stay, since the classes do
+ * not move.
  */
 @Suppress("unused")
 val changePackageNamePatch = bytecodePatch(
@@ -125,9 +142,9 @@ val changePackageNamePatch = bytecodePatch(
             execute {
                 val old = STOCK_PACKAGE
                 val new = packageName.value!!
-                fun moved(value: String) = new + value.substring(old.length)
                 renamed.clear()
                 var authorities = 0
+                var permissions = 0
 
                 document("AndroidManifest.xml").use { manifest ->
                     val root = manifest.documentElement
@@ -136,40 +153,64 @@ val changePackageNamePatch = bytecodePatch(
                     // Only a system app may take over another package's data under a new name.
                     manifest.elements("original-package").forEach { it.parentNode.removeChild(it) }
 
-                    val own = manifest.elements("permission").map { it.getAttribute("android:name") }
-                        .filter { it.startsWith("$old.") }.toSet()
+                    // Every permission, permission group and permission tree the app declares, and every use of one.
+                    val own = manifest.elements("*").filter { it.tagName in DECLARATIONS }.map { it.getAttribute("android:name") }.toSet()
                     if (own.isEmpty()) throw PatchException("no permission of its own in the manifest")
+                    own.forEach { renamed[it] = moved(it, new) }
+                    permissions = own.size
                     for (element in manifest.elements("*")) {
-                        for (attribute in listOf("android:name", "android:permission", "android:readPermission", "android:writePermission")) {
-                            if (attribute == "android:name" && element.tagName !in setOf("permission", "uses-permission")) continue
+                        val attributes = when (element.tagName) {
+                            in DECLARATIONS, "uses-permission", "uses-permission-sdk-23" -> listOf("android:name", "android:permissionGroup")
+                            else -> PERMISSION_ATTRIBUTES
+                        }
+                        for (attribute in attributes) {
                             val value = element.getAttribute(attribute)
-                            if (value in own) {
-                                element.setAttribute(attribute, moved(value))
-                                renamed[value] = moved(value)
-                            }
+                            if (value in own) element.setAttribute(attribute, renamed.getValue(value))
                         }
                     }
 
-                    // Only the app's own providers, not <queries> entries naming other apps' ones.
+                    // Every provider of the app's own (not <queries> entries naming other apps' ones): authorities are
+                    // unique on a phone.
                     val application = manifest.elements("application").single()
                     for (provider in manifest.elements("provider").filter { it.parentNode == application }) {
-                        val list = provider.getAttribute("android:authorities").split(';')
-                        val moved = list.map { if (it.startsWith("$old.")) moved(it) else it }
-                        list.zip(moved).filter { (a, b) -> a != b }.forEach { (a, b) -> renamed[a] = b; authorities++ }
-                        provider.setAttribute("android:authorities", moved.joinToString(";"))
+                        val list = provider.getAttribute("android:authorities").split(';').filter { it.isNotBlank() }
+                        list.forEach { renamed[it] = moved(it, new); authorities++ }
+                        provider.setAttribute("android:authorities", list.joinToString(";") { renamed.getValue(it) })
+                    }
+                    if (renamed.values.any { it == old || it.startsWith("com.android.contacts") }) {
+                        throw PatchException("a declared name did not move")
                     }
                 }
 
-                log.info("Package rename: $authorities authorities, ${renamed.size - authorities} permissions")
-                // Measured against 16.80.15: 20 authorities under the package, 1 permission.
+                // The launcher shortcuts (static shortcuts.xml) open the app's own screens by package.
+                var shortcuts = 0
+                decode("res/xml", "res/xml-*")
+                val res = this["res"]
+                for (dir in res.listFiles()!!.filter { it.isDirectory && (it.name == "xml" || it.name.startsWith("xml-")) }) {
+                    for (file in dir.listFiles()!!.filter { it.name.endsWith(".xml") }) {
+                        if ("\"$old\"" !in file.readText()) continue
+                        document("res/${dir.name}/${file.name}").use { xml ->
+                            for (element in xml.elements("*")) {
+                                if (element.getAttribute("android:targetPackage") == old) {
+                                    element.setAttribute("android:targetPackage", new)
+                                    shortcuts++
+                                }
+                            }
+                        }
+                    }
+                }
+
+                log.info("Package rename: $authorities authorities, $permissions permissions, $shortcuts shortcut targets")
+                // Measured against 16.80.15: 24 authorities, 1 permission, 10 shortcut targets.
                 if (authorities < 10) throw PatchException("package rename found only $authorities authorities")
+                if (shortcuts == 0) throw PatchException("no launcher shortcut names the app")
             }
         },
     )
 
     execute {
         val new = packageName.value!!
-        // Exact authorities, and content:// URIs built on them.
+        // Exact authorities and permissions, and content:// URIs built on the authorities.
         fun rename(s: String): String? {
             renamed[s]?.let { return it }
             if (s.startsWith("content://")) {
@@ -181,7 +222,7 @@ val changePackageNamePatch = bytecodePatch(
         }
         val literals = rewriteStringLiterals(::rename)
         val own = moveOwnPackageLiterals(new)
-        log.info("Package rename: $literals authority literals, $own own package literals moved")
+        log.info("Package rename: $literals authority and permission literals, $own own package literals moved")
         if (literals == 0) throw PatchException("no authority literals found to move")
         if (own == 0) throw PatchException("no literal naming the app itself found")
     }
