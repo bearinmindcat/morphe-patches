@@ -119,6 +119,12 @@ private val UNINSTALL_CALLS = mapOf(
         "$EXT/Launch;->deletePackageAsUser(Landroid/content/pm/PackageManager;Ljava/lang/String;Ljava/lang/Object;II)V",
 )
 
+/** Injected keys (INJECT_EVENTS is the system's): a HOME key starts the launcher's home screen (see Launch). */
+private val KEY_INJECTIONS = mapOf(
+    "Landroid/hardware/input/InputManager;->injectInputEvent(Landroid/view/InputEvent;I)Z" to
+        "$EXT/Launch;->injectInputEvent(Ljava/lang/Object;Landroid/view/InputEvent;I)Z",
+)
+
 /** Calls an installed app may make but that fail for it (see Calls). */
 private val GUARDED_CALLS = mapOf(
     "Landroid/content/ContentResolver;->registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V" to
@@ -247,6 +253,9 @@ private val systemPrivilegesPatch = bytecodePatch(
         val bars = redirectCalls(BAR_CALLS)
         val uninstalls = redirectCalls(UNINSTALL_CALLS)
         val binds = redirectCalls(WIDGET_BINDS)
+        val keys = redirectCalls(KEY_INJECTIONS)
+        log.info("key injections: $keys")
+        if (keys == 0) throw PatchException("no InputManager.injectInputEvent calls found")
         log.info("widget binds: $binds")
         if (binds == 0) throw PatchException("no AppWidgetManager.bindAppWidgetIdIfAllowed calls found")
         log.info("uninstall calls: $uninstalls")

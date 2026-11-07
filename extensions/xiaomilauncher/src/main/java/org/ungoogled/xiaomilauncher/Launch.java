@@ -160,4 +160,28 @@ public final class Launch {
             android.os.Bundle options) {
         a.startActivityForResult(own(a, intent), request, options);
     }
+
+    /**
+     * InputManager.injectInputEvent: injecting keys needs INJECT_EVENTS (signature), and the SecurityException killed the
+     * launcher (Settings > Home screen layout sends a HOME key to show the layout preview on the home screen). A HOME key
+     * starts the launcher's own home screen instead (on its release); any other key is not sent.
+     */
+    public static boolean injectInputEvent(Object inputManager, android.view.InputEvent event, int mode) {
+        if (!(event instanceof android.view.KeyEvent)) return false;
+        android.view.KeyEvent key = (android.view.KeyEvent) event;
+        if (key.getKeyCode() != android.view.KeyEvent.KEYCODE_HOME) return false;
+        if (key.getAction() != android.view.KeyEvent.ACTION_UP) return true;
+        android.content.Context c = App.context();
+        if (c == null) return false;
+        try {
+            c.startActivity(new android.content.Intent(android.content.Intent.ACTION_MAIN)
+                    .addCategory(android.content.Intent.CATEGORY_HOME)
+                    .setPackage(c.getPackageName())
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+            return true;
+        } catch (RuntimeException e) {
+            android.util.Log.w("UA", "home not started: " + e);
+            return false;
+        }
+    }
 }
