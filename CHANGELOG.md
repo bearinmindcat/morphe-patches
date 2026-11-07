@@ -1,3 +1,14 @@
+## [2.8.10](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.9...v2.8.10) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* add samsung one hand operation+ non-one ui support; issue [#132](https://github.com/bearinmindcat/morphe-patches/issues/132) ([1115d55](https://github.com/bearinmindcat/morphe-patches/commit/1115d5537e729408a1bb9be3af5ce8b3e4dae077))
+* morphe manager shows which android each app version needs; issue [#134](https://github.com/bearinmindcat/morphe-patches/issues/134) ([dd2cd9a](https://github.com/bearinmindcat/morphe-patches/commit/dd2cd9aa3cde2b9e655c2098f20f84f13deb2695))
+* navigation media controls can be closed again; issue [#136](https://github.com/bearinmindcat/morphe-patches/issues/136) ([e9cfce4](https://github.com/bearinmindcat/morphe-patches/commit/e9cfce4b6b42326bd06c375b390f59160c114295))
+* oneplus contacts installs next to the phone's own contacts app; issue [#106](https://github.com/bearinmindcat/morphe-patches/issues/106) ([795152a](https://github.com/bearinmindcat/morphe-patches/commit/795152a68b52d8d0224d6994204093d8dd2dd0a7))
+* oneplus system launcher explains unsupported versions; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([ecf7a39](https://github.com/bearinmindcat/morphe-patches/commit/ecf7a396b376a80d73cf82b75527f45f52a0d02f))
+* samsung my files shows sd cards and usb drives; issue [#139](https://github.com/bearinmindcat/morphe-patches/issues/139) ([8af5a2b](https://github.com/bearinmindcat/morphe-patches/commit/8af5a2b4a5eb57446921431d276244722978a4eb))
+
 ## [2.8.9](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.8...v2.8.9) (2026-11-06)
 
 ### 🐛 Bug Fixes

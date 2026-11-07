@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.9](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.9)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;168 patches total
+> **[v2.8.10](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.10)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;170 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;31 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
 
 <p>
@@ -49,6 +49,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG-RE support, microG's C sits in the pin's circle. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG-RE's or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
+| [Media panel can be closed](#media-panel-can-be-closed) | Navigation's media button stays above the media controls, so they can be closed again. |  |
 | [Offline saved places](#offline-saved-places) | Save places without a Google account, kept only on the phone: Save opens Maps' own "Place saved" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a "Local saved" row on the account sheet rebuilds Maps' You tab -- your recent places, your lists and labels (Home, Work, your own) -- with export and import (backup file, KML, Google Takeout's saved lists and Saved Places.json, several files or the whole Takeout .zip at once). It also has a Timeline: where the phone has been, grouped into days and visits, kept only on the phone, with GPX export. Recording is off until switched on there; it shows a notification while it runs. With Add microG-RE support, Maps' own Save keeps syncing to your account and Local saved instead copies the account's saved lists to the phone (Pull from Google account). |  |
 | [Power saving mode](#power-saving-mode) | Brings the Pixel-only power saving mode to every phone: while driving with navigation, press the power button and Maps shows only key information such as the next turn on a black screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a row on the account sheet under Customization, which also has: a navigation button that opens the power saving screen without locking the phone, switching to it by itself when idle, a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps. |  |
 | [Proxy](#proxy) | Adds a Proxy screen to Customization that sends Maps' own traffic, map data included, through an HTTP proxy -- for example Orbot's (127.0.0.1:8118) to use Tor. Map data never falls back to a direct connection: if the proxy stops, Maps stops loading. Needs a recent Play services network engine (Cronet); Maps warns when it cannot take the proxy. |  |
@@ -161,7 +162,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/asus-launcher.png" width="20" height="20" align="top"> ASUS Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/asus-launcher.png" width="20" height="20" align="top"> ASUS Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 11.0.0.76_240920
+**Supported version(s):** 11.0.0.76_240920 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -173,7 +174,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/honor-home.png" width="20" height="20" align="top"> Honor Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 14.0.0.210
+**Supported version(s):** 14.0.0.210 — needs Android 10 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -185,7 +186,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** RELEASE-7.50.06.2372-06261924
+**Supported version(s):** RELEASE-7.50.06.2372-06261924 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -197,7 +198,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 15
+**Supported version(s):** 15 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -209,7 +210,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 4.0.20
+**Supported version(s):** 4.0.20 — needs Android 16 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -221,7 +222,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 18.0.07.59
+**Supported version(s):** 18.0.07.59 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -233,7 +234,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 5.2.66
+**Supported version(s):** 5.2.66 — needs Android 10 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -245,7 +246,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.4.30
+**Supported version(s):** 16.4.30 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -257,7 +258,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/xperia-home.png" width="20" height="20" align="top"> Xperia Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 15
+**Supported version(s):** 15 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -269,7 +270,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;25 apps&nbsp;&nbsp;•&nbsp;&nbsp;44 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;26 apps&nbsp;&nbsp;•&nbsp;&nbsp;45 patches</summary>
 <br>
 <blockquote>
 
@@ -277,7 +278,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.4.00.13
+**Supported version(s):** 12.4.00.13 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -289,7 +290,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.8.01.0, 12.5.06.5
+**Supported version(s):** 12.8.01.0 — needs Android 15 or newer, 12.5.06.5 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -301,7 +302,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.4.02.38
+**Supported version(s):** 12.4.02.38 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -313,7 +314,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.00.87
+**Supported version(s):** 16.3.00.87 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -390,7 +391,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 18.0.00.24
+**Supported version(s):** 18.0.00.24 — needs Android 16 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -423,7 +424,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.21.1
+**Supported version(s):** 16.3.21.1 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -435,7 +436,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 5.1.03.1
+**Supported version(s):** 5.1.03.1 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -459,7 +460,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 15.2.03.2
+**Supported version(s):** 15.2.03.2 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -484,10 +485,22 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
+<summary><img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 9.3.13.0 — needs Android 14 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs One Hand Operation + on non-One UI ROMs through an accessibility service. |  |
+
+</details>
+
+<details>
 <summary><img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.52.1
+**Supported version(s):** 16.3.52.1 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -499,7 +512,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 3.9.04.6
+**Supported version(s):** 3.9.04.6 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -511,7 +524,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.8.00.62
+**Supported version(s):** 12.8.00.62 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -535,7 +548,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
-**Supported version(s):** 8.1.00.6
+**Supported version(s):** 8.1.00.6 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -548,7 +561,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 7.3.47.1
+**Supported version(s):** 7.3.47.1 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -560,7 +573,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 21.5.91.33
+**Supported version(s):** 21.5.91.33 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -722,7 +735,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-gallery.png" width="20" height="20" align="top"> Nothing Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 3.1.3.1019
+**Supported version(s):** 3.1.3.1019 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -734,7 +747,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-recorder.png" width="20" height="20" align="top"> Nothing Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 4.0.0
+**Supported version(s):** 4.0.0 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -746,7 +759,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-screenshot.png" width="20" height="20" align="top"> Nothing Screenshot&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 14.0.0
+**Supported version(s):** 14.0.0 — needs Android 14 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -982,7 +995,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
-**Supported version(s):** 16.80.15
+**Supported version(s):** 16.80.15 — needs Android 15 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
