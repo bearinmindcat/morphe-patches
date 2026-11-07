@@ -79,6 +79,35 @@ The launcher ports are tested on Android 15 and newer.
 | Samsung Weather | `com.sec.android.daemonapp` | 1.7.30.50 | 11+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-weather/samsung-weather-widget-1-7-30-50-release/) |
 | Wonderland | `com.samsung.android.wonderland.wallpaper` | 1.6.22 | 11+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/wonderland/samsung-wonderland-1-6-22-release/) |
 
+### On an older Samsung Galaxy
+
+The patches are for phones that aren't Samsung. On a Galaxy, install Samsung's original APK instead: it updates the
+built-in app and keeps Samsung account sign-in and the links between Samsung apps. A patched copy is signed with a
+different key, so it can't replace the built-in app and installs next to it as a separate app.
+
+Newest original versions whose minimum Android lets them install (from the apps' version histories; not tested on a
+real One UI 4.1 / 5.1 phone, so if one misbehaves, go back to the version Galaxy Store offers):
+
+| App | Android 12 (One UI 4.x) | Android 13 (One UI 5.x) |
+|---|---|---|
+| Samsung Gallery | 15.9.01.7 | 15.9.01.7 |
+| Samsung Notes | 4.4.48.15 | 4.4.48.15 |
+| Samsung Music | 16.2.45.1 | 16.2.45.1 |
+| Samsung Weather | 1.7.30.50 | 1.7.30.50 |
+| Good Lock | 3.0.16.6 | 3.0.16.6 |
+| Samsung Health Monitor | 1.5.3.011 | 1.5.3.011 |
+| Samsung Keyboard | 5.6.10.48 | 5.9.40.75 |
+| Samsung Clock | 12.2.00.55 | 12.2.16.1 |
+| Samsung Calendar | 12.5.00.28 | 12.6.00.37 |
+| Samsung Reminder | 12.5.00.11 | 12.5.04.3 |
+| Samsung Voice Recorder | 21.5.43.02 | 21.5.43.02 |
+| Samsung My Files | 14.2.00.2 | 15.0.04.6 |
+| Samsung Contacts / Phone | 15.7.55 | 15.9.70 |
+| Samsung Messages | 15.7.04.3 | 16.0.11.27 |
+
+Each Samsung app carries its own copy of Samsung's UI library, so a newer app brings that app's newer design; the rest
+of the phone stays on its One UI version.
+
 ## Xiaomi
 
 | App | Package | Version | Android | Where to get it |
