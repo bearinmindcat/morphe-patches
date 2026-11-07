@@ -186,6 +186,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture',
         '<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture',
     ),
+    "com.sec.android.app.sbrowser": (
+        '<img src="docs/icons/samsung-internet.png" width="20" height="20" align="top"> Samsung Internet',
+        '<img src="docs/icons/samsung-internet.png" width="20" height="20" align="top"> Samsung Internet',
+    ),
     "com.samsung.android.email.provider": (
         '<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email',
         '<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email',
