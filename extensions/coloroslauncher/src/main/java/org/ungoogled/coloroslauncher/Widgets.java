@@ -2,6 +2,8 @@ package org.ungoogled.coloroslauncher;
 
 import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetHostView;
+import android.os.Handler;
+import android.os.Looper;
 
 /**
  * Widget hosting. Binding needs no help: where Android refuses the launcher's bind (BIND_APPWIDGET is the system's),
@@ -21,6 +23,19 @@ public final class Widgets {
     static void listen(AppWidgetHost host, int id, Object listener) {
         if (!(listener instanceof AppWidgetHostView)) return;
         AppWidgetHostView view = (AppWidgetHostView) listener;
+        // setListener only records the listener and may be called from any thread (the launcher refreshes widget
+        // containers on its LauncherUtilsThread); createView also sets the widget on the view, which only the UI thread
+        // may touch once the view is shown (CalledFromWrongThreadException).
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (view.getAppWidgetId() == id) register(host, id, view);
+            });
+            return;
+        }
+        register(host, id, view);
+    }
+
+    private static void register(AppWidgetHost host, int id, AppWidgetHostView view) {
         PENDING.set(view);
         try {
             host.createView(view.getContext(), id, view.getAppWidgetInfo());
