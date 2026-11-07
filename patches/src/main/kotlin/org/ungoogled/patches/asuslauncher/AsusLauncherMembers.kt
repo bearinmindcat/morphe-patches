@@ -435,6 +435,37 @@ internal val HIDDEN_SUPERCLASSES = mapOf(
     "Landroid/window/IRemoteTransition\$Stub;" to ("Landroid/os/Binder;" to listOf("Landroid/window/IRemoteTransition;", "Landroid/os/IInterface;")),
 )
 
+/* Android 13 */
+/*
+ * Members and constructors ASUS Launcher calls from its own code that Android 13 refuses or lacks although Android 15
+ * has them (Android 14 and 15 additions; its newer Java library calls go through shared/NewerJavaCalls.kt). Found by
+ * checking the patched APK against the Android 13 emulator's boot classpath and hidden API flags (One UI 5.1's
+ * framework gives the same list); they go through the same member helper (used where the phone has them, else the
+ * fallback or "absent").
+ */
+internal val HIDDEN_MEMBERS_13 = setOf(
+    "Landroid/app/ActivityOptions;->setPendingIntentBackgroundActivityStartMode(I)Landroid/app/ActivityOptions;",
+    "Landroid/app/admin/DevicePolicyManager;->getManagedSubscriptionsPolicy()Landroid/app/admin/ManagedSubscriptionsPolicy;",
+    "Landroid/app/admin/ManagedSubscriptionsPolicy;->getPolicyType()I",
+    "Landroid/hardware/devicestate/DeviceStateManager;->registerCallback(Ljava/util/concurrent/Executor;Landroid/hardware/devicestate/DeviceStateManager\$DeviceStateCallback;)V",
+    "Landroid/hardware/devicestate/DeviceStateManager;->unregisterCallback(Landroid/hardware/devicestate/DeviceStateManager\$DeviceStateCallback;)V",
+    "Landroid/view/ViewTreeObserver;->addOnWindowVisibilityChangeListener(Landroid/view/ViewTreeObserver\$OnWindowVisibilityChangeListener;)V",
+    "Landroid/view/ViewTreeObserver;->removeOnWindowVisibilityChangeListener(Landroid/view/ViewTreeObserver\$OnWindowVisibilityChangeListener;)V",
+    "Landroid/window/BackEvent;->getProgress()F",
+    "Landroid/window/BackEvent;->getSwipeEdge()I",
+    "Landroid/window/BackEvent;->getTouchY()F",
+    "Landroid/window/OnBackAnimationCallback;->onBackCancelled()V",
+    "Landroid/window/OnBackAnimationCallback;->onBackProgressed(Landroid/window/BackEvent;)V",
+    "Landroid/window/OnBackAnimationCallback;->onBackStarted(Landroid/window/BackEvent;)V",
+    "Landroid/window/SurfaceSyncGroup;->add(Landroid/view/AttachedSurfaceControl;Ljava/lang/Runnable;)Z",
+    "Landroid/window/SurfaceSyncGroup;->addTransaction(Landroid/view/SurfaceControl\$Transaction;)V",
+    "Landroid/window/SurfaceSyncGroup;->markSyncReady()V",
+)
+
+internal val HIDDEN_CONSTRUCTORS_13 = setOf(
+    "Landroid/window/SurfaceSyncGroup;-><init>(Ljava/lang/String;)V",
+)
+
 /* Android 16 and 17 */
 /*
  * Members and constructors ASUS Launcher references that Android 16 or 17 refuses or lacks although Android 15 allowed

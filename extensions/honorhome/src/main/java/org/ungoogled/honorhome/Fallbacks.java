@@ -11,6 +11,15 @@ final class Fallbacks {
     }
 
     static Object call(Object receiver, String key, Object[] args) {
+        switch (key) {
+            // Android 14 calls the launcher makes on Android 13 too: the older call that does the same.
+            case "Landroid/util/TypedValue;->deriveDimension(IFLandroid/util/DisplayMetrics;)F": {
+                float one = android.util.TypedValue.applyDimension((Integer) args[0], 1f, (android.util.DisplayMetrics) args[2]);
+                return one == 0f ? 0f : (Float) args[1] / one;
+            }
+            case "Landroid/text/Layout;->getTextDirectionHeuristic()Landroid/text/TextDirectionHeuristic;":
+                return android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR;
+        }
         return NONE;
     }
 

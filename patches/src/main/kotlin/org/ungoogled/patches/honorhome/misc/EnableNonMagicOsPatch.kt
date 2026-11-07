@@ -20,8 +20,10 @@ import org.ungoogled.patches.honor.replaceMagicFrameworkIds
 import org.ungoogled.patches.honor.replaceMagicFrameworkReferences
 import org.ungoogled.patches.honor.replaceMagicInterpolators
 import org.ungoogled.patches.honorhome.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.honorhome.HIDDEN_CONSTRUCTORS_13
 import org.ungoogled.patches.honorhome.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.honorhome.HIDDEN_MEMBERS
+import org.ungoogled.patches.honorhome.HIDDEN_MEMBERS_13
 import org.ungoogled.patches.honorhome.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.honorhome.HonorHomeConstants.COMPATIBILITY_HONOR_HOME
 import org.ungoogled.patches.samsung.redirectCalls
@@ -303,10 +305,10 @@ private val hiddenApisPatch = bytecodePatch(
     execute {
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/Framework;", "$EXT/Hidden;",
-            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + REFUSED_CALLS + MAGIC_MEMBERS_WITHOUT_STAND_IN,
+            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13 + REFUSED_CALLS + MAGIC_MEMBERS_WITHOUT_STAND_IN,
         )
         val constructors = redirectConstructors(
-            "$EXT/Framework;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Framework;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13,
         )
         val rebased = rebaseSubclasses(REBASES)
         skipCastOfNull("$EXT/Hidden;")

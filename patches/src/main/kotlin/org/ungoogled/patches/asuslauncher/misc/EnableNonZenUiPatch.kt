@@ -16,8 +16,10 @@ import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.asuslauncher.AsusLauncherConstants.COMPATIBILITY_ASUS_LAUNCHER
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_13
 import org.ungoogled.patches.asuslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_13
 import org.ungoogled.patches.asuslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.asuslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.asuslauncher.SUPER_CONSTRUCTORS
@@ -28,6 +30,7 @@ import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.coloroslauncher.misc.skipCastOfNull
 import org.ungoogled.patches.coloroslauncher.misc.substituteSuperConstructors
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val ASUS_LAUNCHER_EXTENSION = "extensions/asuslauncher.mpe"
@@ -101,6 +104,19 @@ private val GUARDED_CALLS = mapOf(
     "Landroid/app/ActivityManager;->getCurrentUser()I" to "$EXT/Calls;->getCurrentUser()I",
 )
 
+/** DeviceConfig reads (the launcher's feature flags): Android 13 refuses them to an installed app (see Calls). */
+private val DEVICE_CONFIG_CALLS = listOf(
+    "getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z",
+    "getFloat(Ljava/lang/String;Ljava/lang/String;F)F",
+    "getString(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    "addOnPropertiesChangedListener(Ljava/lang/String;Ljava/util/concurrent/Executor;" +
+        "Landroid/provider/DeviceConfig\$OnPropertiesChangedListener;)V",
+).associate { shape ->
+    // The listener's type is a system API the extension cannot name: Object in the helper.
+    "Landroid/provider/DeviceConfig;->$shape" to
+        "$EXT/Calls;->" + shape.replace("Landroid/provider/DeviceConfig\$OnPropertiesChangedListener;", "Ljava/lang/Object;")
+}
+
 /**
  * ASUS Launcher is a system app built against the full Android framework; an installed app may not link to its hidden
  * parts. Each hidden member it uses goes through Members (used where Android allows it, "absent" elsewhere), each
@@ -115,10 +131,10 @@ private val hiddenApisPatch = bytecodePatch(
 
     execute {
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13,
         )
         val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
         val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
@@ -185,9 +201,13 @@ private val systemPrivilegesPatch = bytecodePatch(
         val windows = redirectCalls(WINDOW_CALLS)
         val reflection = redirectCalls(REFLECTION_CALLS)
         val guarded = redirectCalls(GUARDED_CALLS)
-        log.info("receivers: $receivers, settings calls: $settings, windows: $windows, reflection: $reflection, guarded: $guarded")
+        val deviceConfig = redirectCalls(DEVICE_CONFIG_CALLS)
+        val java = redirectNewerJavaCalls("$EXT/Java21;")
+        log.info("receivers: $receivers, settings calls: $settings, windows: $windows, reflection: $reflection, guarded: $guarded, device config: $deviceConfig, java: $java")
         if (settings < 20) throw PatchException("only $settings settings calls found")
         if (guarded < 2) throw PatchException("only $guarded content observer / user calls found")
+        if (deviceConfig < 2) throw PatchException("only $deviceConfig DeviceConfig calls found")
+        if (java == 0) throw PatchException("no newer Java library calls found")
 
         // Suggested apps come from Android's app prediction service, which only answers a caller with usage access: each
         // lookup of the service sees none without it (the launcher checks for null), so it skips its predictions.

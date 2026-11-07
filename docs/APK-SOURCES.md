@@ -34,7 +34,7 @@ public APK mirror.
 
 ## Launchers
 
-The launcher ports are tested on Android 15 and newer; OnePlus System Launcher 15.6.24 also on Android 11.
+The launcher ports are tested on Android 15 and newer; ASUS Launcher, Honor Home and both OnePlus launchers also on Android 13, OnePlus System Launcher 15.6.24 also on Android 11.
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|

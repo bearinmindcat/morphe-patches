@@ -14,9 +14,11 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloroslauncher.ColorOsLauncherConstants.COMPATIBILITY_COLOROS_LAUNCHER
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_13
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_13
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES
@@ -26,6 +28,7 @@ import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS_15
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.shared.addDefaultsForOlderAndroid
+import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val COLOROS_LAUNCHER_EXTENSION = "extensions/coloroslauncher.mpe"
@@ -146,15 +149,15 @@ private class HiddenLists(
     val followMoves: Boolean = false,
 )
 
-/** 16.4.30's lists were checked against Android 15 (and 16 / 17), 15.6.24's against Android 11, 15, 16 and 17. */
+/** 16.4.30's lists were checked against Android 15 (and 13, 16 / 17), 15.6.24's against Android 11, 15, 16 and 17. */
 private fun hiddenLists(version: String) = when (version) {
     "15.6.24" -> HiddenLists(
         HIDDEN_MEMBERS_15, HIDDEN_CONSTRUCTORS_15, SUPER_CONSTRUCTORS_15, HIDDEN_SUPERCLASSES_15,
         INACCESSIBLE_INTERFACES_15, followMoves = true,
     )
     else -> HiddenLists(
-        HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17, HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17, SUPER_CONSTRUCTORS,
-        HIDDEN_SUPERCLASSES,
+        HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13,
+        HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13, SUPER_CONSTRUCTORS, HIDDEN_SUPERCLASSES,
     )
 }
 
@@ -186,6 +189,10 @@ private val hiddenApisPatch = bytecodePatch(
 
     execute {
         val lists = hiddenLists(packageMetadata.versionName)
+        // Java 21 library calls first (see Java21): 15.6.24's lists name some of them too, and Members could only
+        // answer those "absent" where the phone lacks them.
+        val java = redirectNewerJavaCalls("$EXT/Java21;")
+        if (java == 0) throw PatchException("no newer Java library calls found")
         val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", lists.members)
         val constructors = redirectConstructors(
             "$EXT/Members;", "$EXT/Hidden;", lists.constructors, followMoves = lists.followMoves,
@@ -195,7 +202,7 @@ private val hiddenApisPatch = bytecodePatch(
         val dropped = dropInterfaces(lists.inaccessible)
         if (dropped == 0 && lists.inaccessible.isNotEmpty()) throw PatchException("no classes implement ${lists.inaccessible}")
         skipCastOfNull("$EXT/Hidden;")
-        log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; interfaces dropped: $dropped")
+        log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; interfaces dropped: $dropped; java: $java")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0) throw PatchException("hidden constructors not found")
         if (rebased == 0) throw PatchException("no subclasses of hidden Android classes found")
