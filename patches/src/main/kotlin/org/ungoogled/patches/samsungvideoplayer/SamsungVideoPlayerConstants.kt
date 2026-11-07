@@ -15,7 +15,7 @@ object SamsungVideoPlayerConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x9A10F0,
         targets = listOf(
-            AppTarget(version = "7.3.47.1"),
+            AppTarget(version = "7.3.47.1", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

@@ -15,8 +15,8 @@ object SamsungCalendarConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x06BEB0,
         targets = listOf(
-            AppTarget(version = "12.8.01.0", minSdk = 35),
-            AppTarget(version = "12.5.06.5", minSdk = 33),
+            AppTarget(version = "12.8.01.0", minSdk = 35, description = "needs Android 15 or newer"),
+            AppTarget(version = "12.5.06.5", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }

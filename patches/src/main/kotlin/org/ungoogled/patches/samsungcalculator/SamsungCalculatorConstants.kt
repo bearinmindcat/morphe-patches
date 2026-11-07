@@ -15,7 +15,7 @@ object SamsungCalculatorConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "12.4.00.13"),
+            AppTarget(version = "12.4.00.13", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

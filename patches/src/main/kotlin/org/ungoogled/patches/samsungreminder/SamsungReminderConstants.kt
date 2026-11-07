@@ -14,7 +14,7 @@ object SamsungReminderConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x410CB7,
         targets = listOf(
-            AppTarget(version = "12.8.00.62"),
+            AppTarget(version = "12.8.00.62", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

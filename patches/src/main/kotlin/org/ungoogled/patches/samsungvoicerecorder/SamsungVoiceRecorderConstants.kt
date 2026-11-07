@@ -12,7 +12,7 @@ object SamsungVoiceRecorderConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xF0473E,
         targets = listOf(
-            AppTarget(version = "21.5.91.33"),
+            AppTarget(version = "21.5.91.33", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

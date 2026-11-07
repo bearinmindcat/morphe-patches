@@ -15,7 +15,7 @@ object ColorOsContactsConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x2A9D5C,
         targets = listOf(
-            AppTarget(version = "16.80.15"),
+            AppTarget(version = "16.80.15", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

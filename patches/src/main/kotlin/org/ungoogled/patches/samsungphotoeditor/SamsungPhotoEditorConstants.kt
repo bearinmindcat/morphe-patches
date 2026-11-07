@@ -15,7 +15,7 @@ object SamsungPhotoEditorConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xFE0053,
         targets = listOf(
-            AppTarget(version = "3.9.04.6"),
+            AppTarget(version = "3.9.04.6", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

@@ -14,7 +14,7 @@ object SamsungContactsConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xFF4545,
         targets = listOf(
-            AppTarget(version = "16.3.00.87"),
+            AppTarget(version = "16.3.00.87", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

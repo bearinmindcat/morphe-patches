@@ -15,7 +15,7 @@ object SamsungSoundAssistantConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "8.1.00.6"),
+            AppTarget(version = "8.1.00.6", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

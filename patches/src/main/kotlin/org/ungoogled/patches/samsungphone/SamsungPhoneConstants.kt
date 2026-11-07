@@ -14,7 +14,7 @@ object SamsungPhoneConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x0CC251,
         targets = listOf(
-            AppTarget(version = "16.3.52.1"),
+            AppTarget(version = "16.3.52.1", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

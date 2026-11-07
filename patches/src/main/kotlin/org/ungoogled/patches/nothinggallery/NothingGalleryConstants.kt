@@ -13,7 +13,7 @@ object NothingGalleryConstants {
         packageName = "com.nothing.gallery",
         appIconColor = 0xD71921,
         targets = listOf(
-            AppTarget(version = "3.1.3.1019"),
+            AppTarget(version = "3.1.3.1019", minSdk = 34, description = "needs Android 14 or newer"),
         ),
     )
 }

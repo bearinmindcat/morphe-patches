@@ -14,7 +14,7 @@ object SamsungRoutinesConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x436BEF,
         targets = listOf(
-            AppTarget(version = "5.1.03.1"),
+            AppTarget(version = "5.1.03.1", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

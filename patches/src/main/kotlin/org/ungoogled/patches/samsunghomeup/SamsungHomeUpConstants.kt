@@ -16,7 +16,7 @@ object SamsungHomeUpConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "18.0.00.24"),
+            AppTarget(version = "18.0.00.24", minSdk = 36, description = "needs Android 16 or newer"),
         ),
     )
 }

@@ -15,7 +15,7 @@ object NothingRecorderConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xD71921,
         targets = listOf(
-            AppTarget(version = "4.0.0"),
+            AppTarget(version = "4.0.0", minSdk = 34, description = "needs Android 14 or newer"),
         ),
     )
 }

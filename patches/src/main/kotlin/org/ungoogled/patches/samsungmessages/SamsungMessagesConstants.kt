@@ -14,7 +14,7 @@ object SamsungMessagesConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x20AFFF,
         targets = listOf(
-            AppTarget(version = "16.3.21.1"),
+            AppTarget(version = "16.3.21.1", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }

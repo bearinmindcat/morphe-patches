@@ -15,7 +15,7 @@ object SamsungClockConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "12.4.02.38"),
+            AppTarget(version = "12.4.02.38", minSdk = 35, description = "needs Android 15 or newer"),
         ),
     )
 }
