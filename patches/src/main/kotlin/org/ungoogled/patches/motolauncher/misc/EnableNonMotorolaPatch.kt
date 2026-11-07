@@ -29,6 +29,9 @@ import org.ungoogled.patches.motolauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.motolauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.motolauncher.MotoLauncherConstants.COMPATIBILITY_MOTO_LAUNCHER
 import org.ungoogled.patches.motolauncher.SUPER_CONSTRUCTORS
+import org.ungoogled.patches.motolauncher.v13.HIDDEN_CONSTRUCTORS as V13_HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.motolauncher.v13.HIDDEN_MEMBERS as V13_HIDDEN_MEMBERS
+import org.ungoogled.patches.motolauncher.v13.HIDDEN_SUPERCLASSES as V13_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
@@ -38,6 +41,12 @@ internal const val MOTO_LAUNCHER_EXTENSION = "extensions/motolauncher.mpe"
 private const val EXT = "Lorg/ungoogled/motolauncher"
 
 private val log = java.util.logging.Logger.getLogger("MotoLauncher")
+
+/**
+ * Version 13 is the Android 13 build: its lists are generated against Android 13, 15, 16, 17 and the canary
+ * (v13/MotoLauncher13Members.kt), and it is the older Launcher3 (no background widget host, no pending-intent helper).
+ */
+private fun isAndroid13Build(version: String?) = version == "13"
 
 private val SETTINGS_SHAPES = listOf(
     "getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;" to "GetString",
@@ -104,6 +113,12 @@ private val GUARDED_CALLS = mapOf(
     "Landroid/app/ActivityManager;->getCurrentUser()I" to "$EXT/Calls;->getCurrentUser()I",
 )
 
+/** DeviceConfig reads (Launcher3's device flags): Android 13 refuses them to an installed app (see Calls). */
+private val DEVICE_CONFIG_CALLS = mapOf(
+    "Landroid/provider/DeviceConfig;->getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z" to
+        "$EXT/Calls;->getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z",
+)
+
 /**
  * Moto App Launcher is a system app built against the full Android framework; an installed app may not link to its hidden
  * parts. Each hidden member it uses goes through Members (used where Android allows it, "absent" elsewhere), each
@@ -117,31 +132,47 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(MOTO_LAUNCHER_EXTENSION)
 
     execute {
+        val android13Build = isAndroid13Build(packageMetadata.versionName)
+        // APKMirror's release "13" has two variants with the same version: the October 2023 one adds the Sentry crash
+        // reporter and a newer launcher build this patch was not made for.
+        if (android13Build && classDefByOrNull("Lio/sentry/Sentry;") != null) {
+            throw PatchException(
+                "This is the second Moto App Launcher 13 variant (October 2023); patch the first one " +
+                    "(\"moto-app-launcher-13\", April 2023, see docs/APK-SOURCES.md in the patches repository).",
+            )
+        }
         val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY,
+            "$EXT/Members;", "$EXT/Hidden;",
+            if (android13Build) V13_HIDDEN_MEMBERS else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
+            "$EXT/Members;", "$EXT/Hidden;",
+            if (android13Build) V13_HIDDEN_CONSTRUCTORS else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
-        val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
-        val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
+        val superCalls = if (android13Build) 0 else substituteSuperConstructors(SUPER_CONSTRUCTORS)
+        val superclasses = if (android13Build) V13_HIDDEN_SUPERCLASSES else HIDDEN_SUPERCLASSES
+        val rebased = rebaseSubclasses(superclasses)
         // The launcher's own PendingIntentCompat.newPendingIntent takes an IIntentSender.Stub, a rebased class: its two
         // callers (TouchInteractionService's search and all-apps actions) pass rebased senders, which would no longer
-        // verify. They call Launch.pendingIntent instead, which makes the same pending intent.
-        val pendingIntentShape = "(Landroid/content/IIntentSender\$Stub;)Landroid/app/PendingIntent;"
-        val pendingIntentCompat = buildMap {
-            classDefForEach { c ->
-                if (c.methods.any { m -> m.name == "newPendingIntent" && "(${m.parameterTypes.joinToString("")})${m.returnType}" == pendingIntentShape }) {
-                    put("${c.type}->newPendingIntent$pendingIntentShape", "$EXT/Launch;->pendingIntent(Ljava/lang/Object;)Landroid/app/PendingIntent;")
+        // verify. They call Launch.pendingIntent instead, which makes the same pending intent. (13 has no such helper.)
+        var pendingIntents = 0
+        if (!android13Build) {
+            val pendingIntentShape = "(Landroid/content/IIntentSender\$Stub;)Landroid/app/PendingIntent;"
+            val pendingIntentCompat = buildMap {
+                classDefForEach { c ->
+                    if (c.methods.any { m -> m.name == "newPendingIntent" && "(${m.parameterTypes.joinToString("")})${m.returnType}" == pendingIntentShape }) {
+                        put("${c.type}->newPendingIntent$pendingIntentShape", "$EXT/Launch;->pendingIntent(Ljava/lang/Object;)Landroid/app/PendingIntent;")
+                    }
                 }
             }
+            if (pendingIntentCompat.size != 1) throw PatchException("expected one PendingIntentCompat.newPendingIntent, found ${pendingIntentCompat.keys}")
+            pendingIntents = redirectCalls(pendingIntentCompat)
+            if (pendingIntents == 0) throw PatchException("no PendingIntentCompat.newPendingIntent calls found")
         }
-        if (pendingIntentCompat.size != 1) throw PatchException("expected one PendingIntentCompat.newPendingIntent, found ${pendingIntentCompat.keys}")
-        val pendingIntents = redirectCalls(pendingIntentCompat)
-        if (pendingIntents == 0) throw PatchException("no PendingIntentCompat.newPendingIntent calls found")
-        val casts = nullCastsToRebasedBases(HIDDEN_SUPERCLASSES.keys)
+        val casts = nullCastsToRebasedBases(superclasses.keys)
         skipCastOfNull("$EXT/Hidden;")
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; casts to their old bases: $casts; pending intents: $pendingIntents")
+        // Measured against 13: 815 calls, 128 field accesses, 39 constructors, 9 rebased classes, 15 casts.
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0) throw PatchException("hidden constructors not found")
         if (rebased == 0) throw PatchException("no subclasses of hidden Android classes found")
@@ -203,9 +234,16 @@ private val systemPrivilegesPatch = bytecodePatch(
         val windows = redirectCalls(WINDOW_CALLS)
         val reflection = redirectCalls(REFLECTION_CALLS)
         val guarded = redirectCalls(GUARDED_CALLS)
-        log.info("receivers: $receivers, settings calls: $settings, windows: $windows, reflection: $reflection, guarded: $guarded")
+        val android13Build = isAndroid13Build(packageMetadata.versionName)
+        val deviceConfig = if (android13Build) redirectCalls(DEVICE_CONFIG_CALLS) else 0
+        log.info(
+            "receivers: $receivers, settings calls: $settings, windows: $windows, reflection: $reflection, guarded: $guarded, " +
+                "device config: $deviceConfig",
+        )
         if (settings < 20) throw PatchException("only $settings settings calls found")
         if (guarded < 2) throw PatchException("only $guarded content observer / user calls found")
+        // Measured against 13: one, Launcher3's DeviceFlag.
+        if (android13Build && deviceConfig == 0) throw PatchException("no DeviceConfig reads found")
 
         // Suggested apps come from Android's app prediction service, which only answers a caller with usage access: each
         // lookup of the service sees none without it (the launcher checks for null), so it skips its predictions.
@@ -239,8 +277,10 @@ private val systemPrivilegesPatch = bytecodePatch(
         val manager = "Lcom/android/launcher3/QuickstepTransitionManager;"
         val wrapper = "Lcom/android/launcher3/util/ActivityOptionsWrapper;"
         val runnables = "Lcom/android/launcher3/util/RunnableList;"
-        val launcherField = "$manager->mLauncher:Lcom/android/launcher3/uioverrides/QuickstepLauncher;"
         val transitions = mutableClassDefBy(manager)
+        // 15 keeps a QuickstepLauncher, 13 a BaseQuickstepLauncher.
+        val launcherField = transitions.fields.firstOrNull { it.name == "mLauncher" }?.let { "$manager->mLauncher:${it.type}" }
+            ?: throw PatchException("QuickstepTransitionManager.mLauncher not found")
         val launchOptions = transitions.methods.firstOrNull { it.name == "getActivityLaunchOptions" && it.returnType == wrapper }
             ?: throw PatchException("QuickstepTransitionManager.getActivityLaunchOptions not found")
         if (launchOptions.implementation!!.registerCount - launchOptions.parameterTypes.size - 1 < 3) {
@@ -289,12 +329,14 @@ private val systemPrivilegesPatch = bytecodePatch(
                 registrations++
             }
         }
-        // Measured against 15: registerRemoteAnimations(boolean), registerRemoteTransitions and their two unregisters.
+        // Measured against 15 and 13: registerRemoteAnimations(boolean), registerRemoteTransitions and their two unregisters.
         if (registrations < 4) throw PatchException("only $registrations remote animation registrations found")
 
         // Widgets: with background widget updates on, the launcher's holder routes each widget's updates through a
         // listener only the system may register (AppWidgetHost.setListener), and widgets would stay "Loading...". Where
         // Android refuses it the factory takes its own other branch, Launcher3's plain holder. (From Xperia Home's port.)
+        // (13's Launcher3 has no background widget host: its widgets get their updates the way any home app does.)
+        if (android13Build) return@execute
         val factory = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder\$QuickstepHolderFactory;")
         val newInstance = factory.methods.firstOrNull {
             it.name == "newInstance" && it.parameterTypes.size == 3 && it.returnType == "Lcom/android/launcher3/widget/LauncherWidgetHolder;"

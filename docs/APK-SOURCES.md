@@ -34,14 +34,14 @@ public APK mirror.
 
 ## Launchers
 
-The launcher ports are tested on Android 15 and newer; ASUS Launcher, Honor Home, both OnePlus launchers and One UI Home 16.0.09.35 also on Android 13, OnePlus System Launcher 15.6.24 also on Android 11.
+The launcher ports are tested on Android 15 and newer; ASUS Launcher, Honor Home, both OnePlus launchers, One UI Home 16.0.09.35 and Moto App Launcher 13 also on Android 13, OnePlus System Launcher 15.6.24 also on Android 11.
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|
 | ASUS Launcher | `com.asus.launcher` | 11.0.0.76_240920 | 13+ | [APKMirror](https://www.apkmirror.com/apk/zenui-asus-computer-inc/asus-launcher/asus-launcher-11-0-0-76_240920-release/) |
 | Honor Home | `com.hihonor.android.launcher` | 14.0.0.210 | 10+ | [APKMirror](https://www.apkmirror.com/apk/honor/honor-home/honor-home-14-0-0-210-release/) |
 | HyperOS Launcher | `com.miui.home` | RELEASE-7.50.06.2372-06261924 | 14+ | [APKMirror](https://www.apkmirror.com/apk/xiaomi-inc/miui-launcher/xiaomi-system-launcher-release-7-50-06-2372-06261924-release/) (listed as "Xiaomi System Launcher"; the newer 8.x builds have no app code and can't be patched) |
-| Moto App Launcher | `com.motorola.launcher3` | 15 | 15+ | [APKMirror](https://www.apkmirror.com/apk/motorola-mobility-llc/moto-app-launcher/moto-app-launcher-15-release/) (the release has two variants; take the first, "moto-app-launcher-15") |
+| Moto App Launcher | `com.motorola.launcher3` | 15, 13 | 15+ (15), 13+ (13) | [APKMirror 15](https://www.apkmirror.com/apk/motorola-mobility-llc/moto-app-launcher/moto-app-launcher-15-release/) (the release has two variants; take the first, "moto-app-launcher-15"), [APKMirror 13](https://www.apkmirror.com/apk/motorola-mobility-llc/moto-app-launcher/moto-app-launcher-13-release/) (for Android 13 and 14; on Android 15 and newer take 15. Two variants with the same version; take the first, "moto-app-launcher-13" from April 2023) |
 | Nothing Launcher | `com.nothing.launcher` | 4.0.20, 3.3.14 | 16+ (4.0.20), 15+ (3.3.14) | [APKMirror 4.0.20](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-launcher/nothing-launcher-4-0-20-release/), [APKMirror 3.3.14](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-launcher/nothing-launcher-3-3-14-release/) (for Android 15; on Android 16 and newer take 4.0.20). Bundle. |
 | One UI Home | `com.sec.android.app.launcher` | 18.0.07.59, 16.0.09.35 | 15+ (18.0.07.59), 13+ (16.0.09.35) | [APKMirror 18.0.07.59](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-experience-home-touchwiz-home/samsung-one-ui-home-18-0-07-59-release/), [APKMirror 16.0.09.35](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-experience-home-touchwiz-home/samsung-one-ui-home-16-0-09-35-release/) (for Android 13 and 14; on Android 15 and newer take 18.0.07.59) |
 | OnePlus Launcher (OxygenOS 11) | `net.oneplus.launcher` | 5.2.66 | 10+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-launcher-2/oneplus-launcher-2-5-2-66-release/) |

@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.motolauncher"
 
     defaultConfig {
-        // Moto App Launcher 15 requires Android 15 (API 35).
-        minSdk = 35
+        // Moto App Launcher 13 runs on Android 13 (API 33), 15 on Android 15. Not higher: the dexer drops version checks
+        // below minSdk.
+        minSdk = 33
     }
 }
 
