@@ -1,3 +1,13 @@
+## [2.9.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.1...v2.9.2) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* home up hides the features that need one ui; issue [#150](https://github.com/bearinmindcat/morphe-patches/issues/150) ([fa65b3a](https://github.com/bearinmindcat/morphe-patches/commit/fa65b3aafeeb766fe705e615c894d8cef6ffdb62))
+* moto app launcher runs on android 13 ([c32237c](https://github.com/bearinmindcat/morphe-patches/commit/c32237c59fd4a64a0de97ed9aae14a7d8b89078a))
+* one ui home runs on android 13 ([bbafdf2](https://github.com/bearinmindcat/morphe-patches/commit/bbafdf235a16f9c1652254c5cbe944f1791da947))
+* oneplus photos runs on android 11 ([8d17b87](https://github.com/bearinmindcat/morphe-patches/commit/8d17b8764275ab7cbcf3f8dd27f800153d6ecdf7))
+* samsung capture records on galaxy phones (one ui core clone); issue [#145](https://github.com/bearinmindcat/morphe-patches/issues/145) ([39eaddb](https://github.com/bearinmindcat/morphe-patches/commit/39eaddb828c70c6cc9f712b370f45c5a31fe6aab))
+
 ## [2.9.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.0...v2.9.1) (2026-11-07)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;178 patches total
+> **[v2.9.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;178 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -200,7 +200,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 15 — needs Android 15 or newer
+**Supported version(s):** 15 — needs Android 15 or newer, 13 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -224,7 +224,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 18.0.07.59 — needs Android 15 or newer
+**Supported version(s):** 18.0.07.59 — needs Android 15 or newer, 16.0.09.35 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -1071,7 +1071,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.45.2
+**Supported version(s):** 16.45.2 — needs Android 13 or newer, 15.33.40 — needs Android 11 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
