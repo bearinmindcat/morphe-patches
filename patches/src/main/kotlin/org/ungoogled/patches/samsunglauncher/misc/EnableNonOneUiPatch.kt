@@ -100,6 +100,12 @@ private val WIDGET_BINDS = listOf(
         "$EXT/Widgets;->bind(Landroid/appwidget/AppWidgetManager;${shape.substring(1)}"
 }
 
+/** The wallpaper picture, refused to an installed app (see Wallpapers): Home Up's backups read it. */
+private val WALLPAPER_CALLS = mapOf(
+    "Landroid/app/WallpaperManager;->getDrawable()Landroid/graphics/drawable/Drawable;" to
+        "$EXT/Wallpapers;->getDrawable(Landroid/app/WallpaperManager;)Landroid/graphics/drawable/Drawable;",
+)
+
 /**
  * The widget permission dialog's host activity. Some icons are SPR files, Samsung's vector format that only One UI
  * can draw: they become vector drawables.
@@ -249,6 +255,7 @@ private val systemPrivilegesPatch = bytecodePatch(
         val settings = redirectCalls(SETTINGS_CALLS)
         val widgets = redirectCalls(WIDGET_BINDS)
         val windows = redirectCalls(WINDOW_CALLS)
+        val wallpapers = redirectCalls(WALLPAPER_CALLS)
         val reflection = redirectCalls(REFLECTION_CALLS)
         log.info("reflection lookups: $reflection")
 
@@ -267,10 +274,12 @@ private val systemPrivilegesPatch = bytecodePatch(
             """,
             ExternalLabel("own", invoke.implementation!!.instructions.first()),
         )
-        log.info("system services: $services, settings calls: $settings, widget binds: $widgets, windows: $windows")
+        log.info("system services: $services, settings calls: $settings, widget binds: $widgets, windows: $windows, wallpaper reads: $wallpapers")
         // Measured against 18.0.07.59: 168 settings calls; 16.0.09.35: 117.
         if (settings < 50) throw PatchException("only $settings settings calls found")
         if (widgets == 0) throw PatchException("no widget binds found")
+        // Measured against 18.0.07.59: 1 (the Home Up backup picture).
+        if (wallpapers == 0) throw PatchException("the wallpaper read of Home Up backups was not found")
 
         // App launches: without the remote animation permission, Android's own launch (the path One UI Home itself
         // takes in DeX).

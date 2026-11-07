@@ -19,6 +19,8 @@ import android.util.Log;
 public final class LocalSettings {
     private static final String TAG = "UA";
     private static final String PREFS = "oneuihome_local_settings";
+    /** ContentResolver.NOTIFY_NO_DELAY (hidden; ContentService accepts it from any app). */
+    private static final int NOTIFY_NO_DELAY = 1 << 15;
     private static SharedPreferences prefs;
 
     private LocalSettings() {
@@ -90,7 +92,10 @@ public final class LocalSettings {
         p.edit().putString(key, value).apply();
         if (old == null ? value != null : !old.equals(value)) {
             try {
-                r.notifyChange(uri(table, name), null);
+                // At once, as Android's settings provider does: Android holds a change back 10 s for an app that is
+                // not in the foreground, and the home screen reads two quick changes (a Home Up backup: 0, then 1)
+                // as one that never happened.
+                r.notifyChange(uri(table, name), null, NOTIFY_NO_DELAY);
             } catch (RuntimeException e) {
                 Log.w(TAG, "local setting " + key + " not announced", e);
             }
