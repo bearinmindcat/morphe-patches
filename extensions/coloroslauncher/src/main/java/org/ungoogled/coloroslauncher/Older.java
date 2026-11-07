@@ -170,6 +170,8 @@ final class Older {
             case "Landroid/app/WallpaperManager;->getDrawable(I)Landroid/graphics/drawable/Drawable;":
                 return Wallpapers.getDrawable((android.app.WallpaperManager) receiver, (Integer) args[0]);
             // Drawing.
+            case "Landroid/graphics/Bitmap;->getHardwareBuffer()Landroid/hardware/HardwareBuffer;":
+                return hardwareBuffer((android.graphics.Bitmap) receiver);
             case "Landroid/graphics/Rect;->inset(Landroid/graphics/Insets;)V": {
                 android.graphics.Rect r = (android.graphics.Rect) receiver;
                 android.graphics.Insets i = (android.graphics.Insets) args[0];
@@ -240,6 +242,43 @@ final class Older {
                         (android.graphics.drawable.Drawable) args[1]);
         }
         return Fallbacks.NONE;
+    }
+
+    /**
+     * A hardware bitmap's buffer (Android 12's Bitmap.getHardwareBuffer; Android 11 keeps it private): the bitmap drawn
+     * into a buffer of its own through Android's public HardwareRenderer and ImageReader. The launcher blurs it behind
+     * its icon menus.
+     */
+    private static android.hardware.HardwareBuffer hardwareBuffer(android.graphics.Bitmap bitmap) {
+        int w = bitmap.getWidth(), h = bitmap.getHeight();
+        long usage = android.hardware.HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | android.hardware.HardwareBuffer.USAGE_GPU_COLOR_OUTPUT;
+        android.media.ImageReader reader = android.media.ImageReader.newInstance(w, h, android.graphics.PixelFormat.RGBA_8888, 1, usage);
+        android.graphics.HardwareRenderer renderer = new android.graphics.HardwareRenderer();
+        try {
+            android.graphics.RenderNode node = new android.graphics.RenderNode("hardwareBuffer");
+            node.setPosition(0, 0, w, h);
+            android.graphics.RecordingCanvas canvas = node.beginRecording();
+            canvas.drawBitmap(bitmap, 0f, 0f, null);
+            node.endRecording();
+            renderer.setContentRoot(node);
+            renderer.setSurface(reader.getSurface());
+            renderer.createRenderRequest().setWaitForPresent(true).syncAndDraw();
+            android.media.Image image = reader.acquireNextImage();
+            if (image != null) {
+                try {
+                    return image.getHardwareBuffer();
+                } finally {
+                    image.close();
+                }
+            }
+        } catch (RuntimeException e) {
+            android.util.Log.w("UA", "no hardware buffer for the bitmap: " + e);
+        } finally {
+            renderer.destroy();
+            reader.close();
+        }
+        // An empty buffer of the bitmap's size: the menu's blur shows the wallpaper only.
+        return android.hardware.HardwareBuffer.create(w, h, android.hardware.HardwareBuffer.RGBA_8888, 1, usage);
     }
 
     private static float axis(android.view.VelocityTracker t, int axis, int id) {
