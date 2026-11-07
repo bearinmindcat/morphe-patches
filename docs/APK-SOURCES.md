@@ -213,6 +213,7 @@ Both OnePlus launchers are listed under [Launchers](#launchers).
 |---|---|---|---|---|
 | Sony Album | `com.sonyericsson.album` | 9.9.A.0.20 | 4.4+ | [APKMirror](https://www.apkmirror.com/apk/sony-mobile-communications/album/album-9-9-a-0-20-release/) |
 | Sony Music | `com.sonyericsson.music` | 9.4.16.A.1.17 | 11+ | [APKMirror](https://www.apkmirror.com/apk/sony-corporation/walkman-music/sony-music-9-4-16-a-1-17-release/) |
+| Xperia Keyboard | `com.sonyericsson.textinput.uxp` | 8.1.A.0.12 | 4.4+ | [APKMirror](https://www.apkmirror.com/apk/sony-mobile-communications-inc/xperia-keyboard/xperia-keyboard-8-1-a-0-12-release/) |
 
 Xperia Home is listed under [Launchers](#launchers).
 
