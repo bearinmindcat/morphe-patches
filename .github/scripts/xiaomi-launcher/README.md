@@ -9,6 +9,7 @@ app. Off HyperOS it needs two kinds of help, both generated so a new version is 
   which an installed app may not write) through the extension's `LocalSettings`; `miui.os.Build` adds `IS_DEV_VERSION`
   (read by reflection and unboxed unchecked); `ToggleManager.getAllToggles` is an empty list, not null; `NewHomeView` is
   a FrameLayout and `AdAction` an `Action`, as the launcher's code expects (the ART verifier rejected two classes).
+  `IconCustomizer.generateIconStyleDrawable` gives the icon back (null left pinned shortcuts without an icon).
 - `../coloros-launcher/hidden.py` -- the **hidden Android API** it references (written to
   `patches/.../xiaomilauncher/XiaomiLauncherMembers.kt`), as for the other launcher ports.
 
