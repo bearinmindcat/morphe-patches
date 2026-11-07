@@ -34,7 +34,7 @@ public APK mirror.
 
 ## Launchers
 
-The launcher ports are tested on Android 15 and newer.
+The launcher ports are tested on Android 15 and newer; OnePlus System Launcher 15.6.24 also on Android 11.
 
 | App | Package | Version | Android | Where to get it |
 |---|---|---|---|---|
@@ -45,7 +45,7 @@ The launcher ports are tested on Android 15 and newer.
 | Nothing Launcher | `com.nothing.launcher` | 4.0.20 | 16+ | [APKMirror](https://www.apkmirror.com/apk/nothing-technology-limited/nothing-launcher/nothing-launcher-4-0-20-release/). Bundle. |
 | One UI Home | `com.sec.android.app.launcher` | 18.0.07.59 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-experience-home-touchwiz-home/samsung-one-ui-home-18-0-07-59-release/) |
 | OnePlus Launcher (OxygenOS 11) | `net.oneplus.launcher` | 5.2.66 | 10+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/oneplus-launcher-2/oneplus-launcher-2-5-2-66-release/) |
-| OnePlus System Launcher | `com.android.launcher` | 16.4.30 | 13+ | [APKMirror](https://www.apkmirror.com/apk/oneplus-ltd/system-launcher-5/oneplus-system-launcher-16-4-30-release/) |
+| OnePlus System Launcher | `com.android.launcher` | 16.4.30, 15.6.24 | 13+ (16.4.30), 11+ (15.6.24) | [APKMirror 16.4.30](https://www.apkmirror.com/apk/oneplus-ltd/system-launcher-5/oneplus-system-launcher-16-4-30-release/), [APKMirror 15.6.24](https://www.apkmirror.com/apk/oneplus-ltd/system-launcher-5/oneplus-system-launcher-15-6-24-release/) (for Android 11 and 12; on Android 13 and newer take 16.4.30) |
 | Xperia Home | `com.sonymobile.launcher` | 15 | 15+ | [APKMirror](https://www.apkmirror.com/apk/sony-mobile-communications/xperia-home-3/xperia-home-15-release/) |
 
 ## Samsung

@@ -25,7 +25,7 @@ public class TrackApi {
     public static class Config {
         public Config() {
         }
-        public static class Builder {
+        public static class Builder extends java.lang.Object {
             public Builder(java.lang.String p0, java.lang.String p1) {
             }
             public com.oplus.nearx.track.TrackApi.Config build() {

@@ -83,7 +83,9 @@ public final class Windows {
         int t = overlay(c, type);
         if (!systemType(t)) {
             try {
-                return c.createWindowContext(display, t, options);
+                // Android 11 makes window contexts only of a context's own display.
+                return android.os.Build.VERSION.SDK_INT >= 31 ? c.createWindowContext(display, t, options)
+                        : c.createDisplayContext(display).createWindowContext(t, options);
             } catch (RuntimeException e) {
                 if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "window context refused: " + type + ": " + e);
             }

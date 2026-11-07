@@ -45,6 +45,13 @@ final class Fallbacks {
     }
 
     static Object call(Object receiver, String key, Object[] args) {
+        // Public calls newer than the phone (see Older).
+        try {
+            Object older = Older.call(receiver, key, args);
+            if (older != NONE) return older;
+        } catch (ClassCastException e) {
+            return NONE;
+        }
         // A configuration's window configuration (hidden; the launcher reads it through Configuration's hidden field,
         // which an app gets as null): the full-screen bounds and rotation of the default display (see Reflect).
         if (key.startsWith("Landroid/app/WindowConfiguration;->") && (args == null || args.length == 0)) {
@@ -147,7 +154,11 @@ final class Fallbacks {
                 // Geometry.
                 case "Landroid/graphics/Rect;->inset(Landroid/graphics/Rect;)V": {
                     Rect r = (Rect) args[0];
-                    ((Rect) receiver).inset(r.left, r.top, r.right, r.bottom);
+                    Rect target = (Rect) receiver; // inset(int, int, int, int) is Android 12's
+                    target.left += r.left;
+                    target.top += r.top;
+                    target.right -= r.right;
+                    target.bottom -= r.bottom;
                     return null;
                 }
                 case "Landroid/graphics/Rect;->intersectUnchecked(Landroid/graphics/Rect;)V": {
@@ -313,6 +324,8 @@ final class Fallbacks {
 
     /** Objects of classes an installed app may not construct, from their public equivalents. */
     static Object construct(String key, Object[] args) {
+        Object older = Older.construct(key, args);
+        if (older != NONE) return older;
         switch (key) {
             // A display's info (hidden constructor): the default display's own (its open mDisplayInfo field), which
             // the launcher then only reads (its getDisplayInfo fill-in is hidden too).
@@ -323,6 +336,8 @@ final class Fallbacks {
     }
 
     static Object get(Object receiver, String key) {
+        Object older = Older.get(receiver, key);
+        if (older != NONE) return older;
         switch (key) {
             // A view's scroll position (the hidden fields behind getScrollX/Y).
             case "Landroid/view/ViewGroup;->mScrollX:I":

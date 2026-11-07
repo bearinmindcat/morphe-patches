@@ -33,6 +33,8 @@ private fun MethodReference.key() = "$definingClass->$name(${parameterTypes.join
 
 private fun wide(type: String) = type == "J" || type == "D"
 
+private val MOVE_OBJECT = setOf(Opcode.MOVE_OBJECT, Opcode.MOVE_OBJECT_FROM16, Opcode.MOVE_OBJECT_16)
+
 /** The registers an invoke passes, in order. */
 private fun Instruction.arguments(): List<Int> = when (this) {
     is FiveRegisterInstruction -> listOf(registerC, registerD, registerE, registerF, registerG).take(registerCount)
@@ -55,7 +57,14 @@ private fun Instruction.touches(r: Int): Boolean = when (this) {
  * allows it, or the port's own answer, else null. The `new-instance` is replaced by a null constant and the result
  * moved into the same register, so nothing else at the site changes. Returns the sites changed.
  */
-internal fun BytecodePatchContext.redirectConstructors(helper: String, shimClass: String, keys: Set<String>): Int {
+internal fun BytecodePatchContext.redirectConstructors(
+    helper: String,
+    shimClass: String,
+    keys: Set<String>,
+    // Also sites where the new object is copied to another register before its constructor (`move-object v1, v0`);
+    // the result then goes to both registers.
+    followMoves: Boolean = false,
+): Int {
     val sem = mutableClassDefBy(shimClass)
     val shims = mutableMapOf<String, String>()
 
@@ -111,18 +120,28 @@ internal fun BytecodePatchContext.redirectConstructors(helper: String, shimClass
             val receiver = insn.arguments().first()
             // The new-instance that made the receiver; a constructor's own super() call has none and is left alone.
             var start = -1
+            var origin = receiver
             for (i in index - 1 downTo 0) {
                 val before = instructions[i]
-                if (before.opcode == Opcode.NEW_INSTANCE && (before as OneRegisterInstruction).registerA == receiver &&
+                if (before.opcode == Opcode.NEW_INSTANCE && (before as OneRegisterInstruction).registerA == origin &&
                     ((before as ReferenceInstruction).reference as TypeReference).type == r.definingClass
                 ) {
                     start = i
                     break
                 }
-                if (before.touches(receiver)) break
+                if (followMoves && origin == receiver && before is TwoRegisterInstruction && before.registerA == receiver &&
+                    before.opcode in MOVE_OBJECT
+                ) {
+                    // The copy's source gets the result too: nothing between the copy and the call may use it.
+                    val source = before.registerB
+                    if ((i + 1 until index).any { instructions[it].touches(source) }) break
+                    origin = source
+                    continue
+                }
+                if (before.touches(origin)) break
             }
             if (start < 0) continue
-            if (receiver > 255) throw PatchException("register v$receiver too high in $type.${method.name}")
+            if (receiver > 255 || origin > 255) throw PatchException("register v$receiver too high in $type.${method.name}")
             val arguments = insn.arguments().drop(1)
             val call = when {
                 arguments.isEmpty() -> "invoke-static { }, ${shim(r)}"
@@ -132,7 +151,8 @@ internal fun BytecodePatchContext.redirectConstructors(helper: String, shimClass
             }
             mutable.replaceInstruction(index, call)
             mutable.addInstruction(index + 1, "move-result-object v$receiver")
-            mutable.replaceInstruction(start, if (receiver < 16) "const/4 v$receiver, 0x0" else "const/16 v$receiver, 0x0")
+            if (origin != receiver) mutable.addInstruction(index + 2, "move-object/from16 v$origin, v$receiver")
+            mutable.replaceInstruction(start, if (origin < 16) "const/4 v$origin, 0x0" else "const/16 v$origin, 0x0")
             changed++
         }
     }

@@ -1,5 +1,9 @@
 package com.oplus.wrapper.view;
 
 /** Generated stand-in (.github/scripts/coloros-launcher): names and signatures OnePlus System Launcher uses, answering "absent" off ColorOS and on Android versions without them (no OPPO or Google code). */
-public class IRecentsAnimationController {
+public interface IRecentsAnimationController {
+    public static abstract class Stub extends android.os.Binder implements com.oplus.wrapper.view.IRecentsAnimationController {
+        public Stub() {
+        }
+    }
 }

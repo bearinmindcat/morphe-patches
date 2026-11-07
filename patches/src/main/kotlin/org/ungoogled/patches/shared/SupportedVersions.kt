@@ -35,19 +35,21 @@ internal fun supportedVersionCheck(compatibility: Compatibility) = bytecodePatch
             "$version" + (minSdk?.let { " (${androidName(it)} or newer)" } ?: "")
         val supported = targets.joinToString(" or ") { label(it.version, it.minSdk) }
         val version = packageMetadata.versionName
+        val phone = patchingPhoneSdk()
+        // The version to patch instead: the newest one this phone can run (targets are listed newest first).
+        val fitting = targets.firstOrNull { phone == null || (it.minSdk ?: 0) <= phone }
         if (targets.none { it.version == version }) {
             throw PatchException(
-                "This patch supports $name $supported; $version isn't supported. " +
-                    "Patch $name ${targets.first().version} (see docs/APK-SOURCES.md in the patches repository).",
+                "This patch supports $name $supported; $version isn't supported. Patch $name " +
+                    "${(fitting ?: targets.first()).version} (see docs/APK-SOURCES.md in the patches repository).",
             )
         }
         val needed = targets.first { it.version == version }.minSdk ?: return@execute
-        val phone = patchingPhoneSdk() ?: return@execute
-        if (phone < needed) {
-            throw PatchException(
-                "$name $version needs ${androidName(needed)} or newer; this phone runs ${androidName(phone)} " +
-                    "(API $phone), so the patched app couldn't run on it.",
-            )
-        }
+        if (phone == null || phone >= needed) return@execute
+        throw PatchException(
+            "$name $version needs ${androidName(needed)} or newer; this phone runs ${androidName(phone)} " +
+                "(API $phone), so the patched app couldn't run on it." +
+                (fitting?.let { " Patch $name ${it.version} instead." } ?: ""),
+        )
     }
 }

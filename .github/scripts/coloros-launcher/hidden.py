@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-hidden.py <boot dir> <app.apk> <stand-ins dir> <out .kt> [app name]
+hidden.py <boot dir>[,<boot dir>...] <app.apk> <stand-ins dir> <out .kt> [app name] [--suffix S] [--android TEXT]
 
 The Android members a system app references that an installed app cannot use on the phone the boot classpath comes
 from (adb pull every entry of $BOOTCLASSPATH into <boot dir>, as for ../xiaomi-standins/Missing.java):
@@ -16,6 +16,11 @@ from (adb pull every entry of $BOOTCLASSPATH into <boot dir>, as for ../xiaomi-s
 References through the app's own classes count too: `invoke-virtual Lcom/app/MyView;->hiddenViewMethod()` resolves to
 View's hidden member and is refused the same way. Members of the app's own classes, class initializers and members of
 classes outside Android's namespaces (optional libraries the app handles itself) are left alone.
+
+Several boot directories (one per Android version the app is meant to run on, e.g. a11,a15,a16,a17 for a build
+that supports Android 11 and newer) give the union: a member any of those phones refuses or lacks is listed.
+--suffix names the lists HIDDEN_MEMBERS<S> etc. (several app versions in one package), --android is the phones named in
+the header ("Android 15" by default).
 
 Writes <out .kt> (package taken from its existing first line, else org.ungoogled.patches.coloroslauncher):
 HIDDEN_MEMBERS ("Lowner;->name(params)return" / "Lowner;->name:type") and HIDDEN_CONSTRUCTORS ("Lowner;-><init>(...)V"),
@@ -99,29 +104,42 @@ def dexes(path):
         if re.match(r'classes\d*\.dex$', n): yield Dex(z.read(n))
 
 # --- the phone: classes, hierarchy, members with their hidden-API flags ----------------------------------------
-boot_dir, apk, standins, out = sys.argv[1:5]
+args = sys.argv[1:]
+def option(name, default):
+    if name in args:
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    return default
+suffix = option('--suffix', '')
+android = option('--android', 'Android 15')
+boot_dirs, apk, standins, out = args[0].split(','), args[1], args[2], args[3]
 # The app named in the output's header (other launcher ports reuse this script, e.g. Xperia Home).
-app_name = sys.argv[5] if len(sys.argv) > 5 else 'OnePlus System Launcher'
-SUP, FLAGS = {}, {}
-for jar in sorted(os.listdir(boot_dir)):
-    try: dl = list(dexes(os.path.join(boot_dir, jar)))
-    except (zipfile.BadZipFile, OSError): continue
-    for d in dl:
-        h = d.hiddenapi()
-        for t, sup, its, cdo, ci in d.classes():
-            if t in SUP: continue
-            SUP[t] = ([sup] if sup else []) + its
-            keys = d.members(cdo)
-            if h is None or not cdo:
-                for k in keys: FLAGS[t + '->' + k] = 0
-                continue
-            rel = struct.unpack_from('<I', d.b, h + 4 + 4 * ci)[0]
-            if not rel:
-                for k in keys: FLAGS[t + '->' + k] = 0
-                continue
-            q = h + rel
-            for k in keys:
-                fl, q = uleb(d.b, q); FLAGS[t + '->' + k] = fl
+app_name = args[4] if len(args) > 4 else 'OnePlus System Launcher'
+
+def load_phone(boot_dir):
+    SUP, FLAGS = {}, {}
+    global ACCESS
+    ACCESS = {}
+    for jar in sorted(os.listdir(boot_dir)):
+        try: dl = list(dexes(os.path.join(boot_dir, jar)))
+        except (zipfile.BadZipFile, OSError): continue
+        for d in dl:
+            h = d.hiddenapi()
+            for t, sup, its, cdo, ci in d.classes():
+                if t in SUP: continue
+                SUP[t] = ([sup] if sup else []) + its
+                ACCESS[t] = struct.unpack_from('<I', d.b, d.coff + 32 * ci + 4)[0]
+                keys = d.members(cdo)
+                if h is None or not cdo:
+                    for k in keys: FLAGS[t + '->' + k] = 0
+                    continue
+                rel = struct.unpack_from('<I', d.b, h + 4 + 4 * ci)[0]
+                if not rel:
+                    for k in keys: FLAGS[t + '->' + k] = 0
+                    continue
+                q = h + rel
+                for k in keys:
+                    fl, q = uleb(d.b, q); FLAGS[t + '->' + k] = fl
+    return SUP, FLAGS
 
 def phone_flag(cls, member, seen=None):
     """the flags of the member a reference to cls->member resolves to on the phone, None if it has none"""
@@ -144,8 +162,8 @@ for d in dexes(apk):
     for i in range(d.msz): REFS.add(d.method(i))
     for i in range(d.fsz): REFS.add(d.field(i))
 # Android classes the app carries its own copy of (AIDL stubs it was built with): the phone's copy loads first, so they
-# are the phone's classes.
-OWN -= set(SUP)
+# are the phone's classes (OWN, per phone below).
+OWN_ALL = set(OWN)
 
 # --- the extension's stand-ins: classes and their declared members' types ------------------------------------------
 STAND = set()
@@ -208,158 +226,218 @@ def resolve_own(cls, member, seen=None):
         if r is not None and phone_flag(r, member) is not None: return r
     return None
 
-members, ctors, counts = set(), set(), collections.Counter()
-for cls, member in sorted(REFS):
-    if member.startswith('<clinit>'): continue
-    owner = cls
-    if cls in OWN:
-        if member.startswith('<init>'): continue
-        r = resolve_own(cls, member)
-        if r in (None, 'own'): continue
-        owner = r
-    if not FRAMEWORK.match(owner): continue
-    if owner in SUP:
-        v = phone_flag(owner, member)
-        if v is None: why = 'missing'
-        elif (v & 7) not in (0, 1): why = 'denied'
-        elif SERVICE.match(owner) and binder(owner) and not member.startswith('<init>'): why = 'system service'
-        else: continue
-    elif owner in STAND:
-        if all(compilable(t) for t in types_of(member)): continue
-        why = 'stand-in lacks it'
-    else:
-        why = 'no such class'
-    if owner.startswith('Landroid/') and ONE_UI.match(member): continue
-    counts[why] += 1
-    (ctors if member.startswith('<init>') else members).add(cls + '->' + member)
+def analyze():
+    """members, constructors, reasons, super-constructor substitutes and rebases for the phone in SUP/FLAGS/OWN"""
+    members, ctors, counts, why_of = set(), set(), collections.Counter(), {}
+    for cls, member in sorted(REFS):
+        if member.startswith('<clinit>'): continue
+        owner = cls
+        if cls in OWN:
+            if member.startswith('<init>'): continue
+            r = resolve_own(cls, member)
+            if r in (None, 'own'): continue
+            owner = r
+        if not FRAMEWORK.match(owner): continue
+        if owner in SUP:
+            v = phone_flag(owner, member)
+            if v is None: why = 'missing'
+            elif (v & 7) not in (0, 1): why = 'denied'
+            elif SERVICE.match(owner) and binder(owner) and not member.startswith('<init>'): why = 'system service'
+            else: continue
+        elif owner in STAND:
+            if all(compilable(t) for t in types_of(member)): continue
+            why = 'stand-in lacks it'
+        else:
+            why = 'no such class'
+        if owner.startswith('Landroid/') and ONE_UI.match(member): continue
+        counts[why] += 1; why_of[cls + '->' + member] = why
+        (ctors if member.startswith('<init>') else members).add(cls + '->' + member)
 
-# --- app classes that extend an Android class through one of those constructors ------------------------------------
-# A subclass's super(...) call cannot be redirected like a `new`. Where the Android class has an open constructor whose
-# parameters begin the refused one's (SurfaceView's hidden 5-argument constructor -> its public 4-argument one), the
-# super call takes that one; otherwise the class is rebased onto its nearest ancestor with an open no-argument
-# constructor (Binder for an AIDL stub, Object for a listener), keeping the Android interfaces it implemented.
-def ok(cls, member):
-    v = FLAGS.get(cls + '->' + member)
-    return v is not None and (v & 7) in (0, 1)
+    # --- app classes that extend an Android class through one of those constructors ------------------------------------
+    # A subclass's super(...) call cannot be redirected like a `new`. Where the Android class has an open constructor whose
+    # parameters begin the refused one's (SurfaceView's hidden 5-argument constructor -> its public 4-argument one), the
+    # super call takes that one; otherwise the class is rebased onto its nearest ancestor with an open no-argument
+    # constructor (Binder for an AIDL stub, Object for a listener), keeping the Android interfaces it implemented.
+    def ok(cls, member):
+        v = FLAGS.get(cls + '->' + member)
+        return v is not None and (v & 7) in (0, 1)
 
-def params(sig):
-    out, i = [], 0
-    while i < len(sig):
-        j = i
-        while sig[j] == '[': j += 1
-        if sig[j] == 'L': j = sig.index(';', j)
-        out.append(sig[i:j + 1]); i = j + 1
-    return out
+    def params(sig):
+        out, i = [], 0
+        while i < len(sig):
+            j = i
+            while sig[j] == '[': j += 1
+            if sig[j] == 'L': j = sig.index(';', j)
+            out.append(sig[i:j + 1]); i = j + 1
+        return out
 
-extended = collections.defaultdict(set)
-for c in OWN:
-    for s_ in OWN_SUP.get(c, [])[:1]:
-        if s_ in SUP: extended[s_].add(c)
+    extended = collections.defaultdict(set)
+    for c in OWN:
+        for s_ in OWN_SUP.get(c, [])[:1]:
+            if s_ in SUP: extended[s_].add(c)
+    substitutes, rebases = {}, {}
+    for key in sorted(ctors):
+        cls, member = key.split('->', 1)
+        if cls not in extended: continue
+        want = params(member[member.index('(') + 1:member.index(')')])
+        open_ctors = [k[len(cls) + 2:] for k in FLAGS if k.startswith(cls + '-><init>(') and ok(cls, k[len(cls) + 2:])]
+        best = max((m for m in open_ctors if want[:len(params(m[m.index('(') + 1:m.index(')')]))] ==
+                    params(m[m.index('(') + 1:m.index(')')]) and m != member), key=len, default=None)
+        if best is not None and best != '<init>()V':
+            substitutes[key] = cls + '->' + best
+            continue
+        # Only binder stubs (callbacks handed to the system) and plain listeners are rebased: a subclass deeper in Android's
+        # hierarchy (a TaskOrganizer is a WindowOrganizer) is passed around as its ancestors, which a rebased object no
+        # longer is. Those stay as they are and fail only if made, which only the system's window shell does.
+        if not (cls.endswith('$Stub;') or SUP.get(cls, [None])[0] == 'Ljava/lang/Object;'): continue
+        base, interfaces, t = None, [], cls
+        while t is not None:
+            sups = SUP.get(t, [])
+            t = sups[0] if sups else None
+            if t is None: break
+            if ok(t, '<init>()V'): base = t; break
+        def all_ifaces(c, acc):
+            for i in SUP.get(c, [])[1:]:
+                if i not in acc: acc.append(i); all_ifaces(i, acc)
+            sups = SUP.get(c, [])
+            if sups and sups[0] != base: all_ifaces(sups[0], acc)
+            return acc
+        rebases[cls] = (base or 'Ljava/lang/Object;', [i for i in all_ifaces(cls, []) if FRAMEWORK.match(i)])
+
+    # Code that still names a rebased class (calls its methods on the rebased objects, passes them where the old class is
+    # expected, constructs it): the call goes through Members as well, with its references typed Object in the shim, so the
+    # rebased objects verify; Members answers "absent" for them (they are no longer that class).
+    def defined_in(cls, member, seen=None):
+        seen = seen if seen is not None else set()
+        if cls in seen: return None
+        seen.add(cls)
+        if (cls + '->' + member) in FLAGS: return cls
+        if member.startswith('<init>'): return None
+        for s_ in SUP.get(cls, []):
+            r = defined_in(s_, member, seen)
+            if r: return r
+        return None
+
+    def above(cls, ancestor, seen=None):
+        """whether ancestor is cls or one of its superclasses / interfaces"""
+        seen = seen if seen is not None else set()
+        if cls == ancestor: return True
+        if cls in seen: return False
+        seen.add(cls)
+        return any(above(s_, ancestor, seen) for s_ in SUP.get(cls, []))
+
+    for cls, member in sorted(REFS):
+        if member.startswith('<clinit>'): continue
+        key = cls + '->' + member
+        if key in members or key in ctors: continue
+        owner = cls
+        if cls in OWN:
+            if member.startswith('<init>'): continue
+            r = resolve_own(cls, member)
+            if r in (None, 'own'): continue
+            owner = r
+        hit = False
+        for old, (base, _) in rebases.items():
+            if above(owner, old) or above(old, owner):
+                d = defined_in(owner, member)
+                if d is not None and above(old, d) and not above(base, d): hit = True
+        if not hit and '(' in member:
+            hit = any(t in rebases for t in types_of(member)[1:])
+        if not hit: continue
+        counts['rebased class'] += 1; why_of[key] = 'rebased class'
+        (ctors if member.startswith('<init>') else members).add(key)
+    return members, ctors, why_of, substitutes, rebases
+
+# One phone, or the union of several (a build meant for several Android versions).
+PHONES, RESULTS, INACCESSIBLE = [], [], set()
+for boot_dir in boot_dirs:
+    SUP, FLAGS = load_phone(boot_dir)
+    OWN = OWN_ALL - set(SUP)
+    PHONES.append((SUP, FLAGS))
+    RESULTS.append(analyze())
+    # Android interfaces the app's classes implement that are not public on this phone (Android 11's
+    # AnimationHandler.AnimationFrameCallback): such a class does not load (IllegalAccessError).
+    for c in OWN:
+        for i in OWN_SUP.get(c, [])[1:]:
+            if i in ACCESS and not ACCESS[i] & 1: INACCESSIBLE.add(i)
+members = set().union(*(r[0] for r in RESULTS))
+ctors = set().union(*(r[1] for r in RESULTS))
+why_of = {}
+for r in RESULTS:
+    for k, w in r[2].items(): why_of.setdefault(k, w)
+counts = collections.Counter(why_of.values())
+
+def open_everywhere(key):
+    """a constructor every phone that has its class lets the app call"""
+    cls = key.split('->', 1)[0]
+    return all((key in FL) and (FL[key] & 7) in (0, 1) for SP, FL in PHONES if cls in SP)
+
 substitutes, rebases = {}, {}
-for key in sorted(ctors):
-    cls, member = key.split('->', 1)
-    if cls not in extended: continue
-    want = params(member[member.index('(') + 1:member.index(')')])
-    open_ctors = [k[len(cls) + 2:] for k in FLAGS if k.startswith(cls + '-><init>(') and ok(cls, k[len(cls) + 2:])]
-    best = max((m for m in open_ctors if want[:len(params(m[m.index('(') + 1:m.index(')')]))] ==
-                params(m[m.index('(') + 1:m.index(')')]) and m != member), key=len, default=None)
-    if best is not None and best != '<init>()V':
-        substitutes[key] = cls + '->' + best
-        continue
-    # Only binder stubs (callbacks handed to the system) and plain listeners are rebased: a subclass deeper in Android's
-    # hierarchy (a TaskOrganizer is a WindowOrganizer) is passed around as its ancestors, which a rebased object no
-    # longer is. Those stay as they are and fail only if made, which only the system's window shell does.
-    if not (cls.endswith('$Stub;') or SUP.get(cls, [None])[0] == 'Ljava/lang/Object;'): continue
-    base, interfaces, t = None, [], cls
-    while t is not None:
-        sups = SUP.get(t, [])
-        t = sups[0] if sups else None
-        if t is None: break
-        if ok(t, '<init>()V'): base = t; break
-    def all_ifaces(c, acc):
-        for i in SUP.get(c, [])[1:]:
-            if i not in acc: acc.append(i); all_ifaces(i, acc)
-        sups = SUP.get(c, [])
-        if sups and sups[0] != base: all_ifaces(sups[0], acc)
-        return acc
-    rebases[cls] = (base or 'Ljava/lang/Object;', [i for i in all_ifaces(cls, []) if FRAMEWORK.match(i)])
-
-# Code that still names a rebased class (calls its methods on the rebased objects, passes them where the old class is
-# expected, constructs it): the call goes through Members as well, with its references typed Object in the shim, so the
-# rebased objects verify; Members answers "absent" for them (they are no longer that class).
-def defined_in(cls, member, seen=None):
-    seen = seen if seen is not None else set()
-    if cls in seen: return None
-    seen.add(cls)
-    if (cls + '->' + member) in FLAGS: return cls
-    if member.startswith('<init>'): return None
-    for s_ in SUP.get(cls, []):
-        r = defined_in(s_, member, seen)
-        if r: return r
-    return None
-
-def above(cls, ancestor, seen=None):
-    """whether ancestor is cls or one of its superclasses / interfaces"""
-    seen = seen if seen is not None else set()
-    if cls == ancestor: return True
-    if cls in seen: return False
-    seen.add(cls)
-    return any(above(s_, ancestor, seen) for s_ in SUP.get(cls, []))
-
-for cls, member in sorted(REFS):
-    if member.startswith('<clinit>'): continue
-    key = cls + '->' + member
-    if key in members or key in ctors: continue
-    owner = cls
-    if cls in OWN:
-        if member.startswith('<init>'): continue
-        r = resolve_own(cls, member)
-        if r in (None, 'own'): continue
-        owner = r
-    hit = False
-    for old, (base, _) in rebases.items():
-        if above(owner, old) or above(old, owner):
-            d = defined_in(owner, member)
-            if d is not None and above(old, d) and not above(base, d): hit = True
-    if not hit and '(' in member:
-        hit = any(t in rebases for t in types_of(member)[1:])
-    if not hit: continue
-    counts['rebased class'] += 1
-    (ctors if member.startswith('<init>') else members).add(key)
+for r in RESULTS:
+    for k, v in r[3].items():
+        if k in substitutes and substitutes[k] != v:
+            pick = next((c for c in (substitutes[k], v) if open_everywhere(c)), None)
+            print('super constructor', k, 'differs between phones:', substitutes[k], v, '->', pick)
+            if pick is None: del substitutes[k]; continue
+            v = pick
+        substitutes[k] = v
+    for k, (b, its) in r[4].items():
+        if k in rebases:
+            ob, oits = rebases[k]
+            if ob != b:
+                b = next((c for c in (ob, b) if c == 'Ljava/lang/Object;' or open_everywhere(c + '-><init>()V')), 'Ljava/lang/Object;')
+                print('rebase of', k, 'differs between phones:', ob, r[4][k][0], '->', b)
+            its = oits + [i for i in its if i not in oits]
+        rebases[k] = (b, its)
 
 def kt(s): return '"' + s.replace('\\', '\\\\').replace('$', '\\$').replace('"', '\\"') + '"'
 pkg = 'org.ungoogled.patches.coloroslauncher'
 if os.path.exists(out):
     first = open(out).readline()
     if first.startswith('package '): pkg = first.split()[1]
-src = f'''package {pkg}
-
-/*
- * Generated by .github/scripts/coloros-launcher/hidden.py (do not edit): the Android members {app_name}
+if android == 'Android 15':
+    header = f''' * Generated by .github/scripts/coloros-launcher/hidden.py (do not edit): the Android members {app_name}
  * references that an installed app cannot use on Android 15 -- hidden API it may not link to, members Android 15 does
  * not have, members of classes it does not have that no stand-in declares, calls on system services' binder interfaces
  * that need the system's permissions. Each goes through the extension's Members class, which uses it where the phone
- * allows and answers "absent" elsewhere.
+ * allows and answers "absent" elsewhere.'''
+else:
+    import textwrap
+    header = '\n'.join(' * ' + l for l in textwrap.wrap(
+        f'Generated by .github/scripts/coloros-launcher/hidden.py (do not edit): the Android members {app_name} '
+        f'references that an installed app cannot use on {android} -- hidden API it may not link to, members the phone '
+        f'does not have, members of classes it does not have that no stand-in declares, calls on system services\' '
+        f'binder interfaces that need the system\'s permissions. Each goes through the extension\'s Members class, '
+        f'which uses it where the phone allows and answers "absent" elsewhere.', 117))
+src = f'''package {pkg}
+
+/*
+{header}
  * {", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))}
  */
 
-internal val HIDDEN_MEMBERS = setOf''' + ('' if members else '<String>') + '''(
+internal val HIDDEN_MEMBERS{suffix} = setOf''' + ('' if members else '<String>') + '''(
 ''' + ''.join(f'    {kt(k)},\n' for k in sorted(members)) + ''')
 
 /** Constructors of the same kind, called with new: Members.construct makes the object where it can (null otherwise). */
-internal val HIDDEN_CONSTRUCTORS = setOf''' + ('' if ctors else '<String>') + '''(
+internal val HIDDEN_CONSTRUCTORS''' + suffix + ''' = setOf''' + ('' if ctors else '<String>') + '''(
 ''' + ''.join(f'    {kt(k)},\n' for k in sorted(ctors)) + ''')
 
 /** Super calls to such a constructor that take an open constructor of the same class with the first arguments. */
-internal val SUPER_CONSTRUCTORS = mapOf''' + ('' if substitutes else '<String, String>') + '''(
+internal val SUPER_CONSTRUCTORS''' + suffix + ''' = mapOf''' + ('' if substitutes else '<String, String>') + '''(
 ''' + ''.join(f'    {kt(k)} to {kt(v)},\n' for k, v in sorted(substitutes.items())) + ''')
 
 /**
  * Android classes the launcher extends through such a constructor, with the class each subclass is rebased onto and the
  * Android interfaces it keeps (see rebaseSubclasses).
  */
-internal val HIDDEN_SUPERCLASSES = mapOf''' + ('' if rebases else '<String, Pair<String, List<String>>>') + '''(
+internal val HIDDEN_SUPERCLASSES''' + suffix + ''' = mapOf''' + ('' if rebases else '<String, Pair<String, List<String>>>') + '''(
 ''' + ''.join(f'    {kt(k)} to ({kt(b)} to listOf({", ".join(kt(i) for i in its)})),\n' for k, (b, its) in sorted(rebases.items())) + ')\n'
+if INACCESSIBLE:
+    src += '''
+/** Android interfaces the launcher's classes implement that a phone keeps private: dropped from those classes. */
+internal val INACCESSIBLE_INTERFACES''' + suffix + ''' = setOf(
+''' + ''.join(f'    {kt(k)},\n' for k in sorted(INACCESSIBLE)) + ')\n'
 open(out, 'w').write(src)
 print(len(members), 'members,', len(ctors), 'constructors;', dict(counts), len(substitutes), 'super constructors,',
       len(rebases), 'rebased superclasses')

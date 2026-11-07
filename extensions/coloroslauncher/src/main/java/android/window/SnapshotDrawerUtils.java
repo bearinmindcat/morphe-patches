@@ -1,0 +1,8 @@
+package android.window;
+
+/** Generated stand-in (.github/scripts/coloros-launcher): names and signatures OnePlus System Launcher uses, answering "absent" off ColorOS and on Android versions without them (no OPPO or Google code). */
+public class SnapshotDrawerUtils {
+    public static android.app.ActivityManager.TaskDescription getOrCreateTaskDescription(android.app.ActivityManager.RunningTaskInfo p0) {
+        return null;
+    }
+}

@@ -18,8 +18,9 @@ HEADER = ('Generated stand-in (.github/scripts/coloros-launcher): names and sign
 SUPERS = dict(_base.SUPERS)
 METHODS = dict(_base.METHODS)
 
-# ColorOS's framework, and Android's own classes the phone lacks (android.*, com.android.*).
-ONLY = '(?:' + _base.ONLY + r')|^L(android/|com/android/)'
+# ColorOS's framework, and Android's own classes the phone lacks (android.*, com.android.*; not android.icu.*, a
+# package of Java's base module the extension cannot declare classes in).
+ONLY = '(?:' + _base.ONLY + r')|^L(android/(?!icu/)|com/android/)'
 
 # Constants that are objects of their own class (DesktopModeFlags.ENABLE_..., read and asked isTrue()): one object
 # each, whose answers are "absent" like everything else; null made every read a NullPointerException.
@@ -48,6 +49,7 @@ SUPERS.update({
     'Lcom/oplus/wrapper/content/res/Configuration;': 'Ljava/lang/Object;',
     'Lcom/oplus/wrapper/view/SurfaceControl$Transaction;': 'Ljava/lang/Object;',
     'Lcom/oplus/nearx/track/TrackApi$StaticConfig$Builder;': 'Ljava/lang/Object;',
+    'Lcom/oplus/nearx/track/TrackApi$Config$Builder;': 'Ljava/lang/Object;',
     # ColorOS's copy of ViewPager (the gesture guides' carousels).
     'Lcom/oplus/widget/OplusViewPager;': 'Landroid/view/ViewGroup;',
     # ColorOS's task view (the floating-window container the launcher subclasses) is a SurfaceView.

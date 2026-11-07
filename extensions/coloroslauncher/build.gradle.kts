@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.coloroslauncher"
 
     defaultConfig {
-        // OnePlus System Launcher 16.4 itself requires Android 13 (API 33).
-        minSdk = 33
+        // OnePlus System Launcher 15.6 runs on Android 11 (API 30), 16.4 on Android 13. The dexer drops version checks
+        // below this, so it is the lower one.
+        minSdk = 30
     }
 }
 

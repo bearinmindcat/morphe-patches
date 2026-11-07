@@ -1,6 +1,7 @@
 package org.ungoogled.patches.coloroslauncher.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
@@ -13,12 +14,18 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloroslauncher.ColorOsLauncherConstants.COMPATIBILITY_COLOROS_LAUNCHER
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS
+import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_15
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES
+import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES_15
+import org.ungoogled.patches.coloroslauncher.INACCESSIBLE_INTERFACES_15
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
+import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS_15
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.shared.addDefaultsForOlderAndroid
 import org.ungoogled.patches.shared.supportedVersionCheck
 
 internal const val COLOROS_LAUNCHER_EXTENSION = "extensions/coloroslauncher.mpe"
@@ -91,7 +98,17 @@ private val GUARDED_CALLS = mapOf(
     "Landroid/content/ContentResolver;->registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V" to
         "$EXT/Calls;->registerContentObserver(Landroid/content/ContentResolver;Landroid/net/Uri;ZLandroid/database/ContentObserver;)V",
     "Landroid/app/ActivityManager;->getCurrentUser()I" to "$EXT/Calls;->getCurrentUser()I",
-)
+) + listOf(
+    "getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z",
+    "getFloat(Ljava/lang/String;Ljava/lang/String;F)F",
+    "getString(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    "addOnPropertiesChangedListener(Ljava/lang/String;Ljava/util/concurrent/Executor;" +
+        "Landroid/provider/DeviceConfig\$OnPropertiesChangedListener;)V",
+).associate { shape ->
+    // The listener's type is a system API the extension cannot name: Object in the helper.
+    "Landroid/provider/DeviceConfig;->$shape" to
+        "$EXT/Calls;->" + shape.replace("Landroid/provider/DeviceConfig\$OnPropertiesChangedListener;", "Ljava/lang/Object;")
+}
 
 /** The manifest's shared user id (oppo.uid.launcher) belongs to OPPO's signature: an installed copy goes without. */
 private val manifestPatch = resourcePatch {
@@ -106,10 +123,61 @@ private val manifestPatch = resourcePatch {
 }
 
 /**
+ * 15.6.24 declares Android 11 as its minimum but has some resources (colors, the home settings' styles, ...) only for
+ * Android 12 and newer: they get defaults (see addDefaultsForOlderAndroid). 16.4.30 needs Android 13 anyway.
+ */
+private val olderAndroidResourcesPatch = resourcePatch {
+    execute {
+        if (packageMetadata.versionName != "15.6.24") return@execute
+        val added = addDefaultsForOlderAndroid()
+        log.info("resources given defaults for Android 11: $added")
+        if (added < 100) throw PatchException("only $added resources given defaults for Android 11")
+    }
+}
+
+/** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
+private class HiddenLists(
+    val members: Set<String>,
+    val constructors: Set<String>,
+    val superConstructors: Map<String, String>,
+    val superclasses: Map<String, Pair<String, List<String>>>,
+    val inaccessible: Set<String> = emptySet(),
+    // 15.6.24 copies some new objects to another register before their constructor (see redirectConstructors).
+    val followMoves: Boolean = false,
+)
+
+/** 16.4.30's lists were checked against Android 15 (and 16 / 17), 15.6.24's against Android 11, 15, 16 and 17. */
+private fun hiddenLists(version: String) = when (version) {
+    "15.6.24" -> HiddenLists(
+        HIDDEN_MEMBERS_15, HIDDEN_CONSTRUCTORS_15, SUPER_CONSTRUCTORS_15, HIDDEN_SUPERCLASSES_15,
+        INACCESSIBLE_INTERFACES_15, followMoves = true,
+    )
+    else -> HiddenLists(
+        HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17, HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17, SUPER_CONSTRUCTORS,
+        HIDDEN_SUPERCLASSES,
+    )
+}
+
+/**
+ * App classes that implement an Android interface the phone keeps private (Android 11's
+ * AnimationHandler.AnimationFrameCallback) do not load: they lose it. The calls that took them as one go through
+ * Members, which needs only their methods. Returns the classes changed.
+ */
+private fun BytecodePatchContext.dropInterfaces(interfaces: Set<String>): Int {
+    if (interfaces.isEmpty()) return 0
+    val targets = mutableListOf<String>()
+    classDefForEach { c ->
+        if (!c.type.startsWith("Lorg/ungoogled/") && c.interfaces.any { it in interfaces }) targets += c.type
+    }
+    for (type in targets) mutableClassDefBy(type).interfaces.removeAll(interfaces)
+    return targets.size
+}
+
+/**
  * The System Launcher is a system app built against the full Android framework; an installed app may not link to its
  * hidden parts. Each hidden member it uses goes through Members (used where Android allows it, "absent" elsewhere),
  * each `new` of a class an app may not construct through Members.construct, and subclasses of such classes are rebased.
- * The lists are generated (.github/scripts/coloros-launcher/hidden.py).
+ * The lists are generated per version (.github/scripts/coloros-launcher/hidden.py).
  */
 private val hiddenApisPatch = bytecodePatch(
     description = "Answers Android's hidden parts where an installed app may not use them.",
@@ -117,16 +185,17 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(COLOROS_LAUNCHER_EXTENSION)
 
     execute {
-        val (calls, fields) = redirectHiddenMembers(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17,
-        )
+        val lists = hiddenLists(packageMetadata.versionName)
+        val (calls, fields) = redirectHiddenMembers("$EXT/Members;", "$EXT/Hidden;", lists.members)
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            "$EXT/Members;", "$EXT/Hidden;", lists.constructors, followMoves = lists.followMoves,
         )
-        val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
-        val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES)
+        val superCalls = substituteSuperConstructors(lists.superConstructors)
+        val rebased = rebaseSubclasses(lists.superclasses)
+        val dropped = dropInterfaces(lists.inaccessible)
+        if (dropped == 0 && lists.inaccessible.isNotEmpty()) throw PatchException("no classes implement ${lists.inaccessible}")
         skipCastOfNull("$EXT/Hidden;")
-        log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased")
+        log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; interfaces dropped: $dropped")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0) throw PatchException("hidden constructors not found")
         if (rebased == 0) throw PatchException("no subclasses of hidden Android classes found")
@@ -158,11 +227,24 @@ private val systemPrivilegesPatch = bytecodePatch(
             it.name == "onCreateView" && it.returnType == hostView && it.parameterTypes.map { t -> t.toString() } ==
                 listOf("Landroid/content/Context;", "I", "Landroid/appwidget/AppWidgetProviderInfo;")
         } ?: throw PatchException("LauncherAppWidgetHost.onCreateView(Context, int, AppWidgetProviderInfo) not found")
-        val overload = create.implementation!!.instructions.mapNotNull { insn ->
+        val overloads = create.implementation!!.instructions.mapNotNull { insn ->
             ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.takeIf { it.name == "onCreateView" }
                 ?.let { insn.opcode to it }
-        }.singleOrNull() ?: throw PatchException("LauncherAppWidgetHost.onCreateView does not call its overload once")
-        val (opcode, target) = overload
+        }
+        if (overloads.isEmpty()) {
+            // 15.6.24 makes its views itself and has them registered by Android's public AppWidgetHost.createView.
+            val public = host.methods.any { method ->
+                method.name == "createView" && method.implementation?.instructions?.any { insn ->
+                    ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                        it.definingClass == "Landroid/appwidget/AppWidgetHost;" && it.name == "createView"
+                    } == true
+                } == true
+            }
+            if (!public) throw PatchException("LauncherAppWidgetHost makes widget views neither way it is known to")
+            return@execute
+        }
+        val (opcode, target) = overloads.singleOrNull()
+            ?: throw PatchException("LauncherAppWidgetHost.onCreateView does not call its overload once")
         if (target.parameterTypes.map { it.toString() } != listOf("Landroid/content/Context;", hostView, "I")) {
             throw PatchException("unexpected onCreateView overload $target")
         }
@@ -212,6 +294,6 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
-    dependsOn(versionCheckPatch, manifestPatch, hiddenApisPatch, systemPrivilegesPatch)
+    dependsOn(versionCheckPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch, systemPrivilegesPatch)
     extendWith(COLOROS_LAUNCHER_EXTENSION)
 }

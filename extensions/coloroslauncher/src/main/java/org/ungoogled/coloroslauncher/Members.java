@@ -157,11 +157,17 @@ public final class Members {
         }
     }
 
+    /** The call's own exception, checked ones too (the app catches PackageManager's NameNotFoundException itself). */
     private static RuntimeException rethrow(InvocationTargetException e) {
         Throwable cause = e.getCause();
         if (cause instanceof RuntimeException) return (RuntimeException) cause;
         if (cause instanceof Error) throw (Error) cause;
-        return new RuntimeException(cause);
+        throw Members.<RuntimeException>sneaky(cause);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> RuntimeException sneaky(Throwable t) throws T {
+        throw (T) t;
     }
 
     public static Object call(Object receiver, String key, Object[] args) {

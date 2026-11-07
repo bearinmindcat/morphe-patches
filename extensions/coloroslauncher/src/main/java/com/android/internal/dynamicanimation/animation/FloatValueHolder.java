@@ -1,0 +1,10 @@
+package com.android.internal.dynamicanimation.animation;
+
+/** Generated stand-in (.github/scripts/coloros-launcher): names and signatures OnePlus System Launcher uses, answering "absent" off ColorOS and on Android versions without them (no OPPO or Google code). */
+public class FloatValueHolder {
+    public FloatValueHolder(float p0) {
+    }
+    public float getValue() {
+        return 0f;
+    }
+}
