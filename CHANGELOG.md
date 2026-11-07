@@ -1,3 +1,23 @@
+## [2.9.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.11...v2.9.0) (2026-11-07)
+
+### 🐛 Bug Fixes
+
+* add lg gallery non-lg support ([cb18334](https://github.com/bearinmindcat/morphe-patches/commit/cb18334ce25c0f674f2aa4b44d7b4a4c918f0993))
+* asus launcher adds widgets that have a set-up screen ([023a78a](https://github.com/bearinmindcat/morphe-patches/commit/023a78abd300b63832061e95e77e0c555acdb9c7))
+* gmail microg no longer stops at the play protect screen; issue [#70](https://github.com/bearinmindcat/morphe-patches/issues/70) ([df4fbc8](https://github.com/bearinmindcat/morphe-patches/commit/df4fbc8df03ddf5962951e462e2e8e4b45215610))
+* good lock discover wallpapers can be set; issue [#146](https://github.com/bearinmindcat/morphe-patches/issues/146) ([25d6747](https://github.com/bearinmindcat/morphe-patches/commit/25d674705a26404d9b3bfb152c3587537ad9bd54))
+* hyperos launcher home screen layout no longer crashes ([613aa87](https://github.com/bearinmindcat/morphe-patches/commit/613aa873e0752a7af32bff3558d0651431673cdd))
+* hyperos launcher settings open without a chooser; issue [#144](https://github.com/bearinmindcat/morphe-patches/issues/144) ([155f31b](https://github.com/bearinmindcat/morphe-patches/commit/155f31b03aac433c6e9519029ce9a91d6d94af57))
+* hyperos launcher shows pinned shortcut icons ([88b23ee](https://github.com/bearinmindcat/morphe-patches/commit/88b23ee5de698cecd42d1b95d7c752eda4af975a))
+* launchers install next to the phone's own launcher; issue [#144](https://github.com/bearinmindcat/morphe-patches/issues/144) ([6782624](https://github.com/bearinmindcat/morphe-patches/commit/678262487d9cea53d163d4683f8d43bdcc7b9806))
+* launchers start on the android canary preview; issue [#142](https://github.com/bearinmindcat/morphe-patches/issues/142) ([ed6a0f4](https://github.com/bearinmindcat/morphe-patches/commit/ed6a0f4a6ac7678eeecef17e4133d507fcb38006))
+* oneplus system launcher adds widgets without errors ([9516d9b](https://github.com/bearinmindcat/morphe-patches/commit/9516d9b2e3995d93c1ca08c53dfbfaa19b6237ea))
+* oneplus system launcher starts with a work profile or private space; issue [#142](https://github.com/bearinmindcat/morphe-patches/issues/142) ([4791054](https://github.com/bearinmindcat/morphe-patches/commit/479105471709544ba77ef90512e26e88dbefb5bd))
+
+### ✨ New Features
+
+* add samsung capture non-one ui support; issue [#145](https://github.com/bearinmindcat/morphe-patches/issues/145) ([5afda3e](https://github.com/bearinmindcat/morphe-patches/commit/5afda3e9c56b71e5826a21521dc76ec6010a617c))
+
 ## [2.8.11](https://github.com/bearinmindcat/morphe-patches/compare/v2.8.10...v2.8.11) (2026-11-07)
 
 ### 🐛 Bug Fixes

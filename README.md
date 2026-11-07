@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.8.11](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.8.11)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;173 patches total
+> **[v2.9.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;177 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -86,7 +86,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;10 patches</summary>
+<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
 <br>
 
 **Supported version(s):** 2026.11.02.1012472355.Release
@@ -101,6 +101,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Hide ads](#hide-ads) | Removes sponsored mail from the inbox, Promotions and Social. |  |
 | [Hide upsells](#hide-upsells) | Hides storage nags and Google One, Gemini and Workspace upgrade offers. |  |
 | [Remove telemetry](#remove-telemetry) | Stops logging, surveys, promo fetches and link-click tracking. |  |
+| [Skip Play Protect screen](#skip-play-protect-screen) | Keeps Gmail working where Google shows "This device isn't Play Protect certified". |  |
 | [Strip link trackers](#strip-link-trackers) | Opens links without Google's redirect and without utm and click-tracking parameters. |  |
 | [Turn off Smart Compose](#turn-off-smart-compose) | Turns off Smart Compose and Smart Reply, so what you type isn't sent to Google for suggestions. |  |
 
@@ -271,7 +272,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;26 apps&nbsp;&nbsp;•&nbsp;&nbsp;45 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;27 apps&nbsp;&nbsp;•&nbsp;&nbsp;47 patches</summary>
 <br>
 <blockquote>
 
@@ -296,6 +297,19 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Calendar installable and usable on non-One UI ROMs. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**Supported version(s):** 6.2.12 — needs Android 15 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Samsung Capture on Galaxy phones (One UI Core). | • Package name |
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Capture's screen recorder and editor usable on non-One UI ROMs. |  |
 
 </details>
 
@@ -920,9 +934,21 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 LG Apps&nbsp;&nbsp;•&nbsp;&nbsp;2 apps&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary>📱 LG Apps&nbsp;&nbsp;•&nbsp;&nbsp;3 apps&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 <blockquote>
+
+<details>
+<summary><img src="docs/icons/lg-gallery.png" width="20" height="20" align="top"> LG Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/lg-gallery.png" width="20" height="20" align="top"> LG Gallery&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**Supported version(s):** 9.60.32 — needs Android 11 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Enable non-LG ROM support](#enable-non-lg-rom-support) | Makes LG Gallery installable and usable on non-LG ROMs. |  |
+
+</details>
 
 <details>
 <summary><img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/lg-health.png" width="20" height="20" align="top"> LG Health&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
