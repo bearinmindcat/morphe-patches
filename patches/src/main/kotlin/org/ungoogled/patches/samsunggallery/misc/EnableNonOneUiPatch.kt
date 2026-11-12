@@ -7,6 +7,8 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectToWrappers
@@ -29,6 +31,11 @@ private const val MIRRORED_PHOTOS = "Lorg/ungoogled/samsunggallery/MirroredPhoto
 private const val EXIF_INTERFACE = "Landroidx/exifinterface/media/ExifInterface;"
 /** Gallery's disk cache for thumbnails, unobfuscated. */
 private const val CACHE_MANAGER = "Lcom/samsung/android/gallery/support/cache/CacheManager;"
+/** Gallery's choice of GIF decoder and its feature flags, unobfuscated. */
+private const val GIF_ANIMATION_FACTORY = "Lcom/samsung/android/gallery/module/media/GifAnimationFactory;"
+private const val GIF_ANIMATION = "Lcom/samsung/android/gallery/module/media/GifAnimation;"
+private const val FEATURES = "Lcom/samsung/android/gallery/support/utils/Features;"
+private const val ANIMATED_IMAGES = "Lorg/ungoogled/samsunggallery/AnimatedImages;"
 
 /**
  * Off One UI the libraries Samsung's system provides are missing; Gallery asks for 45, one of them required
@@ -162,6 +169,30 @@ val enableNonOneUiPatch = bytecodePatch(
                 return v0
             """,
         ) ?: throw PatchException("no isActivityResumed in Gallery's generic-device API table")
+
+        // GIFs played as one still frame: Gallery decodes them with Samsung's decoder (a One UI system library) unless it
+        // runs on a "generic device", where it uses Android's AnimatedImageDrawable. Android's is used when Samsung's is
+        // missing.
+        mutableClassDefBy(GIF_ANIMATION_FACTORY).methods.firstOrNull {
+            it.name == "createGifAnimation" && it.parameterTypes.isEmpty() && it.returnType == GIF_ANIMATION
+        }?.let { create ->
+            val instructions = create.implementation!!.instructions.toList()
+            val isGed = instructions.indexOfFirst {
+                (it as? ReferenceInstruction)?.reference?.toString() == "$FEATURES->isEnabled($FEATURES)Z"
+            }
+            val result = instructions.getOrNull(isGed + 1)
+            if (isGed < 0 || result?.opcode != Opcode.MOVE_RESULT) {
+                throw PatchException("Gallery's GIF decoder choice no longer asks for IS_GED")
+            }
+            val register = (result as OneRegisterInstruction).registerA
+            create.addInstructions(
+                isGed + 2,
+                """
+                    invoke-static { v$register }, $ANIMATED_IMAGES->useAndroidDecoder(Z)Z
+                    move-result v$register
+                """,
+            )
+        } ?: throw PatchException("no createGifAnimation() in Gallery's $GIF_ANIMATION_FACTORY")
 
         // Off One UI Gallery reads One UI version 0 and keeps to its generic-device paths, which work; but it turns
         // "MX albums" (One UI 5's album model) on only from One UI 5, and this build has the screens only for that
