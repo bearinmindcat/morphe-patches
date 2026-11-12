@@ -4,11 +4,17 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.Service;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.Settings;
+import android.util.Log;
 
 /**
  * ColorOS's Clock opens its alarm and timer screens straight from the background, which Android refuses a re-signed
@@ -24,6 +30,10 @@ public final class Alerts {
     /** FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_NO_USER_ACTION | FLAG_ACTIVITY_NEW_DOCUMENT, as Clock starts the screens. */
     private static final int SCREEN_FLAGS = 0x100C0000;
     private static final int PENDING_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+    /** ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK / _SYSTEM_EXEMPTED (API 29 / 34). */
+    private static final int TYPE_MEDIA_PLAYBACK = 0x2;
+    private static final int TYPE_SYSTEM_EXEMPTED = 0x400;
+    private static final String TAG = "UngoogledClock";
 
     private Alerts() {
     }
@@ -132,5 +142,47 @@ public final class Alerts {
             c.getSystemService(NotificationManager.class).cancel(TIMER_NOTIFICATION);
         } catch (RuntimeException ignored) {
         }
+    }
+
+    /**
+     * AlarmService.startForeground(id, notification), whose service ran as mediaPlayback. Android 15+ refuses that
+     * type while the app's start allowance comes from BOOT_COMPLETED (an alarm due just after the first unlock
+     * following a reboot), and the alarm crashed instead of ringing. Alarm clocks run as systemExempted instead, which
+     * Android allows apps that set exact alarms (Google's Clock does the same); mediaPlayback stays the fallback.
+     */
+    public static void alarmForeground(Service service, int id, Notification notification) {
+        if (Build.VERSION.SDK_INT < 29) {
+            service.startForeground(id, notification);
+            return;
+        }
+        alarmForeground(service, id, notification, TYPE_MEDIA_PLAYBACK);
+    }
+
+    /** ServiceCompat.startForeground(service, id, notification, type) for the alarm service's placeholder notification. */
+    public static void alarmForeground(Service service, int id, Notification notification, int type) {
+        if (Build.VERSION.SDK_INT >= 34 && systemExempted(service)) {
+            try {
+                service.startForeground(id, notification, TYPE_SYSTEM_EXEMPTED);
+                return;
+            } catch (RuntimeException e) {
+                Log.w(TAG, "alarm service refused as systemExempted, using type " + type, e);
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 29) service.startForeground(id, notification, type);
+        else service.startForeground(id, notification);
+    }
+
+    /** Whether the service declares systemExempted and the app holds what Android requires for it (exact alarms). */
+    private static boolean systemExempted(Service s) {
+        try {
+            ServiceInfo info = s.getPackageManager().getServiceInfo(new ComponentName(s, s.getClass()), 0);
+            if ((info.getForegroundServiceType() & TYPE_SYSTEM_EXEMPTED) == 0) return false;
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            return false;
+        }
+        int granted = PackageManager.PERMISSION_GRANTED;
+        return s.checkSelfPermission("android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED") == granted
+            && (s.checkSelfPermission("android.permission.USE_EXACT_ALARM") == granted
+                || s.checkSelfPermission("android.permission.SCHEDULE_EXACT_ALARM") == granted);
     }
 }
