@@ -581,7 +581,7 @@ public final class PlayingMedia {
     }
 
     /** The package of the service a connection was made for: the ResolveInfo it keeps. */
-    private static String servicePackage(Object connection) throws IllegalAccessException {
+    static String servicePackage(Object connection) throws IllegalAccessException {
         for (Object v : values(connection)) {
             if (v instanceof android.content.pm.ResolveInfo && ((android.content.pm.ResolveInfo) v).serviceInfo != null) {
                 return ((android.content.pm.ResolveInfo) v).serviceInfo.packageName;
@@ -591,7 +591,7 @@ public final class PlayingMedia {
     }
 
     /** The object, or one it holds (two deep), with a field of the given type. */
-    private static Object holderOf(Object o, Class<?> type) throws IllegalAccessException {
+    static Object holderOf(Object o, Class<?> type) throws IllegalAccessException {
         if (o == null) return null;
         if (fieldOf(o.getClass(), type) != null) return o;
         for (Object v : values(o)) {
@@ -607,7 +607,7 @@ public final class PlayingMedia {
     }
 
     /** The non-null object fields of an object. */
-    private static List<Object> values(Object o) throws IllegalAccessException {
+    static List<Object> values(Object o) throws IllegalAccessException {
         List<Object> out = new java.util.ArrayList<>();
         for (Class<?> k = o.getClass(); k != null && k != Object.class; k = k.getSuperclass()) {
             for (Field f : k.getDeclaredFields()) {
@@ -620,7 +620,7 @@ public final class PlayingMedia {
         return out;
     }
 
-    private static Field fieldOf(Class<?> c, Class<?> type) {
+    static Field fieldOf(Class<?> c, Class<?> type) {
         for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
             for (Field f : k.getDeclaredFields()) {
                 if (f.getType() == type && !java.lang.reflect.Modifier.isStatic(f.getModifiers())) {

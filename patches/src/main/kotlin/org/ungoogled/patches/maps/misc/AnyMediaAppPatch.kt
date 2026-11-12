@@ -1,15 +1,18 @@
 package org.ungoogled.patches.maps.misc
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
@@ -187,5 +190,67 @@ val anyMediaAppPatch = bytecodePatch(
         }
         answer("entryClass", entryType.removePrefix("L").removeSuffix(";").replace('/', '.'))
         answer("addMethod", addRef.name)
+
+        // Issue #78: Maps waits for every listed app's media browser to answer its connection, with no time limit --
+        // the Default media app list (also opened by Show media playback controls) loads until all have, the media
+        // panel likewise. A browser that never answers (its service binding null, as media3's does when it has no
+        // session for a legacy browser) kept the list loading for good. Unanswered after ten seconds counts as refused.
+        run {
+            val callbacks = mutableListOf<Method>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                c.methods.filterTo(callbacks) { m ->
+                    m.returnType == "V" && m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                        ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "sessionToken is null"
+                    } == true
+                }
+            }
+            val onConnected = callbacks.singleOrNull() ?: throw PatchException("media browser callback: found ${callbacks.size}")
+            val callback = mutableClassDefBy(onConnected.definingClass)
+            val code = onConnected.implementation!!.instructions.toList()
+            // The connection the callback reports to, and its report "unavailable", which only the failures make.
+            val connection = code.firstNotNullOfOrNull { i ->
+                ((i as? ReferenceInstruction)?.reference as? FieldReference)?.takeIf {
+                    i.opcode == Opcode.IGET_OBJECT && it.definingClass == callback.type
+                }
+            }?.type ?: throw PatchException("media browser callback keeps no connection")
+            val unavailable = code.indexOfFirst { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "sessionToken is null" }
+                .let { i -> (code[i + 1] as? ReferenceInstruction)?.reference as? MethodReference }
+                ?: throw PatchException("\"sessionToken is null\" is no longer reported right away")
+            // Connected, failed, suspended: each marks the connection answered.
+            val answers = callback.methods.filter { m ->
+                m.name != "<init>" && m.returnType == "V" && m.parameterTypes.isEmpty() && !AccessFlags.STATIC.isSet(m.accessFlags)
+            }
+            val onFailed = answers.singleOrNull { m ->
+                m.name != onConnected.name && m.implementation?.instructions?.any { ((it as? ReferenceInstruction)?.reference as? MethodReference) == unavailable } == true
+            } ?: throw PatchException("media browser's onConnectionFailed not found")
+            if (answers.size !in 2..3) throw PatchException("media browser callback has ${answers.size} callbacks")
+            answers.forEach { it.addInstruction(0, "invoke-static { p0 }, $MEDIA_APPS->answered(Ljava/lang/Object;)V") }
+
+            // Made right before Maps connects: the extension starts the clock with the callback and its connection.
+            val init = callback.methods.singleOrNull { m -> m.name == "<init>" && m.parameterTypes.any { it.toString() == connection } }
+                ?: throw PatchException("media browser callback is no longer made with its connection")
+            var p = 1
+            var connectionParam = -1
+            init.parameterTypes.forEach { t ->
+                if (t.toString() == connection && connectionParam < 0) connectionParam = p
+                p += if (t.toString() == "J" || t.toString() == "D") 2 else 1
+            }
+            val impl = init.implementation!!
+            if (impl.registerCount > 16) throw PatchException("media browser callback's constructor registers out of invoke range")
+            // Right after the super constructor, while `this` and the connection are still in their registers.
+            val self = impl.registerCount - (p - 1) - 1
+            val connectionReg = self + connectionParam
+            val superInit = impl.instructions.indexOfFirst { insn ->
+                insn.opcode == Opcode.INVOKE_DIRECT && (insn as? Instruction35c)?.registerC == self &&
+                    ((insn as ReferenceInstruction).reference as MethodReference).name == "<init>"
+            }
+            if (superInit < 0) throw PatchException("media browser callback's constructor no longer calls its super constructor")
+            if (impl.instructions.take(superInit).any { it.opcode.setsRegister() && (it as? OneRegisterInstruction)?.registerA in setOf(self, connectionReg) }) {
+                throw PatchException("media browser callback's constructor reuses its parameters")
+            }
+            init.addInstruction(superInit + 1, "invoke-static { p0, p$connectionParam }, $MEDIA_APPS->connecting(Ljava/lang/Object;Ljava/lang/Object;)V")
+            answer("failedMethod", onFailed.name)
+        }
     }
 }

@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.media.browse.MediaBrowser;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -12,9 +15,12 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Any media app (issue #9): navigation's media controls (Settings > Navigation > Default media
@@ -42,6 +48,48 @@ public final class MediaApps {
     /** Rewritten by the patch: Maps' media app entry class, and its list builder's add method. */
     static String entryClass() { return ""; }
     static String addMethod() { return ""; }
+    /** Rewritten by the patch: the media browser callback's onConnectionFailed. */
+    static String failedMethod() { return ""; }
+
+    /** How long an app's media browser may leave Maps' connection unanswered before it counts as refused. */
+    private static final long ANSWER_MS = 10000;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final Map<Object, Boolean> ANSWERED = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * Maps made the callback of a connection to an app's media browser and connects it right away (issue #78). It
+     * waits for the answer with no time limit -- the Default media app list loads until every app answered -- and a
+     * browser can stay silent for good: a service that binds null (as media3's does when it has no session for a
+     * legacy browser) never connects nor fails. Ten seconds without an answer count as a refusal.
+     */
+    public static void connecting(Object callback, Object connection) {
+        MAIN.postDelayed(() -> unanswered(callback, connection), ANSWER_MS);
+    }
+
+    /** The browser connected, refused or went away. */
+    public static void answered(Object callback) {
+        ANSWERED.put(callback, Boolean.TRUE);
+    }
+
+    private static void unanswered(Object callback, Object connection) {
+        try {
+            if (ANSWERED.containsKey(callback)) return;
+            // Still this callback's browser, still not connected: Maps neither disconnected nor started anew since.
+            Object impl = PlayingMedia.holderOf(connection, MediaBrowser.class);
+            if (impl == null || !PlayingMedia.values(callback).contains(impl)) return;
+            Field field = PlayingMedia.fieldOf(impl.getClass(), MediaBrowser.class);
+            MediaBrowser browser = field == null ? null : (MediaBrowser) field.get(impl);
+            if (browser == null || browser.isConnected()) return;
+            ANSWERED.put(callback, Boolean.TRUE);
+            android.util.Log.i("UA", "media: " + PlayingMedia.servicePackage(connection) + " never answered Maps, taken as refused");
+            browser.disconnect();
+            Method failed = callback.getClass().getDeclaredMethod(failedMethod());
+            failed.setAccessible(true);
+            failed.invoke(callback);
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media connection", t);
+        }
+    }
 
     /** Right after Maps starts its list of media apps: the others go in first. */
     public static void addAll(Object builder) {
