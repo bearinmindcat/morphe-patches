@@ -153,6 +153,26 @@ private val supportedOsPatch = bytecodePatch(
 }
 
 /**
+ * On Android 16 the app takes itself for One UI 8 and uses One UI 8's own ways: it watches HoneySpace's edge settings
+ * provider (Android 16 refuses an observer on a provider that does not exist: the app crashed as soon as it was turned
+ * on), reads its handle position from there and leaves back gestures to One UI's gesture policy. Off One UI it keeps
+ * the One UI 7 ways, which the rest of this port answers.
+ */
+private val oneUi8Patch = bytecodePatch(
+    description = "Keeps the app on its One UI 7 code on Android 16.",
+) {
+    execute {
+        OneUi8Fingerprint.method.addInstructions(
+            0,
+            """
+                const/4 v0, 0x0
+                return v0
+            """,
+        )
+    }
+}
+
+/**
  * The app's actions (see extension Actions): before the app runs one itself, Actions runs it through the accessibility
  * service or Android's own calls; the app then only gives its touch feedback. Its key presses and touches (injected
  * input events, which only the system may send) go to Actions.key and Gestures.inject, and its action lists leave out
@@ -501,6 +521,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_ONE_HAND)
-    dependsOn(oneUiMembersPatch, manifestPatch, oneUiLookPatch, supportedOsPatch, actionsPatch, windowsPatch, touchableRegionPatch, foregroundAppPatch, quickToolsPatch, accessPatch)
+    dependsOn(oneUiMembersPatch, manifestPatch, oneUiLookPatch, supportedOsPatch, oneUi8Patch, actionsPatch, windowsPatch, touchableRegionPatch, foregroundAppPatch, quickToolsPatch, accessPatch)
     extendWith(SAMSUNG_ONE_HAND_EXTENSION)
 }
