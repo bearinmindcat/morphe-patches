@@ -78,7 +78,102 @@ public final class Wallpapers {
      * only ever turns its own light-bar flag off again (WallpaperResolver.resolveNavigationBarBrightness never sets it),
      * so elsewhere they stayed white on any wallpaper and vanished on a light one. This replaces that method: the bottom
      * of the wallpaper (the strip the launcher measures) decides, as for the status bar.
+     *
+     * The launcher's SystemUiController then recomputes the bars' flags from its own states whenever one changes (an
+     * app opening or closing, the drawer, recents), and two of those states also set the navigation bar: the window's
+     * (light only with the theme's dark labels) and the home screen's (the status bar's brightness). Either turned the
+     * buttons white again over a light wallpaper. Both now carry this decision (see uiState).
      */
+
+    private static final int LIGHT_NAV = 1, DARK_NAV = 2, LIGHT_STATUS = 4, DARK_STATUS = 8;
+
+    /** One SystemUiController's states, and whether its scrim state was last set for the home screen. */
+    private static final class Bars {
+        final int[] states;
+        boolean homeScrim;
+
+        Bars(int[] states) {
+            this.states = states;
+        }
+    }
+
+    private static final java.util.WeakHashMap<android.view.Window, Bars> BARS = new java.util.WeakHashMap<>();
+    private static java.lang.ref.WeakReference<android.view.Window> navWindow;
+    private static int navBits; // LIGHT_NAV or DARK_NAV once the wallpaper was measured
+    private static boolean homeNext;
+
+    /** Called just before the launcher asks for the status bar's brightness to set the home screen's bars. */
+    public static void homeBars() {
+        homeNext = true;
+    }
+
+    /** SystemUiController.updateUiState(state, flags): its body, with the navigation bar's buttons decided here. */
+    public static void uiState(android.view.Window window, int[] states, int state, int flags) {
+        boolean home = homeNext;
+        homeNext = false;
+        if (window == null || states == null || state < 0 || state >= states.length) return;
+        Bars bars = BARS.get(window);
+        if (bars == null || bars.states != states) {
+            bars = new Bars(states);
+            BARS.put(window, bars);
+        }
+        boolean homeScrim = state == 1 ? home : bars.homeScrim;
+        boolean changed = states[state] != flags;
+        if (!changed && homeScrim == bars.homeScrim) return;
+        states[state] = flags;
+        bars.homeScrim = homeScrim;
+        apply(window, bars, changed);
+    }
+
+    /**
+     * The bars' flags from the states in order (later ones win), the window and home screen states with ours. The
+     * status bar's only where the launcher recomputes them (the wallpaper's measure sets it directly, as ColorOS does).
+     */
+    private static void apply(android.view.Window window, Bars bars, boolean status) {
+        android.view.View decor = window.getDecorView();
+        boolean ours = navBits != 0 && navWindow != null && navWindow.get() == window;
+        int old = decor.getSystemUiVisibility(), f = old;
+        for (int i = 0; i < bars.states.length; i++) {
+            int s = bars.states[i];
+            if (ours && (i == 0 || (i == 1 && bars.homeScrim))) s = (s & ~(LIGHT_NAV | DARK_NAV)) | navBits;
+            if ((s & LIGHT_NAV) != 0) f |= android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            else if ((s & DARK_NAV) != 0) f &= ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            if (!status) continue;
+            if ((s & LIGHT_STATUS) != 0) f |= android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else if ((s & DARK_STATUS) != 0) f &= ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        if (f != old) decor.setSystemUiVisibility(f);
+    }
+
+    /**
+     * ToolbarUtils.setSystemUiVisibility(view, flags), the launcher's own pages (its settings, guides): ColorOS shades
+     * the navigation bar's buttons to the bar's colour, so these pages paint the bar light grey and leave the buttons
+     * white, invisible elsewhere. Over an opaque bar the buttons now follow its colour; over a see-through one (the home
+     * screen) the flags stay as they are.
+     */
+    public static int barFlags(android.view.View view, int flags) {
+        android.app.Activity activity = activity(view);
+        if (activity == null) return flags;
+        android.view.Window window = activity.getWindow();
+        if (window == null || window.getDecorView() != view) return flags;
+        int color = window.getNavigationBarColor();
+        if (Color.alpha(color) < 0xc0) return flags;
+        return luminance(color) >= 150 ? flags | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                : flags & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+    }
+
+    /** The activity a view (a window's decor view too: its own context is the app's) belongs to. */
+    private static android.app.Activity activity(android.view.View view) {
+        if (view == null) return null;
+        android.content.Context c = view.getContext();
+        if (view instanceof android.view.ViewGroup && ((android.view.ViewGroup) view).getChildCount() > 0) {
+            c = ((android.view.ViewGroup) view).getChildAt(0).getContext();
+        }
+        while (c instanceof android.content.ContextWrapper && !(c instanceof android.app.Activity)) {
+            c = ((android.content.ContextWrapper) c).getBaseContext();
+        }
+        return c instanceof android.app.Activity ? (android.app.Activity) c : null;
+    }
 
     /** WallpaperResolver.resolveNavigationBarBrightness(launcher, wallpaper). */
     public static void navigationBar(Object resolver, final android.app.Activity launcher, Bitmap wallpaper) {
@@ -106,7 +201,16 @@ public final class Wallpapers {
             // The flag below is what shows.
         }
         launcher.runOnUiThread(() -> {
-            android.view.View decor = launcher.getWindow().getDecorView();
+            android.view.Window window = launcher.getWindow();
+            navWindow = new java.lang.ref.WeakReference<>(window);
+            navBits = bright ? LIGHT_NAV : DARK_NAV;
+            if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "navigation bar over the wallpaper: " + (bright ? "light" : "dark"));
+            Bars bars = BARS.get(window);
+            if (bars != null) {
+                apply(window, bars, false);
+                return;
+            }
+            android.view.View decor = window.getDecorView();
             int flags = decor.getSystemUiVisibility();
             int wanted = bright ? flags | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
                     : flags & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;

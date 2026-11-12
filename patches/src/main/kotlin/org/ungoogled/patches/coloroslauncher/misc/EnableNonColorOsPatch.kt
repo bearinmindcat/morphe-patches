@@ -38,6 +38,7 @@ import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS_15
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.shared.addDefaultsForOlderAndroid
+import org.ungoogled.patches.shared.addInstructionsAtLabel
 import org.ungoogled.patches.shared.enablePageSizeCompat
 import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
@@ -290,6 +291,69 @@ private val wallpaperBrightnessPatch = bytecodePatch {
             """,
         )
 
+        // The bars' states: the window's and the home screen's carry the navigation bar decided above (see
+        // Wallpapers.uiState). The home screen's is the one set from the status bar's brightness.
+        val controllerType = "Lcom/android/launcher3/util/SystemUiController;"
+        val controller = mutableClassDefBy(controllerType)
+        val update = controller.methods.firstOrNull {
+            it.name == "updateUiState" && it.returnType == "V" && it.parameterTypes.map { t -> t.toString() } == listOf("I", "I")
+        } ?: throw PatchException("SystemUiController.updateUiState(int, int) not found")
+        if (controller.fields.none { it.name == "mWindow" && it.type == "Landroid/view/Window;" } ||
+            controller.fields.none { it.name == "mStates" && it.type == "[I" }
+        ) {
+            throw PatchException("SystemUiController has no mWindow / mStates")
+        }
+        if (update.implementation!!.registerCount - 3 < 2) throw PatchException("updateUiState has no spare registers")
+        update.addInstructions(
+            0,
+            """
+                iget-object v0, p0, $controllerType->mWindow:Landroid/view/Window;
+                iget-object v1, p0, $controllerType->mStates:[I
+                invoke-static { v0, v1, p1, p2 }, $EXT/Wallpapers;->uiState(Landroid/view/Window;[III)V
+                return-void
+            """,
+        )
+        val homeScreen = mutableListOf<Pair<String, String>>() // class, method (name + descriptor)
+        val signature = { m: com.android.tools.smali.dexlib2.iface.Method -> m.name + m.parameterTypes.joinToString("") + m.returnType }
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            for (method in c.methods) {
+                val refs = method.implementation?.instructions?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+                    ?: continue
+                if (refs.any { it.definingClass == controllerType && it.name == "updateUiState" } &&
+                    refs.any { it.definingClass == "Lcom/android/launcher/wallpaper/LauncherWallpaperManager;" && it.name == "isStatusBarWpBright" }
+                ) {
+                    homeScreen += c.type to signature(method)
+                }
+            }
+        }
+        // The launcher's own pages paint the navigation bar opaque and leave its buttons to ColorOS (see Wallpapers.barFlags).
+        val toolbar = mutableClassDefBy("Lcom/android/common/util/ToolbarUtils;")
+        val setFlags = toolbar.methods.firstOrNull {
+            it.name == "setSystemUiVisibility" && it.returnType == "V" &&
+                it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/view/View;", "I")
+        } ?: throw PatchException("ToolbarUtils.setSystemUiVisibility(View, int) not found")
+        setFlags.addInstructions(
+            0,
+            """
+                invoke-static { p0, p1 }, $EXT/Wallpapers;->barFlags(Landroid/view/View;I)I
+                move-result p1
+            """,
+        )
+        var homeBars = 0
+        for ((type, sig) in homeScreen) {
+            val method = mutableClassDefBy(type).methods.first { signature(it) == sig }
+            val reads = method.implementation!!.instructions.withIndex().filter { (_, insn) ->
+                ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                    it.definingClass == "Lcom/android/launcher/wallpaper/LauncherWallpaperManager;" && it.name == "isStatusBarWpBright"
+                } == true
+            }.map { it.index }
+            for (index in reads.reversed()) method.addInstructionsAtLabel(index, "invoke-static { }, $EXT/Wallpapers;->homeBars()V")
+            homeBars += reads.size
+        }
+        if (homeBars == 0) throw PatchException("no home screen bars set from the status bar's brightness")
+        log.info("home screen bar states: $homeBars")
+
         val images = redirectCalls(
             mapOf(
                 "Landroid/app/WallpaperManager;->getDrawable()Landroid/graphics/drawable/Drawable;" to
@@ -358,6 +422,49 @@ private val personalizationPatch = bytecodePatch {
         }
         if (calls == 0) throw PatchException("no ToggleBarMainUIController.isIgnoreItem calls found")
         log.info("edit bar: wallpaper intent, $calls item checks")
+    }
+}
+
+/**
+ * The launcher's settings link to ColorOS Settings pages ("System navigation" under "You might be looking for", the
+ * taskbar settings' navigation entry), which did nothing elsewhere: each intent its settings start is checked first and
+ * a ColorOS page this phone lacks becomes Android's own (see Links).
+ */
+private val settingsLinksPatch = bytecodePatch {
+    execute {
+        val starts = mutableListOf<Pair<String, String>>()
+        val signature = { m: com.android.tools.smali.dexlib2.iface.Method -> m.name + m.parameterTypes.joinToString("") + m.returnType }
+        val isStart = { r: MethodReference? ->
+            r != null && r.name == "startActivity" && r.returnType == "V" &&
+                r.parameterTypes.map { it.toString() } == listOf("Landroid/content/Intent;")
+        }
+        classDefForEach { c ->
+            if (!c.type.startsWith("Lcom/android/launcher/settings/")) return@classDefForEach
+            for (method in c.methods) {
+                if (method.implementation?.instructions?.any { isStart((it as? ReferenceInstruction)?.reference as? MethodReference) } == true) {
+                    starts += c.type to signature(method)
+                }
+            }
+        }
+        var calls = 0
+        for ((type, sig) in starts) {
+            val method = mutableClassDefBy(type).methods.first { signature(it) == sig }
+            val sites = method.implementation!!.instructions.withIndex().filter { (_, insn) ->
+                isStart((insn as? ReferenceInstruction)?.reference as? MethodReference)
+            }
+            for ((index, insn) in sites.reversed()) {
+                val receiver = if (insn.opcode == Opcode.INVOKE_STATIC || insn.opcode == Opcode.INVOKE_STATIC_RANGE) 0 else 1
+                val intent = when (insn) {
+                    is FiveRegisterInstruction -> if (receiver == 0) insn.registerC else insn.registerD
+                    is com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction -> insn.startRegister + receiver
+                    else -> throw PatchException("unexpected startActivity call in $type")
+                }
+                method.addInstructionsAtLabel(index, "invoke-static/range { v$intent .. v$intent }, $EXT/Links;->settings(Landroid/content/Intent;)V")
+                calls++
+            }
+        }
+        log.info("settings links: $calls startActivity calls")
+        if (calls < 2) throw PatchException("only $calls startActivity calls in the launcher's settings")
     }
 }
 
@@ -466,7 +573,7 @@ val enableNonColorOsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_COLOROS_LAUNCHER)
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
-        systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch,
+        systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
