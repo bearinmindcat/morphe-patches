@@ -3068,3 +3068,16 @@ internal val HIDDEN_MEMBERS_CANARY = setOf<String>(
 internal val HIDDEN_CONSTRUCTORS_CANARY = setOf(
     "Landroid/view/InputChannel;-><init>()V",
 )
+
+/* One UI */
+/*
+ * Android interfaces OnePlus System Launcher 16.4.30's classes implement that a phone's framework keeps private: an
+ * installed app's class that implements one does not load, so the launcher stopped at start (IllegalAccessError while
+ * inflating its recents view). AnimationHandler.AnimationFrameCallback is public on AOSP 13 to 17 but private in One UI
+ * 5.1's framework (and Android 11's). The classes lose it everywhere: their only framework calls with it
+ * (AnimationHandler's add/remove) go through Members, which gives them their frames from the Choreographer (Frames).
+ * Found by .github/scripts/coloros-launcher/inaccessible.py against each phone's boot classpath.
+ */
+internal val INACCESSIBLE_INTERFACES = setOf(
+    "Landroid/animation/AnimationHandler\$AnimationFrameCallback;",
+)

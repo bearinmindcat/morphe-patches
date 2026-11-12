@@ -41,6 +41,10 @@ git checkout $J/org                                                 # gen.py's C
 python3 $L/hidden.py a15 16.4.30.apk $J $K/ColorOsLauncherMembers.kt
 python3 $L/hidden.py a11,a15,a16,a17,canary 15.6.24.apk $J $K/ColorOsLauncher15Members.kt "OnePlus System Launcher 15.6.24" \
     --suffix _15 --android "Android 11, 15, 16, 17 or the canary"
+# Android interfaces the launcher's classes implement that a phone keeps private (o51/ = Android 13's boot classpath
+# with One UI 5.1's framework.jar): INACCESSIBLE_INTERFACES / _15
+python3 $L/inaccessible.py 16.4.30.apk a13 o51 a15 a16 a17 canary
+python3 $L/inaccessible.py 15.6.24.apk a11 o51 a15 a16 a17 canary
 ```
 
 Run the stand-ins first: `hidden.py` reads the extension to know which classes and members the stand-ins declare.
@@ -53,8 +57,9 @@ hidden on 16/17. Always run the ART verifier sweep afterwards: 0 rejected classe
 hidden members: defaults for resources defined only for Android 12+ (`shared/OlderAndroidResources.kt`), Android
 12-15 calls answered with their Android 11 equivalents (`Older.java`, reached through `Members` only where the phone
 lacks the call), DeviceConfig reads, which need a system permission on Android 11 (`Calls.java`), and
-`INACCESSIBLE_INTERFACES_15` (Android 11's private AnimationHandler.AnimationFrameCallback). The extension's minSdk is
-30: the dexer drops version checks below it.
+`INACCESSIBLE_INTERFACES_15` (Android 11's private AnimationHandler.AnimationFrameCallback and
+ViewRootImpl.SurfaceChangedCallback). One UI 5.1 keeps AnimationFrameCallback private too, so 16.4.30's classes drop it
+as well (`INACCESSIBLE_INTERFACES`). The extension's minSdk is 30: the dexer drops version checks below it.
 
 Emulator notes: with SwiftShader (no host GPU) the launcher's window blurs make frames take seconds -- turn
 "Allow window-level blurs" off (`settings put global disable_window_blurs 1`) and keep the animation scales at 1 when

@@ -32,6 +32,7 @@ import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.coloroslauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.coloroslauncher.HIDDEN_SUPERCLASSES_15
+import org.ungoogled.patches.coloroslauncher.INACCESSIBLE_INTERFACES
 import org.ungoogled.patches.coloroslauncher.INACCESSIBLE_INTERFACES_15
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.coloroslauncher.SUPER_CONSTRUCTORS_15
@@ -180,13 +181,13 @@ private fun hiddenLists(version: String) = when (version) {
     else -> HiddenLists(
         HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_13 + HIDDEN_MEMBERS_CANARY,
         HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_13 + HIDDEN_CONSTRUCTORS_CANARY,
-        SUPER_CONSTRUCTORS, HIDDEN_SUPERCLASSES,
+        SUPER_CONSTRUCTORS, HIDDEN_SUPERCLASSES, INACCESSIBLE_INTERFACES,
     )
 }
 
 /**
- * App classes that implement an Android interface the phone keeps private (Android 11's
- * AnimationHandler.AnimationFrameCallback) do not load: they lose it. The calls that took them as one go through
+ * App classes that implement an Android interface the phone keeps private (AnimationHandler.AnimationFrameCallback on
+ * Android 11 and One UI 5.1) do not load: they lose it, on every phone. The calls that took them as one go through
  * Members, which needs only their methods. Returns the classes changed.
  */
 private fun BytecodePatchContext.dropInterfaces(interfaces: Set<String>): Int {
