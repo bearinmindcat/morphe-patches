@@ -179,12 +179,13 @@ public final class Customization {
 
     static {
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_POLICE_ALERT_DISTANCE_METERS", new Label("Police", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ALERTER_ALERT_DISTANCE", new Label("Speed cameras", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_HAZARD_ALERT_DISTANCE_METERS", new Label("Hazards", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ACCIDENT_ALERT_DISTANCE_METERS", new Label("Crashes", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_HEAVY_TRAFFIC_ALERT_DISTANCE_METERS", new Label("Traffic jams", "m", 1, 20000));
-        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_STREETS", new Label("Speed cameras on streets", "m", 1, 20000));
-        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_HIGHWAY", new Label("Speed cameras on highways", "m", 1, 20000));
-        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", new Label("Speed cameras on freeways", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_STREETS", new Label("Enforcement zones on streets", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_HIGHWAY", new Label("Enforcement zones on highways", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", new Label("Enforcement zones on freeways", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_BLOCKED_LANE_ALERT_DISTANCE", new Label("Blocked lanes", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_DISTANCE_BETWEEN_ALERTS", new Label("Least distance between two alerts", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_NORMAL", new Label("Android Auto heads-up, normal roads", "m", 1, 20000));
@@ -387,6 +388,22 @@ public final class Customization {
         if (feature.equals("flockCameras")) Flock.switched(on);
         if (feature.equals("speedCameras")) SpeedCameras.switched(on);
         reapply(feature + (on ? " on" : " off"));
+        restartNote(feature);
+    }
+
+    /**
+     * Waze reads its alert distances once, when it first needs one after starting, and keeps them until it is
+     * closed (issue #157): a change there is used after Shut off and reopening Waze.
+     */
+    private static void restartNote(String feature) {
+        if (!"alertDistances".equals(feature)) return;
+        try {
+            Context c = context();
+            if (c != null) android.widget.Toast.makeText(c, "Shut off and reopen Waze to use the new distances",
+                    android.widget.Toast.LENGTH_LONG).show();
+        } catch (Throwable t) {
+            Log.w("UA", "Waze customization: note", t);
+        }
     }
 
     /** The key a changed value is kept under. */
@@ -420,6 +437,8 @@ public final class Customization {
         if (name.equals(PIN_SIZE)) applyPins();
         if (name.equals(ZONE_POSITION)) ZoneBar.moved();
         reapply(name + " = " + (value == null ? "the patch's" : value));
+        Value kept = values.get(name);
+        if (kept != null) restartNote(kept.feature);
     }
 
     /**
@@ -463,10 +482,12 @@ public final class Customization {
         Class<?> c = cm.getClass();
         Method lock = c.getMethod("setConfigValueLockedNTV", int.class, boolean.class);
         if (on(feature)) {
+            Object before = Log.isLoggable("UA", Log.DEBUG) ? read(cm, k) : null;
             // Unlocked, set, locked again: Waze's native config refuses a server update to a locked value.
             lock.invoke(cm, k.id, false);
             write(cm, k.id, k.value);
             lock.invoke(cm, k.id, true);
+            if (before != null) Log.d("UA", "Waze customization: " + k.name + " " + before + " -> " + read(cm, k));
         } else {
             boolean locked = (Boolean) c.getMethod("isConfigValueLockedNTV", int.class).invoke(cm, k.id);
             if (!locked) {

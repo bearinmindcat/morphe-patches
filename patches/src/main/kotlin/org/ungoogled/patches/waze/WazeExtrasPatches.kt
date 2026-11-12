@@ -194,18 +194,22 @@ val wazeAlertDistancesPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeConfigOverridesPatch)
 
-    val police by intOption(key = "police", default = 1000, title = "Police", description = "Waze: 600 m.")
+    val police by intOption(key = "police", default = 1000, title = "Police", description = "Waze: 600 to 900 m.")
+    val cameras by intOption(key = "cameras", default = 1000, title = "Speed cameras", description = "Every kind of camera. Waze: 400 to 900 m.")
     val hazard by intOption(key = "hazard", default = 500, title = "Hazards", description = "Waze: 600 to 900 m.")
     val accident by intOption(key = "accident", default = 2000, title = "Crashes", description = "Waze: 600 m.")
     val traffic by intOption(key = "traffic", default = 3000, title = "Traffic jams", description = "Waze: 600 m.")
-    val streets by intOption(key = "streets", default = 700, title = "Speed cameras on streets", description = "Waze: 500 m.")
-    val highways by intOption(key = "highways", default = 900, title = "Speed cameras on highways", description = "Waze: 1000 m.")
-    val freeways by intOption(key = "freeways", default = 1200, title = "Speed cameras on freeways", description = "Waze: 2000 m.")
+    val streets by intOption(key = "streets", default = 700, title = "Enforcement zones on streets", description = "Where Waze shows zones, not cameras. Waze: 500 m.")
+    val highways by intOption(key = "highways", default = 900, title = "Enforcement zones on highways", description = "Where Waze shows zones, not cameras. Waze: 1000 m.")
+    val freeways by intOption(key = "freeways", default = 1200, title = "Enforcement zones on freeways", description = "Where Waze shows zones, not cameras. Waze: 2000 m.")
     val blockedLane by intOption(key = "blockedLane", default = 1000, title = "Blocked lanes", description = "Waze: 400 m.")
     val between by intOption(key = "between", default = 200, title = "Least distance between two alerts", description = "Waze: 300 m.")
 
     execute {
         police?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_POLICE_ALERT_DISTANCE_METERS", it) }
+        // Waze's camera alerts (speed, red light, average speed, ...) all use its general alert distance; the
+        // three enforcement distances below are only for countries where Waze turns cameras into zones.
+        cameras?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ALERTER_ALERT_DISTANCE", it) }
         blockedLane?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_BLOCKED_LANE_ALERT_DISTANCE", it) }
         between?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_DISTANCE_BETWEEN_ALERTS", it) }
         hazard?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_HAZARD_ALERT_DISTANCE_METERS", it) }
@@ -214,6 +218,9 @@ val wazeAlertDistancesPatch = bytecodePatch(
         streets?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_STREETS", it) }
         highways?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_HIGHWAY", it) }
         freeways?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", it) }
+        // Waze's server turns this on (issue #157): then an alert comes only as far ahead as the car drives in
+        // 22 s (30 s for police; at least 200 m), so longer distances never showed. Off, the distances hold.
+        keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_MAX_TRIGGER_TIME_ENABLED", false)
     }
 }
 
