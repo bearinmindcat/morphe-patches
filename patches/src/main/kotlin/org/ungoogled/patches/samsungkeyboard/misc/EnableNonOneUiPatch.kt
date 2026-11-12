@@ -241,6 +241,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
-    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch)
+    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch, android13Patch, languageDownloadsPatch)
     extendWith(SAMSUNG_KEYBOARD_EXTENSION)
 }

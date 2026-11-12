@@ -51,6 +51,8 @@ val changePackageNamePatch = bytecodePatch(
     dependsOn(
         // As an ordinary app it is refused what only the system keyboard may do.
         systemAccessPatch,
+        // Its build runs from Android 13, which lacks some Java 21 calls it makes unchecked.
+        android13Patch,
         resourcePatch(description = "Moves the manifest to the new package name.") {
             execute {
                 val old = STOCK_PACKAGE

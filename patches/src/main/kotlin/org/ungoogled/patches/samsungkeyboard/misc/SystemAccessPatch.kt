@@ -28,9 +28,10 @@ private val OWNERS = mapOf(
 /**
  * Calls only a system app may make go through SystemAccess, which does them the ordinary app's way: the copy is
  * an ordinary app, and Android refuses it the hidden settings the system keyboard reads as it starts, the
- * broadcast to every user it sends as it shows, the system window sticker suggestions open as you type and the serial
- * number its language pack downloads ask for, and the call listener it registers as it starts. Every
- * call SystemAccess has a method for moves (an instance call passes its receiver first); nothing else does.
+ * broadcast to every user it sends as it shows, the system window sticker suggestions open as you type and the call
+ * listener it registers as it starts. The serial number and IMEI its language pack downloads ask for are never read
+ * (Android 13 has no getPrimaryImei: the download died on it). Every call SystemAccess has a method for moves (an
+ * instance call passes its receiver first); nothing else does.
  */
 internal val systemAccessPatch = bytecodePatch(
     description = "Lets the keyboard run without the system app's privileges.",

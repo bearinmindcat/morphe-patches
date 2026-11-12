@@ -4,7 +4,6 @@ import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
@@ -330,19 +329,45 @@ public final class SystemAccess {
         }
     }
 
-    // Build
+    // Hardware identifiers
 
-    /**
-     * The phone's serial number, which only a system app may read: refused, it is withheld (as Android withholds it
-     * from every ordinary app), and the keyboard sends its language pack requests without it.
+    /*
+     * The phone's serial number and IMEI/MEID are never read: the keyboard hashes one of them into its language pack
+     * requests to Samsung. Android refuses them to an ordinary app anyway, and Android 13 has no getPrimaryImei at all
+     * (the keyboard died on it, "Samsung Keyboard has stopped", as a language download started). Withheld, the request
+     * goes without them.
      */
+
     public static String buildGetSerial() {
-        try {
-            return Build.getSerial();
-        } catch (SecurityException e) {
-            refused("serial", e);
-            return "";
-        }
+        return "";
+    }
+
+    public static String telephonyManagerGetPrimaryImei(TelephonyManager manager) {
+        return "";
+    }
+
+    public static String telephonyManagerGetImei(TelephonyManager manager) {
+        return "";
+    }
+
+    public static String telephonyManagerGetImei(TelephonyManager manager, int slot) {
+        return "";
+    }
+
+    public static String telephonyManagerGetMeid(TelephonyManager manager) {
+        return "";
+    }
+
+    public static String telephonyManagerGetMeid(TelephonyManager manager, int slot) {
+        return "";
+    }
+
+    public static String telephonyManagerGetDeviceId(TelephonyManager manager) {
+        return "";
+    }
+
+    public static String telephonyManagerGetDeviceId(TelephonyManager manager, int slot) {
+        return "";
     }
 
     // TelephonyManager
