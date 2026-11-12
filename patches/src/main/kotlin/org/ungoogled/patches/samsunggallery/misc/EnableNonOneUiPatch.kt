@@ -2,12 +2,14 @@ package org.ungoogled.patches.samsunggallery.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import org.ungoogled.patches.samsung.redirectCalls
@@ -36,6 +38,11 @@ private const val GIF_ANIMATION_FACTORY = "Lcom/samsung/android/gallery/module/m
 private const val GIF_ANIMATION = "Lcom/samsung/android/gallery/module/media/GifAnimation;"
 private const val FEATURES = "Lcom/samsung/android/gallery/support/utils/Features;"
 private const val ANIMATED_IMAGES = "Lorg/ungoogled/samsunggallery/AnimatedImages;"
+/** The intent Gallery was started with, and its viewer of a photo within its album, unobfuscated. */
+private const val LAUNCH_INTENT = "Lcom/samsung/android/gallery/module/abstraction/LaunchIntent;"
+private const val LOCAL_ALBUM_LAUNCHER = "Lcom/samsung/android/gallery/app/activity/external/launcher/LocalAlbumViewLauncher;"
+private const val LATCH = "Ljava/util/concurrent/CountDownLatch;"
+private const val OPEN_IN_ALBUM = "Lorg/ungoogled/samsunggallery/OpenInAlbum;"
 
 /**
  * Off One UI the libraries Samsung's system provides are missing; Gallery asks for 45, one of them required
@@ -193,6 +200,41 @@ val enableNonOneUiPatch = bytecodePatch(
                 """,
             )
         } ?: throw PatchException("no createGifAnimation() in Gallery's $GIF_ANIMATION_FACTORY")
+
+        // A photo opened from a camera app other than Samsung's (GCam's REVIEW, or VIEW through a "Photos" stub) showed
+        // alone. Gallery opens a photo within its album when the intent names the album (bucketId, as Samsung's My Files
+        // does); OpenInAlbum adds it for a camera's photo before Gallery reads the intent, and makes REVIEW a VIEW.
+        (mutableClassDefByOrNull(LAUNCH_INTENT) ?: throw PatchException("Samsung Gallery has no $LAUNCH_INTENT"))
+            .methods.firstOrNull { it.name == "<init>" && it.parameterTypes == listOf("Landroid/content/Intent;") }
+            ?.let { constructor ->
+                val superCall = constructor.implementation!!.instructions.indexOfFirst {
+                    it.opcode == Opcode.INVOKE_DIRECT && (it as ReferenceInstruction).reference.toString() == "Ljava/lang/Object;-><init>()V"
+                }
+                if (superCall < 0) throw PatchException("$LAUNCH_INTENT<init> does not call Object.<init>")
+                constructor.addInstructions(
+                    superCall + 1,
+                    "invoke-static { p1 }, $OPEN_IN_ALBUM->prepare(Landroid/content/Intent;)V",
+                )
+            } ?: throw PatchException("no $LAUNCH_INTENT<init>(Intent)")
+
+        // Gallery waits 2 s for the photo's row before opening the album, and opens nothing after that; the media copy
+        // made on a cold start can take longer.
+        (mutableClassDefByOrNull(LOCAL_ALBUM_LAUNCHER) ?: throw PatchException("Samsung Gallery has no $LOCAL_ALBUM_LAUNCHER"))
+            .methods.firstOrNull { it.name == "loadLocalAlbumItem" && it.parameterTypes == listOf("Ljava/lang/String;") }
+            ?.let { load ->
+                val instructions = load.implementation!!.instructions.toList()
+                val await = instructions.indexOfFirst {
+                    it.opcode == Opcode.INVOKE_VIRTUAL &&
+                        (it as ReferenceInstruction).reference.toString() == "$LATCH->await(JLjava/util/concurrent/TimeUnit;)Z"
+                }
+                val call = instructions.getOrNull(await) as? FiveRegisterInstruction
+                    ?: throw PatchException("$LOCAL_ALBUM_LAUNCHER.loadLocalAlbumItem no longer waits on a latch")
+                load.replaceInstruction(
+                    await,
+                    "invoke-static { v${call.registerC}, v${call.registerD}, v${call.registerE}, v${call.registerF} }, " +
+                        "$OPEN_IN_ALBUM->awaitAlbumItem($LATCH" + "JLjava/util/concurrent/TimeUnit;)Z",
+                )
+            } ?: throw PatchException("no loadLocalAlbumItem(String) in $LOCAL_ALBUM_LAUNCHER")
 
         // Off One UI Gallery reads One UI version 0 and keeps to its generic-device paths, which work; but it turns
         // "MX albums" (One UI 5's album model) on only from One UI 5, and this build has the screens only for that

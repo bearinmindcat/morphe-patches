@@ -103,6 +103,19 @@ public final class MediaMirror extends ContentProvider {
         return true;
     }
 
+    /** Starts copying MediaStore now, for a screen Gallery opens on a short wait (a photo within its album: 2 s). */
+    static void warmUp() {
+        MediaMirror mirror = instance;
+        if (mirror == null) return;
+        new Thread(() -> {
+            try {
+                mirror.sync();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "mirror: " + e);
+            }
+        }, "UA-mirror").start();
+    }
+
     /** Runs work on the copy's database (the saved tables are "saved.") with the provider locked; false without one. */
     public static boolean withDatabase(Consumer<SQLiteDatabase> work) {
         MediaMirror mirror = instance;
@@ -124,8 +137,49 @@ public final class MediaMirror extends ContentProvider {
             db = SQLiteDatabase.openOrCreateDatabase(c.getDatabasePath("media_mirror.db"), null);
             db.execSQL("CREATE TABLE files (_id INTEGER PRIMARY KEY)");
             attachSaved(db);
+            addKnownSchema(db);
         }
         return db;
+    }
+
+    /**
+     * The tables and columns Gallery asked for in earlier runs, added at once: the copy is rebuilt on every start, and
+     * adding each one when a statement fails (heal) took seconds on a cold start -- long enough for Gallery to give up
+     * opening a photo within its album (it waits 2 s).
+     */
+    private static void addKnownSchema(SQLiteDatabase d) {
+        long started = System.currentTimeMillis();
+        int added = 0;
+        d.beginTransaction();
+        try (Cursor c = d.rawQuery("SELECT tbl, col FROM " + SAVED + ".mirror_schema ORDER BY tbl, col", null)) {
+            Map<String, Set<String>> have = new HashMap<>();
+            while (c.moveToNext()) {
+                String table = c.getString(0);
+                String column = c.getString(1);
+                if (!have.containsKey(table)) {
+                    d.execSQL("CREATE TABLE IF NOT EXISTS " + table + " (_id INTEGER PRIMARY KEY)");
+                    have.put(table, columns(d, table));
+                }
+                if (column != null && !column.isEmpty() && have.get(table).add(column)) {
+                    d.execSQL("ALTER TABLE " + table + " ADD COLUMN " + column + " NUMERIC");
+                    added++;
+                }
+            }
+            d.setTransactionSuccessful();
+        } catch (SQLiteException e) {
+            Log.w(TAG, "mirror: known tables not added: " + e.getMessage());
+        } finally {
+            d.endTransaction();
+        }
+        if (debug()) Log.d(TAG, "mirror: " + added + " known columns added in " + (System.currentTimeMillis() - started) + " ms");
+    }
+
+    private static void rememberSchema(SQLiteDatabase d, String table, String column) {
+        try {
+            d.execSQL("INSERT OR IGNORE INTO " + SAVED + ".mirror_schema (tbl, col) VALUES (?, ?)", new Object[]{table, column});
+        } catch (SQLiteException e) {
+            Log.w(TAG, "mirror: " + e.getMessage());
+        }
     }
 
     /**
@@ -147,6 +201,7 @@ public final class MediaMirror extends ContentProvider {
         d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".usertag (_id INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "sec_media_id INTEGER, tag TEXT, server_id TEXT, _data TEXT, UNIQUE (sec_media_id, tag) ON CONFLICT IGNORE)");
         d.execSQL("CREATE INDEX IF NOT EXISTS " + SAVED + ".usertag_media ON usertag (sec_media_id)");
+        d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".mirror_schema (tbl TEXT, col TEXT, PRIMARY KEY (tbl, col))");
         ExifOrientation.createTable(d, SAVED);
         SearchIndex.createTables(d, SAVED);
         // One UI's view puts every kind of tag together; tag_type 0 = the user's own, 4 and 5 what the photo shows.
@@ -222,11 +277,12 @@ public final class MediaMirror extends ContentProvider {
             if (src == null) return;
             Set<String> have = columns(d, "files");
             String[] names = src.getColumnNames();
-            for (String n : names) {
-                if (!have.contains(n)) d.execSQL("ALTER TABLE files ADD COLUMN " + n + " NUMERIC");
-            }
+            // One transaction for the new columns too: each ALTER on its own is a disk sync.
             d.beginTransaction();
             try {
+                for (String n : names) {
+                    if (!have.contains(n)) d.execSQL("ALTER TABLE files ADD COLUMN " + n + " NUMERIC");
+                }
                 d.execSQL("DELETE FROM files");
                 ContentValues v = new ContentValues();
                 while (src.moveToNext()) {
@@ -334,13 +390,15 @@ public final class MediaMirror extends ContentProvider {
         return m.find() ? m.group(1) : null;
     }
 
-    private synchronized boolean heal(String sql, SQLiteException e) {
+    /** Adds what a statement missed; false when there is nothing to add. retried: columns another thread had added. */
+    private synchronized boolean heal(String sql, SQLiteException e, Set<String> retried) {
         if (reattach(e)) return true;
         String msg = String.valueOf(e.getMessage());
         SQLiteDatabase d = db();
         Matcher t = NO_TABLE.matcher(msg);
         if (t.find()) {
             d.execSQL("CREATE TABLE IF NOT EXISTS " + t.group(1) + " (_id INTEGER PRIMARY KEY)");
+            rememberSchema(d, t.group(1), "");
             Log.i(TAG, "mirror: added table " + t.group(1));
             return true;
         }
@@ -350,13 +408,15 @@ public final class MediaMirror extends ContentProvider {
             String table = tableOf(sql, alias);
             if (table == null) table = alias != null && !columns(d, alias).isEmpty() ? alias : "files";
             if (columns(d, table).isEmpty()) d.execSQL("CREATE TABLE IF NOT EXISTS " + table + " (_id INTEGER PRIMARY KEY)");
-            if (columns(d, table).contains(c.group(2))) return false;
+            // Added meanwhile by another query (they run on several threads): once more.
+            if (columns(d, table).contains(c.group(2))) return retried.add(table + "." + c.group(2));
             try {
                 d.execSQL("ALTER TABLE " + table + " ADD COLUMN " + c.group(2) + " NUMERIC");
             } catch (SQLiteException notTable) {
                 // A view (tag_view): its columns are fixed.
                 return false;
             }
+            rememberSchema(d, table, c.group(2));
             Log.i(TAG, "mirror: added column " + table + "." + c.group(2));
             return true;
         }
@@ -377,6 +437,7 @@ public final class MediaMirror extends ContentProvider {
         }
         selection = SearchByContent.query(selection);
         sync();
+        Set<String> retried = new HashSet<>();
         for (int attempt = 0; attempt < 40; attempt++) {
             try {
                 Cursor cursor = db().rawQuery(selection, args);
@@ -391,7 +452,7 @@ public final class MediaMirror extends ContentProvider {
                 }
                 return cursor;
             } catch (SQLiteException e) {
-                if (!heal(selection, e)) {
+                if (!heal(selection, e, retried)) {
                     Log.w(TAG, "mirror: " + e.getMessage() + " in " + selection);
                     return null;
                 }
