@@ -4,30 +4,48 @@ import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.net.Uri;
+import android.os.Process;
 import android.provider.Settings;
 import android.util.Log;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * Every Settings.Global / Secure / System read and write in Samsung capture comes here. On One UI it is a system app
  * and keeps its own options in Android's settings tables (screen recorder sound, quality, selfie view size, screenshot
- * toolbar, format, ...). An ordinary app may not write Global or Secure (WRITE_SECURE_SETTINGS, adb only) nor One UI's
- * own keys in System (the settings screen crashed opening). A refused write is kept in the app's own preferences
- * instead and announced to the app's observers of that setting (as Android announces a real write); reads see it, so
- * the app finds its own options again, in each of its processes (the settings screen and the recorder run apart).
- * Writes the phone allows go to Android as before, and a kept value of that key is dropped.
+ * toolbar, format, ...), which One UI's SystemUI reads for its screenshots. This copy keeps every option it writes in
+ * its own files instead and announces it to the app's observers of that setting (as Android announces a real write);
+ * reads see it, so the app finds its own options again, in each of its processes (the settings screen and the
+ * recorder run apart). Off One UI Android refuses those writes anyway (WRITE_SECURE_SETTINGS, One UI's keys in System);
+ * One UI lets an app write its keys in System, so a copy installed next to Samsung's (Change package name) changed
+ * Samsung's own screenshot options. Only a copy installed as the system app (a root mount over Samsung's) still writes
+ * to Android, as Samsung's does; a write Android refuses it is kept here too.
+ *
+ * One file per setting, replaced in one step: shared preferences across processes lost writes (a process re-reading
+ * after the announcement put the previous file back while the writer was replacing it).
  */
 public final class LocalSettings {
     private static final String TAG = "UA";
-    private static final String PREFS = "smartcapture_local_settings";
+    /** Where these settings were kept before (shared preferences, "table/name" keys), moved to files on first use. */
+    private static final String OLD_PREFS = "smartcapture_local_settings";
+    private static final String DIR = "local_settings";
     private static Context app;
+    private static Boolean systemCopy;
+    private static File dir;
 
     private LocalSettings() {
     }
 
-    /** Re-read from disk when another process changed it (MODE_MULTI_PROCESS). */
-    @SuppressWarnings("deprecation")
-    private static synchronized SharedPreferences prefs() {
+    static synchronized Context context() {
         if (app == null) {
             try {
                 app = (Application) Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null);
@@ -36,11 +54,102 @@ public final class LocalSettings {
             }
             if (app == null) app = Services.app();
         }
-        return app == null ? null : app.getSharedPreferences(PREFS, Context.MODE_MULTI_PROCESS);
+        return app;
     }
 
-    private static String id(String table, String name) {
-        return table + "/" + name;
+    /** Installed as the phone's system app (a root mount over Samsung's own copy), not next to it or on another ROM. */
+    static synchronized boolean systemCopy() {
+        if (systemCopy == null) {
+            Context c = context();
+            if (c == null) return false;
+            systemCopy = (c.getApplicationInfo().flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+        }
+        return systemCopy;
+    }
+
+    private static synchronized File dir() {
+        if (dir != null) return dir;
+        Context c = context();
+        if (c == null) return null;
+        File d = new File(c.getFilesDir(), DIR);
+        if (!d.isDirectory()) {
+            File staging = new File(c.getFilesDir(), DIR + "." + Process.myPid());
+            staging.mkdirs();
+            try {
+                SharedPreferences old = c.getSharedPreferences(OLD_PREFS, Context.MODE_PRIVATE);
+                for (Map.Entry<String, ?> e : old.getAll().entrySet()) {
+                    int slash = e.getKey().indexOf('/');
+                    if (slash > 0 && e.getValue() instanceof String) {
+                        store(new File(staging, fileName(e.getKey().substring(0, slash), e.getKey().substring(slash + 1))),
+                            (String) e.getValue());
+                    }
+                }
+            } catch (RuntimeException | IOException e) {
+                Log.w(TAG, "local settings not moved", e);
+            }
+            // Another process may have moved them first: then its directory stays.
+            if (!staging.renameTo(d)) {
+                for (File f : files(staging)) f.delete();
+                staging.delete();
+            } else {
+                c.deleteSharedPreferences(OLD_PREFS);
+            }
+        }
+        dir = d;
+        return d;
+    }
+
+    private static File[] files(File d) {
+        File[] list = d.listFiles();
+        return list == null ? new File[0] : list;
+    }
+
+    /** One setting's file. */
+    private static File file(String table, String name) {
+        File d = dir();
+        return d == null ? null : new File(d, fileName(table, name));
+    }
+
+    /** Setting names are letters, digits, '_' and '.'; anything else is escaped. */
+    private static String fileName(String table, String name) {
+        StringBuilder b = new StringBuilder(table).append('-');
+        for (byte x : name.getBytes(StandardCharsets.UTF_8)) {
+            char ch = (char) (x & 0xff);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '.') {
+                b.append(ch);
+            } else {
+                b.append('%').append(String.format("%02x", x & 0xff));
+            }
+        }
+        return b.toString();
+    }
+
+    /** Writes [value] next to [f] and renames it over [f], so readers see the old or the new value, never a mix. */
+    private static void store(File f, String value) throws IOException {
+        File tmp = new File(f.getParentFile(), "." + f.getName() + "." + Process.myPid() + "." + Thread.currentThread().getId());
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
+            out.write(value.getBytes(StandardCharsets.UTF_8));
+        }
+        if (!tmp.renameTo(f)) {
+            tmp.delete();
+            throw new IOException("rename to " + f);
+        }
+    }
+
+    /** The kept value; null when nothing is kept (the setting then comes from Android). */
+    private static String local(File f) {
+        if (f == null) return null;
+        try (FileInputStream in = new FileInputStream(f)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[256];
+            for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
+            return out.toString("UTF-8");
+        } catch (FileNotFoundException e) {
+            return null;
+        } catch (IOException e) {
+            Log.w(TAG, "local setting " + f.getName() + " not read", e);
+            return null;
+        }
     }
 
     private static Uri uri(String table, String name) {
@@ -64,39 +173,46 @@ public final class LocalSettings {
     }
 
     private static String read(String table, ContentResolver r, String name) {
-        SharedPreferences p = prefs();
-        String key = id(table, name);
-        if (p != null && p.contains(key)) return p.getString(key, null);
-        return real(table, r, name);
+        String kept = local(file(table, name));
+        return kept != null ? kept : real(table, r, name);
     }
 
     private static boolean write(String table, ContentResolver r, String name, String value) {
-        try {
-            boolean ok;
-            switch (table) {
-                case "global": ok = Settings.Global.putString(r, name, value); break;
-                case "secure": ok = Settings.Secure.putString(r, name, value); break;
-                default: ok = Settings.System.putString(r, name, value); break;
-            }
-            if (ok) {
-                SharedPreferences p = prefs();
-                if (p != null && p.contains(id(table, name))) p.edit().remove(id(table, name)).commit();
-            }
-            return ok;
-        } catch (SecurityException | IllegalArgumentException e) {
-            // Not allowed for an ordinary app: kept locally.
-        }
-        SharedPreferences p = prefs();
-        if (p == null) return false;
-        String key = id(table, name);
-        String old = p.getString(key, null);
-        p.edit().putString(key, value).commit();
-        if (old == null ? value != null : !old.equals(value)) {
+        File f = file(table, name);
+        if (systemCopy()) {
             try {
-                r.notifyChange(uri(table, name), null);
-            } catch (RuntimeException e) {
-                Log.w(TAG, "local setting " + key + " not announced", e);
+                boolean ok;
+                switch (table) {
+                    case "global": ok = Settings.Global.putString(r, name, value); break;
+                    case "secure": ok = Settings.Secure.putString(r, name, value); break;
+                    default: ok = Settings.System.putString(r, name, value); break;
+                }
+                if (ok && f != null) f.delete();
+                return ok;
+            } catch (SecurityException | IllegalArgumentException e) {
+                // Refused: kept locally.
             }
+        }
+        if (f == null) return false;
+        String old = local(f);
+        // An unchanged value is not written again (the settings screen echoes every change it is told about).
+        if (old == null ? value == null : old.equals(value)) return true;
+        if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "local setting " + f.getName() + " = " + value + " (was " + old + ")");
+        if (value == null) {
+            // Nothing kept: Android's value again, as a null in shared preferences was.
+            f.delete();
+        } else {
+            try {
+                store(f, value);
+            } catch (IOException e) {
+                Log.w(TAG, "local setting " + f.getName() + " not kept", e);
+                return false;
+            }
+        }
+        try {
+            r.notifyChange(uri(table, name), null);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "local setting " + f.getName() + " not announced", e);
         }
         return true;
     }
