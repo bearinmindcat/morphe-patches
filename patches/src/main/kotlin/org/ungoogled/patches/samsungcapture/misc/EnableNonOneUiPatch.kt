@@ -12,9 +12,11 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectMembers
@@ -572,6 +574,38 @@ private val telemetryPatch = bytecodePatch(
     execute {
         method("$APP/baseutil/analytics/SmartCaptureSamsungAnalyticsUtils;", "setConfiguration")
             .addInstruction(0, "return-void")
+        // Unconfigured, the SDK's tracker lookup is an assertion that throws where the ROM is not a "user" build
+        // (LineageOS and other userdebug ROMs: the settings screen, recorder and editor stopped on their first log).
+        // Every log call asks for the tracker first, so those calls return at once.
+        val tracker = mutableListOf<Method>()
+        classDefForEach { c ->
+            c.methods.filterTo(tracker) { m ->
+                m.parameterTypes.isEmpty() && m.returnType == c.type && m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "call after setConfiguration() method"
+                } == true
+            }
+        }
+        val lookup = tracker.singleOrNull() ?: throw PatchException("Samsung Analytics' tracker lookup not found (${tracker.size})")
+        val loggers = mutableListOf<Pair<String, Method>>()
+        classDefForEach { c ->
+            if (c.type == lookup.definingClass) return@classDefForEach
+            c.methods.filter { m ->
+                m.implementation?.instructions?.any {
+                    val ref = (it as? ReferenceInstruction)?.reference as? MethodReference
+                    ref != null && ref.definingClass == lookup.definingClass && ref.name == lookup.name &&
+                        ref.parameterTypes.isEmpty() && ref.returnType == lookup.returnType
+                } == true
+            }.forEach { loggers += c.type to it }
+        }
+        loggers.forEach { (type, m) ->
+            if (m.returnType != "V") throw PatchException("Samsung Analytics log call $type.${m.name} returns ${m.returnType}")
+            val shape = m.parameterTypes.map(CharSequence::toString)
+            method(type, m.name) { it.parameterTypes.map(CharSequence::toString) == shape && it.returnType == "V" }
+                .addInstruction(0, "return-void")
+        }
+        log.info("Samsung Analytics log calls: ${loggers.size}")
+        // Measured against 6.2.12: 5 (screen, event and status logs).
+        if (loggers.size < 3) throw PatchException("only ${loggers.size} Samsung Analytics log calls found")
         val result = "Lcom/samsung/android/app/settings/updatechecker/CheckForUpdates\$PackageCheckResult;"
         method("Lcom/samsung/android/app/settings/updatechecker/CheckForUpdates;", "createPackageCheckResult")
             .addInstructions(
