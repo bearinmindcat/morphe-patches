@@ -762,10 +762,10 @@ public final class YouActivity extends UiScreen {
         LinearLayout row = new LinearLayout(this);
         row.setPadding(dp(16), 0, dp(16), dp(8));
         row.addView(dropChip(SavedStore.enrichmentPaused ? "Resume" : "Pause", false, v -> {
-            PlaceEnrichment.pause(this, !SavedStore.enrichmentPaused); render();
+            PlaceEnrichment.pause(this, !SavedStore.enrichmentPaused, this::render);
         }));
-        row.addView(dropChip("Retry failed", false, v -> { PlaceEnrichment.retry(this, null); render(); }));
-        row.addView(dropChip("Cancel queue", false, v -> { PlaceEnrichment.cancel(this); render(); }));
+        row.addView(dropChip("Retry failed", false, v -> PlaceEnrichment.retry(this, null, this::render)));
+        row.addView(dropChip("Cancel queue", false, v -> PlaceEnrichment.cancel(this, this::render)));
         body.addView(row);
     }
 
@@ -961,7 +961,7 @@ public final class YouActivity extends UiScreen {
                             .setPositiveButton("Use this listing", (d, w) -> {
                                 try {
                                     SavedStore.confirmReplacement(this, p, candidate);
-                                    PlaceEnrichment.retry(this, p);
+                                    PlaceEnrichment.retry(this, p, this::render);
                                 } catch (IllegalStateException e) {
                                     Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
                                 }
@@ -972,7 +972,7 @@ public final class YouActivity extends UiScreen {
             }
             if (Shapes.localSavedPatched()) {
                 names.add("Retry details / thumbnail");
-                actions.add(() -> { PlaceEnrichment.retry(this, p); render(); });
+                actions.add(() -> PlaceEnrichment.retry(this, p, this::render));
             }
         }
         names.add("More options");
@@ -1686,6 +1686,7 @@ public final class YouActivity extends UiScreen {
             uris.add(data.getData());
         }
         if (uris.isEmpty()) return;
+        PlaceEnrichment.beginImport(this);
         LIBRARY.execute(() -> {
             String title, message;
             try {
@@ -1694,17 +1695,19 @@ public final class YouActivity extends UiScreen {
                 message = r.places == 0 ? "Everything in " + (r.files == 1 ? "that file" : "those files") + " is here already."
                         : "Added " + count(r.places) + (r.lists == 0 ? "" : r.lists == 1 ? " and 1 list" : " and " + r.lists + " lists") + ".";
                 if (r.places == 0 && !r.problems.isEmpty()) message = "No new places were added. See the file warnings below.";
+                message += "\nRead " + r.files + (r.files == 1 ? " file." : " files.");
                 if (r.unlocated > 0) message += "\n\n" + r.unlocated + " entries still need verified coordinates.";
                 message += Shapes.localSavedPatched()
                         ? "\n\nMaps will load available details and one representative thumbnail for resolvable entries. "
                                 + "No API key or Google sign-in is added. Requests still reach Google. You can pause, cancel or retry from the library."
                         : "\n\nEntries are kept locally. Background enrichment is not included in this profile.";
                 if (!r.problems.isEmpty()) message += "\n\nFiles needing attention:\n" + android.text.TextUtils.join("\n", r.problems);
-                PlaceEnrichment.start(this);
             } catch (Exception t) {
                 android.util.Log.w("UA", "Library import failed", t);
                 title = "That didn't work";
                 message = String.valueOf(t.getMessage());
+            } finally {
+                PlaceEnrichment.finishImport(this);
             }
             String ti = title, m = message;
             runOnUiThread(() -> {

@@ -117,6 +117,34 @@ public class YouActivityTest extends LibraryTestSupport {
         } finally { controller.pause().stop().destroy(); }
     }
 
+    @Test public void multiFileImportReportsEveryReadFileEvenWhenNothingIsNew() throws Exception {
+        String list = SavedStore.addList(context, "Current list", "");
+        ActivityController<YouActivity> controller = openList(list);
+        try {
+            android.content.ClipData files = null;
+            for (int i = 0; i < 13; i++) {
+                File file = new File(context.getCacheDir(), "Part-" + i + ".csv");
+                Files.write(file.toPath(), ("Title,Note,URL\nPlace " + i + ",note,\"geo:" + i + ",20\"\n")
+                        .getBytes(StandardCharsets.UTF_8));
+                if (files == null) files = android.content.ClipData.newRawUri("Saved lists", Uri.fromFile(file));
+                else files.addItem(new android.content.ClipData.Item(Uri.fromFile(file)));
+            }
+            Intent selected = new Intent();
+            selected.setClipData(files);
+            for (int run = 0; run < 2; run++) {
+                controller.get().onActivityResult(3, Activity.RESULT_OK, selected);
+                awaitLibrary();
+                awaitLibrary();
+                AlertDialog result = ShadowAlertDialog.getLatestAlertDialog();
+                assertNotNull(result);
+                String message = ((TextView) result.findViewById(android.R.id.message)).getText().toString();
+                assertTrue(message, message.contains("Read 13 files."));
+                assertEquals(13, SavedStore.places.size());
+                result.dismiss();
+            }
+        } finally { controller.pause().stop().destroy(); }
+    }
+
     private ActivityController<YouActivity> openList(String list) throws Exception {
         Intent intent = new Intent(context, YouActivity.class).putExtra(YouActivity.EXTRA_PAGE, "list")
                 .putExtra(YouActivity.EXTRA_LIST, list);

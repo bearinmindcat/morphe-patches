@@ -14,19 +14,34 @@ public final class NativePlaces {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static volatile WeakReference<Object> loader = new WeakReference<>(null);
     private static volatile WeakReference<Object> provider = new WeakReference<>(null);
+    private static volatile Object retainedLoader, retainedProvider;
+    private static volatile boolean retaining;
 
     private NativePlaces() {}
 
-    public static void bind(Object instance) {
+    public static synchronized void bind(Object instance) {
         loader = new WeakReference<>(instance);
+        if (retaining) retainedLoader = instance;
     }
 
-    public static void bindProvider(Object instance) {
+    public static synchronized void bindProvider(Object instance) {
         provider = new WeakReference<>(instance);
+        if (retaining) retainedProvider = instance;
+    }
+
+    static synchronized void retain() {
+        retaining = true;
+        retainedLoader = loader.get();
+        retainedProvider = provider.get();
+    }
+
+    static synchronized void release() {
+        retaining = false;
+        retainedLoader = retainedProvider = null;
     }
 
     static boolean available() {
-        return loader.get() != null || provider.get() != null;
+        return retainedLoader != null || retainedProvider != null || loader.get() != null || provider.get() != null;
     }
 
     static SavedStore.Place lookup(Context context, String featureId) throws Exception {
@@ -37,8 +52,8 @@ public final class NativePlaces {
         Runnable begin = () -> {
             if (started.isCancelled()) return;
             try {
-                Object service = loader.get();
-                Object supplier = provider.get();
+                Object service = retainedLoader != null ? retainedLoader : loader.get();
+                Object supplier = retainedProvider != null ? retainedProvider : provider.get();
                 if (service == null && supplier != null) service = resolve(supplier);
                 if (service == null) throw new ServiceUnavailable();
                 Object request = request(service, featureId);

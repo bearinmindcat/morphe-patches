@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -16,6 +17,8 @@ import java.lang.reflect.Method;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 29, manifest = Config.NONE)
 public class PlaceEnrichmentTest extends LibraryTestSupport {
+    @Before public void connectedNetwork() { QueueRecoveryTest.online(context, true); }
+
     @Test public void unavailableMetadataFinishesDecodedNativeThumbnailWithoutRetryingMetadata() throws Exception {
         SavedStore.Place p = new SavedStore.Place();
         p.name = "Native photo already known";
@@ -33,7 +36,7 @@ public class PlaceEnrichmentTest extends LibraryTestSupport {
         p.photos.add(0, "https://example.invalid/unsupported-first-photo");
         SavedStore.places.put(p.key(), p);
         SavedStore.enrichmentPaused = false;
-        drain();
+        enrich(p);
         assertEquals("unavailable", p.detailsState);
         assertEquals("ready", p.thumbnailState);
         assertEquals(available, p.thumbnailUrl);
@@ -41,6 +44,7 @@ public class PlaceEnrichmentTest extends LibraryTestSupport {
         assertEquals(1, p.thumbnailAttempts);
         assertFalse(waiting(p));
         assertTrue(Thumbs.cached(context, p.photo()));
+        SavedStore.save(context);
         reload();
         assertEquals("ready", SavedStore.find(p.id).thumbnailState);
     }
@@ -77,7 +81,7 @@ public class PlaceEnrichmentTest extends LibraryTestSupport {
         p.photos.add("https://example.invalid/not-a-supported-thumbnail");
         SavedStore.places.put(p.key(), p);
         SavedStore.enrichmentPaused = false;
-        drain();
+        enrich(p);
         assertEquals("review", p.detailsState);
         assertEquals("Unverified replacement", p.detailError);
         assertEquals(0, p.attempts);
@@ -85,10 +89,12 @@ public class PlaceEnrichmentTest extends LibraryTestSupport {
         assertEquals(5, p.thumbnailAttempts);
         assertFalse(waiting(p));
         PlaceEnrichment.retry(context, null);
+        awaitControls();
         assertEquals("review", p.detailsState);
     }
 
     @Test public void unsupportedIdentifiersAreRetainedWithoutConsumingNativeRequests() throws Exception {
+        SavedStore.enrichmentPaused = false;
         SavedStore.Place p = SavedStore.fromMapsLink("https://www.google.com/maps/search/?query_place_id=ChIJ42", "Opaque");
         p.detailsState = "loading";
         SavedStore.places.put(p.key(), p);
@@ -153,10 +159,30 @@ public class PlaceEnrichmentTest extends LibraryTestSupport {
         assertTrue(cached.length() > 3);
     }
 
+    @Test public void nativeReferencesAreRetainedOnlyForTheVisibleJob() throws Exception {
+        Object provider = new Object();
+        NativePlaces.bindProvider(provider);
+        NativePlaces.retain();
+        java.lang.reflect.Field field = NativePlaces.class.getDeclaredField("provider");
+        field.setAccessible(true);
+        ((java.lang.ref.WeakReference<?>) field.get(null)).clear();
+        assertTrue(NativePlaces.available());
+        NativePlaces.release();
+        NativePlaces.bindProvider(null);
+        NativePlaces.bind(null);
+        assertFalse(NativePlaces.available());
+    }
+
     private void drain() throws Exception {
         Method drain = PlaceEnrichment.class.getDeclaredMethod("drain", Context.class);
         drain.setAccessible(true);
         worker(() -> { drain.invoke(null, context); return null; });
+    }
+
+    private void enrich(SavedStore.Place p) throws Exception {
+        Method enrich = PlaceEnrichment.class.getDeclaredMethod("enrich", Context.class, SavedStore.Place.class);
+        enrich.setAccessible(true);
+        worker(() -> { enrich.invoke(null, context, p); return null; });
     }
 
     private static boolean waiting(SavedStore.Place p) throws Exception {

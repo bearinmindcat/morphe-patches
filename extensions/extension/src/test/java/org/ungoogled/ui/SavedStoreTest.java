@@ -342,6 +342,60 @@ public class SavedStoreTest extends LibraryTestSupport {
         assertTrue(result.problems.get(0).contains("Bad.csv"));
         assertEquals(1, SavedStore.countIn(listNamed("Last")));
     }
+
+    @Test public void legacyExhaustedQueueRecoversOnceWithoutChangingPauseOrIdentityReview() throws Exception {
+        String old = "{\"version\":3,\"enrichmentPaused\":true,\"lists\":[{\"id\":\"custom\",\"name\":\"Food\",\"emoji\":\"\\u2615\"}],"
+                + "\"places\":[{\"id\":\"kept\",\"cid\":\"42\",\"name\":\"Place\",\"hasCoordinates\":false,"
+                + "\"note\":\"private\",\"lists\":[\"custom\"],\"membershipIds\":{\"custom\":\"membership\"},"
+                + "\"listNotes\":{\"custom\":\"list note\"},\"sources\":[{\"id\":\"original\",\"values\":[\"all columns\"]}],"
+                + "\"detailsState\":\"failed\",\"attempts\":5,\"detailError\":\"Placemark fetch returned with errorCode: UNKNOWN\"},"
+                + "{\"id\":\"cancelled\",\"name\":\"Cancel\",\"detailsState\":\"cancelled\"},"
+                + "{\"id\":\"review\",\"name\":\"Review\",\"detailsState\":\"review\",\"candidateFtid\":\"0x1:0x2\"},"
+                + "{\"id\":\"candidate\",\"name\":\"Candidate\",\"detailsState\":\"failed\",\"candidateFtid\":\"0x1:0x3\"},"
+                + "{\"id\":\"photo\",\"name\":\"Photo\",\"detailsState\":\"complete\",\"thumbnailState\":\"failed\",\"thumbnailAttempts\":5},"
+                + "{\"id\":\"cancelled-photo\",\"name\":\"Cancelled photo\",\"detailsState\":\"complete\",\"thumbnailState\":\"cancelled\"},"
+                + "{\"id\":\"unavailable\",\"name\":\"Unavailable\",\"detailsState\":\"unavailable\"}]}";
+        File file = new File(context.getFilesDir(), SavedStore.FILE);
+        Files.write(file.toPath(), old.getBytes(StandardCharsets.UTF_8));
+        set(SavedStore.class, "loaded", false);
+        SavedStore.load(context);
+        assertTrue(SavedStore.enrichmentPaused);
+        SavedStore.Place p = SavedStore.find("kept");
+        assertEquals("pending", p.detailsState);
+        assertEquals(0, p.attempts);
+        assertEquals("private", p.note);
+        assertEquals("list note", p.listNote("custom"));
+        assertEquals("membership", p.membershipId("custom"));
+        assertEquals("original", p.sources.get(0).getString("id"));
+        assertEquals("cancelled", SavedStore.find("cancelled").detailsState);
+        assertEquals("review", SavedStore.find("review").detailsState);
+        assertEquals("0x1:0x2", SavedStore.find("review").candidateFtid);
+        assertEquals("review", SavedStore.find("candidate").detailsState);
+        assertEquals("0x1:0x3", SavedStore.find("candidate").candidateFtid);
+        assertEquals("pending", SavedStore.find("photo").thumbnailState);
+        assertEquals(0, SavedStore.find("photo").thumbnailAttempts);
+        assertEquals("cancelled", SavedStore.find("cancelled-photo").thumbnailState);
+        assertEquals("unavailable", SavedStore.find("unavailable").detailsState);
+        worker(() -> { SavedStore.flush(); return null; });
+        assertEquals(old, new String(Files.readAllBytes(new File(context.getFilesDir(), SavedStore.FILE + ".queue-v0.bak").toPath()),
+                StandardCharsets.UTF_8));
+        p.detailsState = "failed";
+        p.attempts = 5;
+        SavedStore.save(context);
+        reload();
+        assertEquals("failed", SavedStore.find("kept").detailsState);
+        assertEquals(5, SavedStore.find("kept").attempts);
+    }
+
+    @Test public void unsupportedQueueSchemaIsNotSilentlyDowngraded() throws Exception {
+        String original = "{\"version\":3,\"enrichmentQueueVersion\":2,\"places\":[]}";
+        File file = new File(context.getFilesDir(), SavedStore.FILE);
+        Files.write(file.toPath(), original.getBytes(StandardCharsets.UTF_8));
+        set(SavedStore.class, "loaded", false);
+        assertThrows(IllegalStateException.class, () -> SavedStore.load(context));
+        assertThrows(IllegalStateException.class, () -> SavedStore.save(context));
+        assertEquals(original, new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8));
+    }
 }
 
 abstract class LibraryTestSupport {
@@ -349,10 +403,12 @@ abstract class LibraryTestSupport {
 
     @Before public void resetLibrary() throws Exception {
         context = RuntimeEnvironment.getApplication();
+        awaitControls();
+        awaitQueue();
         try { worker(() -> { SavedStore.flush(); return null; }); }
         catch (IOException expectedAfterWriteFailure) { /* The failure test leaves the writer in an error state. */ }
         for (String name : new String[]{SavedStore.FILE, HistoryStore.FILE}) {
-            for (String suffix : new String[]{"", ".bak", ".new", ".v1.bak", ".v2.bak"})
+            for (String suffix : new String[]{"", ".bak", ".new", ".v1.bak", ".v2.bak", ".queue-v0.bak"})
                 Files.deleteIfExists(new File(context.getFilesDir(), name + suffix).toPath());
         }
         for (Class<?> type : new Class<?>[]{SavedStore.class, HistoryStore.class}) {
@@ -362,18 +418,23 @@ abstract class LibraryTestSupport {
         set(SavedStore.class, "generation", 0L);
         set(SavedStore.class, "persistedGeneration", 0L);
         set(SavedStore.class, "writeError", null);
+        set(PlaceEnrichment.class, "pauseRequested", false);
         SavedStore.enrichmentPaused = true;
+        SavedStore.enrichmentPauseReason = SavedStore.enrichmentLastFailure = "";
         SavedStore.load(context);
         HistoryStore.load(context);
     }
 
     @After public void finishWrites() throws Exception {
+        awaitControls();
+        awaitQueue();
         SavedStore.enrichmentPaused = true;
         try { worker(() -> { SavedStore.flush(); return null; }); }
         catch (IOException expectedAfterWriteFailure) { /* Asserted by the failure test itself. */ }
     }
 
     protected void reload() throws Exception {
+        awaitControls();
         worker(() -> { SavedStore.flush(); return null; });
         set(SavedStore.class, "loaded", false);
         SavedStore.load(context);
@@ -387,6 +448,16 @@ abstract class LibraryTestSupport {
         Field field = type.getDeclaredField(name);
         field.setAccessible(true);
         field.set(null, value);
+    }
+
+    protected static void awaitControls() throws Exception { awaitEnrichment("CONTROLS"); }
+
+    protected static void awaitQueue() throws Exception { awaitEnrichment("WORKER"); }
+
+    private static void awaitEnrichment(String name) throws Exception {
+        Field field = PlaceEnrichment.class.getDeclaredField(name);
+        field.setAccessible(true);
+        ((java.util.concurrent.ExecutorService) field.get(null)).submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     protected static <T> T worker(Callable<T> work) throws Exception {

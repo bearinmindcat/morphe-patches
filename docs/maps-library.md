@@ -2,7 +2,7 @@
 
 The **Offline saved places** patch keeps the existing Local saved screen, native
 Save sheet, labels, list emoji support and account-pull behavior. These additions
-do not require a Google account, a Places API key or a separate service.
+do not require a Google account, a Places API key or a separate server.
 
 ## Import a library
 
@@ -10,6 +10,8 @@ Open **Local saved > Import** and select a backup, Google Takeout saved-list CSV
 Saved Places GeoJSON, KML, a list snapshot, several files, or a Takeout ZIP.
 The ZIP reader selects `Saved/*.csv` and `Saved Places.json`; unrelated Takeout
 data is not imported.
+The result reports how many files were read, including when all their entries
+were already present.
 
 CSV titles, multiline notes, comments, tags, headers and original rows are kept.
 GeoJSON features retain their original properties and geometry. KML imports keep
@@ -27,6 +29,12 @@ unsupported features. Unsupported versions, malformed documents and conflicting
 unknown fields produce an error rather than a partial rewrite. An unreadable local
 store is not overwritten. A failed document is rolled back; successfully read
 files in a multi-file import remain, with file-specific warnings.
+
+An update also repairs the earlier enrichment queue once: entries whose retries
+were exhausted by a lost network can resume without importing the files again.
+The original store is retained as `ungoogled_saved.json.queue-v0.bak`. Your pause
+choice, cancelled entries and identity-review decisions are preserved. This
+migration does not reset genuine failures on every launch.
 
 ## Available native details, without a key
 
@@ -51,7 +59,7 @@ reviews.
 
 | State | Meaning |
 |---|---|
-| Queued / loading | Waiting for Maps' service or a request in progress. |
+| Queued / loading | Waiting for a usable network, Maps' service, or a request in progress. |
 | Retry scheduled / failed | A bounded retry is pending, or manual Retry is needed. |
 | Unavailable | No supported identifier or native listing was returned; the entry stays. |
 | Identity review | Maps returned a different listing. Its name alone does not establish an alias. |
@@ -61,8 +69,37 @@ reviews.
 Use **Pause**, **Resume**, **Retry failed** or **Cancel queue** in Local saved.
 Review a proposed replacement from the entry's menu; no replacement is accepted
 automatically. Original source links and import rows are retained after confirmation.
-Pending requests recover when Maps next runs. This is an in-process queue, not a
-service that keeps the app running indefinitely.
+
+Import, Resume and reopening Maps with unfinished work can start a **visible
+Android `dataSync` foreground service**, only while the app is in the foreground.
+Its notification shows progress and offers Pause and Cancel queue. Native request
+handles are retained for the job and released when it stops. A bounded partial
+wake lock is held only for active work, not while waiting offline. This is an
+on-device service, not a companion server or an always-running sync feature.
+
+Disconnected or captive-portal networks do not consume place or thumbnail
+attempts. A connection change or service stop during a failed request does not
+spend its retry budget. Reconnection wakes existing authorized work; it does not
+start a new foreground service from the background. Internet-capable networks are
+allowed even when Android's validation probes are blocked. Genuine native
+failures on a connected network still have bounded retries, and a returned
+identity mismatch still requires review.
+
+Controls and checkpoints run off the UI thread, including when import parsing
+holds the store lock. A normal service stop waits for its pause/cancel checkpoint.
+Android's `dataSync` timeout instead stops the service immediately and requests a
+paused checkpoint; reopen Local saved and tap Resume to continue. Android 15+
+limits background `dataSync` work to six hours per 24 hours across the app's
+services. Force-stop, device restart, power management and platform restrictions
+can also stop work; reopen Maps to resume unfinished work unless you paused or
+cancelled it.
+
+If notifications are denied, Android can still show the foreground job in
+**Active apps** rather than the notification drawer. No notification permission
+prompt is forced. A start restriction or missing installed service is reported
+without deleting the queue or using retries. Root/mount installs that retain the
+stock manifest may require a normal patched install for background enrichment;
+imported rows and ordinary saved-place actions remain available.
 
 Library writes run off the UI thread and use atomic checkpoints. Enrichment is
 checkpointed in small batches, map refreshes are coalesced, and long lists recycle

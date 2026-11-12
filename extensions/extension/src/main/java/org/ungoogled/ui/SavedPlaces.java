@@ -100,11 +100,11 @@ public final class SavedPlaces {
             }
             // Maps is in front: the one moment a timeline left on may be restarted.
             TimelineService.resumeIfWanted(a);
-            if (Shapes.localSavedPatched()) PlaceEnrichment.start(a);
+            if (Shapes.localSavedPatched()) PlaceEnrichment.foreground(a);
         }
         @Override public void onActivityCreated(Activity a, android.os.Bundle b) {}
         @Override public void onActivityStarted(Activity a) {}
-        @Override public void onActivityPaused(Activity a) {}
+        @Override public void onActivityPaused(Activity a) { PlaceEnrichment.background(a); }
         @Override public void onActivityStopped(Activity a) {}
         @Override public void onActivitySaveInstanceState(Activity a, android.os.Bundle b) {}
         @Override public void onActivityDestroyed(Activity a) {}

@@ -319,6 +319,7 @@ final class SavedStore {
     private static volatile IOException writeError;
     private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(r -> new Thread(r, "UA-store"));
     static boolean enrichmentPaused;
+    static String enrichmentPauseReason = "", enrichmentLastFailure = "";
     private static final Map<String, String> importedLists = new LinkedHashMap<>();
     private static JSONObject extra = new JSONObject();
     /** List id -> name, in display order. */
@@ -354,6 +355,7 @@ final class SavedStore {
         if (loaded) return;
         clearState();
         boolean migrated = false;
+        boolean queueMigrated = false;
         try {
             File f = new File(c.getFilesDir(), FILE);
             AtomicFile atomic = new AtomicFile(f);
@@ -368,6 +370,15 @@ final class SavedStore {
                 }
                 read(root, true);
                 enrichmentPaused = root.optBoolean("enrichmentPaused", false);
+                enrichmentPauseReason = root.optString("enrichmentPauseReason",
+                        enrichmentPaused ? "Paused in the earlier build. Tap Resume to continue your existing imports." : "");
+                enrichmentLastFailure = root.optString("enrichmentLastFailure", "");
+                if (queueVersion(root) < 1) {
+                    File backup = new File(c.getFilesDir(), FILE + ".queue-v0.bak");
+                    if (!backup.exists()) java.nio.file.Files.copy(f.toPath(), backup.toPath());
+                    recoverLegacyQueue();
+                    queueMigrated = true;
+                }
             }
         } catch (Exception e) {
             writeDisabled = true;
@@ -378,10 +389,39 @@ final class SavedStore {
         ensureDefaultLists();
         loaded = true;
         writeDisabled = false;
-        if (migrated) {
+        if (migrated || queueMigrated) {
             prepareEnrichment();
             save(c);
         }
+    }
+
+    private static void recoverLegacyQueue() {
+        for (Place p : places.values()) {
+            if ("review".equals(p.detailsState) || "cancelled".equals(p.detailsState) || "unavailable".equals(p.detailsState)) continue;
+            if ("failed".equals(p.detailsState) && !p.candidateFtid.isEmpty()) {
+                p.detailsState = "review";
+                continue;
+            }
+            if ("pending".equals(p.detailsState) || "loading".equals(p.detailsState) ||
+                    "retry".equals(p.detailsState) || "failed".equals(p.detailsState)) {
+                p.detailsState = "pending";
+                p.attempts = 0;
+                p.retryAt = 0;
+            }
+            if ("failed".equals(p.thumbnailState)) {
+                p.thumbnailState = "pending";
+                p.thumbnailAttempts = 0;
+                p.retryAt = 0;
+            }
+        }
+    }
+
+    private static int queueVersion(JSONObject root) throws Exception {
+        if (!root.has("enrichmentQueueVersion")) return 0;
+        Object value = root.get("enrichmentQueueVersion");
+        if (!(value instanceof Number) || (((Number) value).doubleValue() != 0 && ((Number) value).doubleValue() != 1))
+            throw new IOException("Unsupported enrichment queue version; original file retained");
+        return ((Number) value).intValue();
     }
 
     static boolean isDefault(String id) {
@@ -408,8 +448,10 @@ final class SavedStore {
     /** Reads our own format; [replace] false merges into what is already there. */
     private static void read(JSONObject root, boolean replace) throws Exception {
         version(root);
+        queueVersion(root);
         JSONObject unknown = unknownFields(root, "app", "version", "lists", "places", "home", "work",
-                "labels", "hiddenOnMap", "history", "enrichmentPaused", "importedLists");
+                "labels", "hiddenOnMap", "history", "enrichmentPaused", "importedLists",
+                "enrichmentQueueVersion", "enrichmentPauseReason", "enrichmentLastFailure");
         if (replace) extra = unknown;
         else mergeExtra(extra, unknown);
         JSONArray l = array(root, "lists");
@@ -594,6 +636,9 @@ final class SavedStore {
         root.put("app", "Ungoogled Maps");
         root.put("version", 3);
         root.put("enrichmentPaused", enrichmentPaused);
+        root.put("enrichmentQueueVersion", 1);
+        root.put("enrichmentPauseReason", enrichmentPauseReason);
+        root.put("enrichmentLastFailure", enrichmentLastFailure);
         root.put("importedLists", new JSONObject(importedLists));
         JSONArray l = new JSONArray();
         for (Map.Entry<String, String> e : lists.entrySet()) {

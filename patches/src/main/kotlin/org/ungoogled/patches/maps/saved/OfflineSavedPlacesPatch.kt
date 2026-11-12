@@ -60,6 +60,25 @@ private val savedManifestPatch = resourcePatch(description = "Declares the Local
             activity.setAttribute("android:label", "Local saved")
             activity.setAttribute("android:theme", "@android:style/Theme.DeviceDefault.DayNight")
             application.appendChild(activity)
+            val service = manifest.createElement("service")
+            service.setAttribute("android:name", "org.ungoogled.ui.EnrichmentService")
+            service.setAttribute("android:exported", "false")
+            service.setAttribute("android:foregroundServiceType", "dataSync")
+            application.appendChild(service)
+            val root = manifest.documentElement
+            listOf(
+                "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+                "android.permission.ACCESS_NETWORK_STATE", "android.permission.WAKE_LOCK", "android.permission.POST_NOTIFICATIONS",
+            ).forEach { permission ->
+                val declarations = root.getElementsByTagName("uses-permission")
+                if ((0 until declarations.length).none {
+                        (declarations.item(it) as Element).getAttribute("android:name") == permission
+                    }) {
+                    root.appendChild(manifest.createElement("uses-permission").apply {
+                        setAttribute("android:name", permission)
+                    })
+                }
+            }
         }
     }
 }
