@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 /**
  * The short sounds of the speed alerts, made on the phone: no sound files are added to Maps. They
  * play as navigation guidance does -- through the car on Android Auto and Bluetooth, music turned
- * down for them -- one at a time, on a thread of their own.
+ * down for them, silent while navigation is Muted -- one at a time, on a thread of their own.
  */
 final class Chime {
     private Chime() {}
@@ -40,8 +40,12 @@ final class Chime {
         play(new float[]{1319f, 988f, 1319f}, 130, 40);
     }
 
-    /** [notes] in Hz, each [noteMs] long with [gapMs] of silence after it. */
+    /** [notes] in Hz, each [noteMs] long with [gapMs] of silence after it; nothing while navigation is Muted. */
     private static void play(float[] notes, int noteMs, int gapMs) {
+        if (NavMute.muted()) {
+            android.util.Log.i("UA", "chime: navigation is muted");
+            return;
+        }
         AUDIO.execute(() -> {
             Context c = Shapes.appContext();
             if (c == null) return;

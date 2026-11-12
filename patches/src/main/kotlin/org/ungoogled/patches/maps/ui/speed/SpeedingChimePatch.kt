@@ -45,7 +45,7 @@ val speedingChimePatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, wazeFeaturesRowPatch)
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, wazeFeaturesRowPatch, navigationMuteHookPatch)
 
     execute {
         fun Instruction.ref() = (this as? ReferenceInstruction)?.reference

@@ -21,7 +21,7 @@ val wazeAlertsPatch = bytecodePatch(
     // The settings are read at every Activity (Shapes.wrap), which also registers the receiver; guidance
     // start and end come from the navigation camera hook. The pins are drawn as Maps' personal places
     // (mapMarkersPatch).
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, wazeFeaturesRowPatch, mapMarkersPatch)
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, wazeFeaturesRowPatch, mapMarkersPatch, navigationMuteHookPatch)
 
     execute {
         markPatched("wazeAlertsPatched")
