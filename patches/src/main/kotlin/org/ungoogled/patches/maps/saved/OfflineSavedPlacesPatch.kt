@@ -598,6 +598,9 @@ internal val localSavedPlacesPatch = bytecodePatch(
                 refs(m).any { r -> r is FieldReference && r.definingClass == ratingRecord.returnType && r.type == "I" }
         } ?: throw PatchException("place review count getter not found")
 
+        backgroundPlaceDetails(placeType, nameGetter, featureIdGetter, positionGetter, categoryGetter,
+            photosGetter, photoUrl.name, ratingGetter, reviewsGetter)
+
         val placeClass = mutableClassDefBy(placeType)
         placeClass.methods.add(
             ImmutableMethod(

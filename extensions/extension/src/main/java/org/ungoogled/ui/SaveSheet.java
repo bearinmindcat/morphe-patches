@@ -23,9 +23,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The "Place saved" sheet, a copy of Maps' own, measured off a signed-in Maps on
@@ -185,9 +183,7 @@ final class SaveSheet {
         newList.setPadding(dp(8), dp(1), 0, 0);
         newList.setOnClickListener(v -> SavedPlaces.listDialog(a, null, (n, e) -> {
             String id = SavedStore.addList(a, n, e);
-            Set<String> in = new LinkedHashSet<>(place.lists);
-            in.add(id);
-            SavedStore.setLists(a, place, in);
+            SavedStore.setMembership(a, place, id, true);
             renderRows();
         }));
         addRow.addView(newList, new LinearLayout.LayoutParams(-2, -1));
@@ -389,7 +385,7 @@ final class SaveSheet {
      */
     private void renderRows() {
         rows.removeAllViews();
-        for (Map.Entry<String, String> e : SavedStore.lists.entrySet()) {
+        for (Map.Entry<String, String> e : SavedStore.listNames().entrySet()) {
             final String id = e.getKey();
             final boolean in = place.lists.contains(id);
             LinearLayout row = new LinearLayout(a);
@@ -417,9 +413,7 @@ final class SaveSheet {
             box.setContentDescription(e.getValue());
             row.addView(box, new LinearLayout.LayoutParams(dp(48), dp(48)));
             row.setOnClickListener(v -> {
-                Set<String> lists = new LinkedHashSet<>(place.lists);
-                if (in) lists.remove(id); else lists.add(id);
-                SavedStore.setLists(a, place, lists);
+                SavedStore.setMembership(a, place, id, !in);
                 renderRows();
             });
             row.setAccessibilityDelegate(new View.AccessibilityDelegate() {

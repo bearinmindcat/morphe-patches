@@ -100,6 +100,7 @@ public final class SavedPlaces {
             }
             // Maps is in front: the one moment a timeline left on may be restarted.
             TimelineService.resumeIfWanted(a);
+            if (Shapes.localSavedPatched()) PlaceEnrichment.start(a);
         }
         @Override public void onActivityCreated(Activity a, android.os.Bundle b) {}
         @Override public void onActivityStarted(Activity a) {}
@@ -208,9 +209,7 @@ public final class SavedPlaces {
                 if (seen != null) p.fillFrom(seen.asPlace());
                 SavedStore.Place stored = SavedStore.keep(c, p);
                 stored.fillFrom(p);
-                Set<String> in = new LinkedHashSet<>(stored.lists);
-                in.add(list);
-                SavedStore.setLists(c, stored, in);
+                SavedStore.setMembership(c, stored, list, true);
                 reopenList = list;
                 picked = true;
                 return;
@@ -237,7 +236,7 @@ public final class SavedPlaces {
     }
 
     /** The first few photos' URLs out of Maps' photo list: each keeps its URL in the field the patch names. */
-    private static List<String> photoUrls(Object photos, String field) {
+    static List<String> photoUrls(Object photos, String field) {
         List<String> out = new ArrayList<>();
         if (!(photos instanceof List) || field == null) return out;
         for (Object o : (List<?>) photos) {
@@ -336,7 +335,7 @@ public final class SavedPlaces {
             emoji.setSingleLine(true);
             emoji.setTextSize(22);
             emoji.setGravity(android.view.Gravity.CENTER);
-            emoji.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(16)});
+            emoji.setFilters(new android.text.InputFilter[] {new android.text.InputFilter.LengthFilter(ListTransfer.EMOJI_LIMIT)});
             String now = id == null ? null : SavedStore.emojis.get(id);
             if (now != null) emoji.setText(now);
             row.addView(emoji, new LinearLayout.LayoutParams(Math.round(64 * dp), -2));
@@ -460,7 +459,7 @@ public final class SavedPlaces {
             SavedStore.load(c);
             String q = query.trim();
             SavedStore.Place p = SavedStore.labelled(q);
-            if (p == null || (p.lat == 0 && p.lng == 0)) return;
+            if (p == null || !p.located()) return;
             // The feature id "0x89b7b7bce3d77213:0xbd541016f552a256": two hex longs.
             int colon = p.ftid == null ? -1 : p.ftid.indexOf(':');
             if (colon > 2 && p.ftid.startsWith("0x") && p.ftid.startsWith("0x", colon + 1)) {
@@ -582,8 +581,12 @@ public final class SavedPlaces {
     }
 
     static String placeUrl(SavedStore.Place p) {
-        String cid = cid(p.ftid);
+        String cid = p.cid != null ? p.cid : cid(p.ftid);
         if (cid != null) return "https://maps.google.com/?cid=" + cid;
+        if (p.placeId != null) return "https://www.google.com/maps/search/?api=1&query=" + Uri.encode(p.name)
+                + "&query_place_id=" + Uri.encode(p.placeId);
+        if (!p.sourceUrl.isEmpty()) return p.sourceUrl;
+        if (!p.located()) return "https://www.google.com/maps/search/?api=1&query=" + Uri.encode(p.name);
         return String.format(Locale.US, "geo:%.7f,%.7f?q=%.7f,%.7f(%s)", p.lat, p.lng, p.lat, p.lng, Uri.encode(p.name));
     }
 

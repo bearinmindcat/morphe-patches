@@ -12,11 +12,14 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -42,7 +45,7 @@ public final class YouActivity extends UiScreen {
     private static final String EXTRA_KIND = "kind", EXTRA_SAVED_LIST = "savedList", EXTRA_CATEGORY = "category",
             EXTRA_SEARCH = "search";
     private static final String YOU = "you", PLACES = "places", LIST = "list", SAVED = "saved", LABELED = "labeled";
-    private static final int EXPORT_JSON = 1, EXPORT_KML = 2, IMPORT = 3, EXPORT_RECENT = 4;
+    private static final int EXPORT_JSON = 1, EXPORT_KML = 2, IMPORT = 3, EXPORT_RECENT = 4, EXPORT_LIST = 5, SHARE_LIST = 6;
     /** Beside HistoryStore's kinds: saved, and any use at all ("All Maps history"). */
     private static final int KIND_SAVED = 16, KIND_HISTORY = 32;
     private static final int[] HISTORY_KINDS = {KIND_HISTORY, HistoryStore.VIEWED, HistoryStore.DIRECTIONS,
@@ -67,6 +70,23 @@ public final class YouActivity extends UiScreen {
     private int sort;
     private FrameLayout filterBar;
     private EditText search;
+    private boolean libraryReady;
+    private ListView libraryView;
+    private LibraryAdapter libraryAdapter;
+    private TextView enrichmentProgress, emptyResults;
+    private int renderTicket;
+    private long renderedRevision = -1;
+    private final android.os.Handler updates = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final java.util.concurrent.ExecutorService LIBRARY = java.util.concurrent.Executors.newSingleThreadExecutor(
+            r -> new Thread(r, "UA-library"));
+    private final Runnable refreshProgress = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed()) return;
+            if (enrichmentProgress != null) enrichmentProgress.setText(PlaceEnrichment.progress());
+            if (libraryAdapter != null && renderedRevision != SavedStore.revision()) requestLibraryRows();
+            updates.postDelayed(this, 2000);
+        }
+    };
 
     // Maps' You tab colours, light as sampled off it; dark and Black their counterparts.
     int t1() { return dark ? 0xFFE3E3E3 : 0xFF535353; }
@@ -89,10 +109,28 @@ public final class YouActivity extends UiScreen {
             savedList = i.getStringExtra(EXTRA_SAVED_LIST);
             category = i.getStringExtra(EXTRA_CATEGORY);
         }
-        SavedStore.load(this);
-        HistoryStore.load(this);
         // A list's page draws its own header, as Maps' does; the others have the usual title bar.
         frame(pageTitle(), !(LIST.equals(page) || SAVED.equals(page)));
+        body.addView(hint("Loading saved library..."));
+        LIBRARY.execute(() -> {
+            try {
+                SavedStore.load(this);
+                HistoryStore.load(this);
+                PlaceEnrichment.start(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    libraryReady = true;
+                    render();
+                });
+            } catch (RuntimeException e) {
+                android.util.Log.e("UA", "Library screen could not load", e);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle("Library unavailable")
+                            .setMessage(e.getMessage()).setPositiveButton("Close", (d, w) -> finish()).show();
+                });
+            }
+        });
         if (search != null && i != null && i.getBooleanExtra(EXTRA_SEARCH, false)) {
             search.requestFocus();
             search.postDelayed(() -> {
@@ -117,14 +155,25 @@ public final class YouActivity extends UiScreen {
 
     @Override protected void onResume() {
         super.onResume();
-        if (LIST.equals(page) && !SavedStore.lists.containsKey(listId)) { finish(); return; }
-        render();
+        if (libraryReady) {
+            if (LIST.equals(page) && !SavedStore.lists.containsKey(listId)) { finish(); return; }
+            render();
+        }
+        updates.removeCallbacks(refreshProgress);
+        updates.post(refreshProgress);
     }
 
     /** Back to Maps: a place saved or unsaved here must not keep its old Save button. */
     @Override protected void onPause() {
         super.onPause();
+        updates.removeCallbacks(refreshProgress);
         SavedPlaces.refreshButtons();
+    }
+
+    @Override protected void onDestroy() {
+        renderTicket++;
+        updates.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     /** The Labeled page: Home, Work and the user's own labels (where Maps' search sends a Home that is not set). */
@@ -150,7 +199,10 @@ public final class YouActivity extends UiScreen {
     }
 
     private void render() {
+        if (!libraryReady) return;
+        if (PLACES.equals(page) || LIST.equals(page) || SAVED.equals(page)) ensureLibraryView();
         body.removeAllViews();
+        enrichmentProgress = null;
         switch (page) {
             case PLACES: renderPlaces(); break;
             case LIST: renderList(); break;
@@ -196,8 +248,12 @@ public final class YouActivity extends UiScreen {
         body.addView(listLikeRow(new PathIcon(PathIcon.DOWNLOAD, accent()), "Export",
                 null /* "A backup file, or KML for other map apps" */, v -> exportMenu(), null));
         body.addView(listLikeRow(new PathIcon(PathIcon.UPLOAD, accent()), "Import",
-                null /* "A backup, KML, or Google Takeout's Saved Places.json" */, v -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                Shapes.localSavedPatched()
+                        ? "Takeout, backups, KML or list snapshots. Available details download from Google; pause below to import offline."
+                        : "Takeout, backups, KML or list snapshots, copied to this phone.",
+                v -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
                         .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true), IMPORT), null));
+        addEnrichmentControls();
     }
 
     /**
@@ -273,7 +329,7 @@ public final class YouActivity extends UiScreen {
 
     /** The lists, most recently used first (by their newest place), empty ones last. */
     private List<Map.Entry<String, String>> listsByUse() {
-        List<Map.Entry<String, String>> out = new ArrayList<>(SavedStore.lists.entrySet());
+        List<Map.Entry<String, String>> out = new ArrayList<>(SavedStore.listNames().entrySet());
         Map<String, Long> newest = new LinkedHashMap<>();
         for (SavedStore.Place p : SavedStore.allSaved()) for (String id : p.lists) newest.merge(id, p.added, Math::max);
         out.sort((a, b) -> Long.compare(newest.getOrDefault(b.getKey(), 0L), newest.getOrDefault(a.getKey(), 0L)));
@@ -398,7 +454,7 @@ public final class YouActivity extends UiScreen {
         List<String> ids = new ArrayList<>();
         m.getMenu().add(0, 0, 0, "All saved");
         ids.add(null);
-        for (Map.Entry<String, String> e : SavedStore.lists.entrySet()) {
+        for (Map.Entry<String, String> e : SavedStore.listNames().entrySet()) {
             m.getMenu().add(0, ids.size(), ids.size(), e.getValue());
             ids.add(e.getKey());
         }
@@ -635,25 +691,19 @@ public final class YouActivity extends UiScreen {
     }
 
     private void renderPlaces() {
-        List<Item> list = items(kind, savedList, category, query);
-        if (list.isEmpty()) {
-            if (!query.trim().isEmpty() || kind != 0 || category != null) body.addView(hint("No results found"));
-            else if (!HistoryStore.enabled(this)) body.addView(hint("Remembering the places you look at is off. Turn it on under Your recent places on Local saved."));
-            return;
-        }
-        for (Item it : list) body.addView(placeRow(it));
+        requestLibraryRows();
     }
 
     // ---- one list, all saved places, Labeled ------------------------------------------------
 
     private void renderList() {
         String name = SavedStore.lists.get(listId);
-        if (name != null) listPage(SaveSheet.listIcon(this, listId, dark), name, SavedStore.inList(listId), true);
+        if (name != null) listPage(SaveSheet.listIcon(this, listId, dark), name, SavedStore.countIn(listId), true);
     }
 
     private void renderSaved() {
         listPage(drawable(BOOKMARK_FILL, accent(), new PathIcon(PathIcon.BOOKMARK, accent())), "All saved places",
-                SavedStore.allSaved(), false);
+                SavedStore.allSaved().size(), false);
     }
 
     /**
@@ -662,7 +712,7 @@ public final class YouActivity extends UiScreen {
      * name and edit, rating, category and distance, note, photos -- between bands. An empty list is
      * just that: no "nothing here" text.
      */
-    private void listPage(Drawable icon, String title, List<SavedStore.Place> places, boolean isList) {
+    private void listPage(Drawable icon, String title, int placeCount, boolean isList) {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(dp(20), dp(20), dp(20), 0);
@@ -671,7 +721,8 @@ public final class YouActivity extends UiScreen {
         top.addView(ic, new LinearLayout.LayoutParams(dp(28), dp(28)));
         top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         if (isList) top.addView(circleButton(MORE, null, "More options", 32, this::listPageMenu));
-        top.addView(circleButton(SHARE, null, "Share", 32, v -> shareList(title, places)), leftGap(12, 32));
+        top.addView(circleButton(SHARE, null, "Share", 32, v ->
+                shareList(title, isList ? SavedStore.inList(listId) : SavedStore.allSaved())), leftGap(12, 32));
         top.addView(circleButton(UiScreen.CLOSE, null, "Close", 32, v -> finish()), leftGap(12, 32));
         body.addView(top);
 
@@ -679,7 +730,7 @@ public final class YouActivity extends UiScreen {
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-1, -2);
         tl.setMargins(dp(20), dp(11), dp(20), 0);
         body.addView(t, tl);
-        TextView c = label(count(places.size()), 12, t2(), sans);
+        TextView c = label(count(placeCount), 12, t2(), sans);
         LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(-1, -2);
         cl.setMargins(dp(20), dp(13), dp(20), 0);
         body.addView(c, cl);
@@ -691,7 +742,9 @@ public final class YouActivity extends UiScreen {
             if (add) pills.addView(tonalPill(ADD_PLACE, "Add", v -> SavedPlaces.addPlaceTo(this, listId)));
             pills.addView(tonalPill(EDIT, "Edit", v -> editList(title)), add ? leftGap(8, 0) : new LinearLayout.LayoutParams(-2, -2));
             body.addView(pills);
+            body.addView(hint("Private. List notes are separate from private notes and are included in snapshots."));
         }
+        addEnrichmentControls();
         body.addView(bandView());
 
         LinearLayout sortRow = new LinearLayout(this);
@@ -699,12 +752,233 @@ public final class YouActivity extends UiScreen {
         sortRow.addView(dropChip(sort == 0 ? "Sort by" : SORTS[sort], sort != 0, this::sortMenu));
         body.addView(sortRow);
 
+        requestLibraryRows();
+    }
+
+    private void addEnrichmentControls() {
+        if (!Shapes.localSavedPatched()) return;
+        enrichmentProgress = hint(PlaceEnrichment.progress());
+        body.addView(enrichmentProgress);
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(dp(16), 0, dp(16), dp(8));
+        row.addView(dropChip(SavedStore.enrichmentPaused ? "Resume" : "Pause", false, v -> {
+            PlaceEnrichment.pause(this, !SavedStore.enrichmentPaused); render();
+        }));
+        row.addView(dropChip("Retry failed", false, v -> { PlaceEnrichment.retry(this, null); render(); }));
+        row.addView(dropChip("Cancel queue", false, v -> { PlaceEnrichment.cancel(this); render(); }));
+        body.addView(row);
+    }
+
+    private void ensureLibraryView() {
+        if (libraryView != null) return;
+        scroll.removeView(body);
+        content.removeAllViews();
+        body.setPadding(0, 0, 0, 0);
+        libraryView = new ListView(this);
+        libraryView.setDivider(new android.graphics.drawable.ColorDrawable(band()));
+        libraryView.setDividerHeight(dp(4));
+        libraryView.addHeaderView(body, null, false);
+        emptyResults = hint("");
+        emptyResults.setVisibility(View.GONE);
+        libraryView.addFooterView(emptyResults, null, false);
+        libraryAdapter = new LibraryAdapter();
+        libraryView.setAdapter(libraryAdapter);
+        libraryView.setRecyclerListener(view -> {
+            if (view instanceof LibraryRow) Thumbs.cancel(((LibraryRow) view).photo);
+        });
+        content.addView(libraryView, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    private void requestLibraryRows() {
+        int ticket = ++renderTicket;
+        int filterKind = kind, order = sort;
+        String filterList = savedList, filterCategory = category, filterQuery = query, selected = listId;
+        String currentPage = page;
         android.location.Location here = lastLocation();
-        List<SavedStore.Place> sorted = sorted(places, here);
-        for (int i = 0; i < sorted.size(); i++) {
-            if (i > 0) body.addView(bandView());
-            body.addView(card(sorted.get(i), here));
+        LIBRARY.execute(() -> {
+            List<Item> rows = new ArrayList<>();
+            long revision;
+            synchronized (SavedStore.class) {
+                if (PLACES.equals(currentPage)) rows.addAll(items(filterKind, filterList, filterCategory, filterQuery));
+                else {
+                    List<SavedStore.Place> places = LIST.equals(currentPage) ? SavedStore.inList(selected) : SavedStore.allSaved();
+                    if (order == 1 && here != null) places.sort((a, b) ->
+                            a.located() != b.located() ? a.located() ? -1 : 1 :
+                                    a.located() ? Float.compare(meters(here, a), meters(here, b)) : 0);
+                    else if (order == 2) java.util.Collections.reverse(places);
+                    for (SavedStore.Place p : places) rows.add(savedItem(p));
+                }
+                for (Item row : rows) row.place = row.place.displayCopy();
+                revision = SavedStore.revision();
+            }
+            runOnUiThread(() -> {
+                if (ticket != renderTicket || isFinishing() || isDestroyed() || libraryAdapter == null) return;
+                android.os.Parcelable position = libraryView.onSaveInstanceState();
+                libraryAdapter.rows = rows;
+                libraryAdapter.location = here;
+                libraryAdapter.notifyDataSetChanged();
+                libraryView.onRestoreInstanceState(position);
+                String empty = "";
+                if (rows.isEmpty() && PLACES.equals(currentPage)) {
+                    if (!filterQuery.trim().isEmpty() || filterKind != 0 || filterCategory != null) empty = "No results found";
+                    else if (!HistoryStore.enabled(this)) empty = "Remembering the places you look at is off. Turn it on under Your recent places on Local saved.";
+                }
+                emptyResults.setText(empty);
+                emptyResults.setVisibility(empty.isEmpty() ? View.GONE : View.VISIBLE);
+                renderedRevision = revision;
+            });
+        });
+    }
+
+    private final class LibraryAdapter extends BaseAdapter {
+        List<Item> rows = new ArrayList<>();
+        android.location.Location location;
+        final Map<String, Long> rowIds = new LinkedHashMap<>();
+        @Override public int getCount() { return rows.size(); }
+        @Override public Item getItem(int position) { return rows.get(position); }
+        @Override public long getItemId(int position) {
+            String id = rows.get(position).place.id;
+            Long stable = rowIds.get(id);
+            if (stable == null) rowIds.put(id, stable = (long) rowIds.size());
+            return stable;
         }
+        @Override public boolean hasStableIds() { return true; }
+        @Override public View getView(int position, View recycled, ViewGroup parent) {
+            LibraryRow row = recycled instanceof LibraryRow ? (LibraryRow) recycled : new LibraryRow();
+            row.bind(rows.get(position));
+            return row;
+        }
+    }
+
+    private final class LibraryRow extends LinearLayout {
+        final ImageView photo = new ImageView(YouActivity.this);
+        final TextView title = label("", 18, t1(), textMedium);
+        final TextView metadata = label("", 14, t2(), text);
+        final TextView note = label("", 14, t2(), text);
+        final TextView status = label("", 12, t3(), text);
+        final ImageView edit = circleButton(MORE, null, "Place options", 40, null);
+
+        LibraryRow() {
+            super(YouActivity.this);
+            setGravity(Gravity.TOP);
+            setPadding(dp(16), dp(16), dp(12), dp(16));
+            setMinimumHeight(dp(128));
+            ripple(this);
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(fill());
+            background.setCornerRadius(dp(12));
+            photo.setBackground(background);
+            photo.setClipToOutline(true);
+            addView(photo, new LinearLayout.LayoutParams(dp(88), dp(96)));
+            LinearLayout lines = new LinearLayout(YouActivity.this);
+            lines.setOrientation(VERTICAL);
+            lines.setPadding(dp(14), 0, dp(8), 0);
+            title.setMaxLines(2);
+            metadata.setMaxLines(2);
+            note.setMaxLines(3);
+            status.setMaxLines(2);
+            for (TextView line : new TextView[]{title, metadata, note, status}) {
+                line.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                line.setPadding(0, 0, 0, dp(4));
+                lines.addView(line);
+            }
+            addView(lines, new LinearLayout.LayoutParams(0, -2, 1));
+            addView(edit);
+        }
+
+        void bind(Item item) {
+            SavedStore.Place p = item.place;
+            title.setText(LIST.equals(page) ? p.listTitle(listId) : name(p));
+            String stars = Float.isNaN(p.rating) ? "" :
+                    String.format(Locale.getDefault(), "%.1f ★ (%s)", p.rating, java.text.NumberFormat.getInstance().format(p.reviews));
+            String description = stars + (stars.isEmpty() || p.category.isEmpty() ? "" : " · ") + p.category;
+            if (PLACES.equals(page)) description += (description.isEmpty() ? "" : "\n") + whatHappened(item) + " · " + ago(item.time);
+            else if (libraryAdapter.location != null && p.located())
+                description += (description.isEmpty() ? "" : "\n") + distance(meters(libraryAdapter.location, p));
+            metadata.setText(description);
+            metadata.setVisibility(description.isEmpty() ? GONE : VISIBLE);
+            String annotation = p.listNote(LIST.equals(page) ? listId : null);
+            if (annotation.isEmpty() && LIST.equals(page) && !p.note.isEmpty()) annotation = "Private note: " + p.note;
+            note.setText(annotation);
+            note.setVisibility(annotation.isEmpty() ? GONE : VISIBLE);
+            status.setText(PlaceEnrichment.status(p));
+            status.setVisibility(status.getText().length() == 0 ? GONE : VISIBLE);
+            Thumbs.cancel(photo);
+            photo.setPadding(dp(24), dp(24), dp(24), dp(24));
+            photo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            photo.setImageDrawable(new PathIcon(PathIcon.PIN, ink()));
+            Thumbs.loadInto(photo, p.photo(), Thumbs.SIZE, () -> {
+                photo.setPadding(0, 0, 0, 0); photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            });
+            setOnClickListener(v -> SavedPlaces.open(YouActivity.this, p));
+            edit.setOnClickListener(v -> libraryPlaceMenu(p, item.history));
+            setOnLongClickListener(v -> { libraryPlaceMenu(p, item.history); return true; });
+        }
+    }
+
+    private void libraryPlaceMenu(SavedStore.Place displayed, HistoryStore.Entry history) {
+        SavedStore.Place current = SavedStore.find(displayed.id);
+        SavedStore.Place p = current != null ? current : displayed;
+        List<String> names = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (LIST.equals(page) && current != null) {
+            names.add("Edit this list's note");
+            actions.add(() -> {
+                EditText field = new EditText(this);
+                field.setText(p.listNote(listId));
+                field.setMinLines(2);
+                new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle("Note for this list")
+                        .setMessage("Only this note is included if you share this list. Your private note stays on this device.")
+                        .setView(field).setPositiveButton("Save", (d, w) -> {
+                            SavedStore.setListNote(this, p, listId, field.getText().toString()); render();
+                        }).setNegativeButton("Cancel", null).show();
+            });
+        }
+        names.add("Save / private note / lists");
+        actions.add(() -> SaveSheet.show(this, p, this::render));
+        names.add("Open full Maps place page");
+        actions.add(() -> SavedPlaces.open(this, p));
+        if (!p.hours.isEmpty()) {
+            names.add("Opening hours (downloaded)");
+            actions.add(() -> new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle(name(p))
+                    .setMessage(p.hours + "\n\nDownloaded details may change. Open Maps for live information.")
+                    .setPositiveButton("Open Maps", (d, w) -> SavedPlaces.open(this, p)).setNegativeButton("Close", null).show());
+        }
+        if (current != null) {
+            if (!p.candidateFtid.isEmpty()) {
+                names.add("Review proposed replacement");
+                actions.add(() -> {
+                    String candidate, candidateName;
+                    synchronized (SavedStore.class) {
+                        candidate = p.candidateFtid;
+                        candidateName = p.candidateName;
+                    }
+                    SavedStore.Place proposed = SavedStore.fromMapsLink(
+                            "https://maps.google.com/?cid=" + SavedPlaces.cid(candidate), candidateName);
+                    new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle("Confirm the listing, not just its name")
+                            .setMessage("Imported: " + name(p) + "\n" + p.key() + "\n\nMaps proposed: " + candidateName
+                                    + "\n" + candidate + "\n\nNo alias relationship was verified. Keep it unresolved unless you confirm this is the same place. Original import rows are retained.")
+                            .setPositiveButton("Use this listing", (d, w) -> {
+                                try {
+                                    SavedStore.confirmReplacement(this, p, candidate);
+                                    PlaceEnrichment.retry(this, p);
+                                } catch (IllegalStateException e) {
+                                    Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                                }
+                                render();
+                            }).setNeutralButton("Open proposed place", (d, w) -> SavedPlaces.open(this, proposed))
+                            .setNegativeButton("Keep unresolved", null).show();
+                });
+            }
+            if (Shapes.localSavedPatched()) {
+                names.add("Retry details / thumbnail");
+                actions.add(() -> { PlaceEnrichment.retry(this, p); render(); });
+            }
+        }
+        names.add("More options");
+        actions.add(() -> placeMenu(p, history));
+        new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle(name(p))
+                .setItems(names.toArray(new String[0]), (d, w) -> actions.get(w).run()).show();
     }
 
     private LinearLayout.LayoutParams leftGap(int gap, int size) {
@@ -875,8 +1149,38 @@ public final class YouActivity extends UiScreen {
 
     /** The list as text: its name, then each place with a link that opens it in Maps. */
     private void shareList(String title, List<SavedStore.Place> places) {
+        if (LIST.equals(page)) {
+            new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle("Share " + title)
+                    .setItems(new String[]{"Export snapshot file", "Share snapshot file", "Share text links"}, (dialog, which) -> {
+                        if (which == 2) shareText(title, places);
+                        else new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle("Static list snapshot")
+                                .setMessage("Includes only this list's title, emoji, description, places, source links, "
+                                        + "source-provided coordinates and list notes. Anyone with the file can read and re-share it.\n\n"
+                                        + "Home, Work, history, other list memberships, private notes and downloaded Google photos, "
+                                        + "ratings and opening hours are excluded. This is not a full-library backup.\n\n"
+                                        + "Recipients use Import to create their own local copy. No account, server or live synchronization is needed.")
+                                .setPositiveButton("Choose file", (d, w) -> startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                                        .addCategory(Intent.CATEGORY_OPENABLE).setType("application/json")
+                                        .putExtra(Intent.EXTRA_TITLE, "ungoogled-maps-list.json"), which == 0 ? EXPORT_LIST : SHARE_LIST))
+                                .setNegativeButton("Cancel", null).show();
+                    }).show();
+        } else shareText(title, places);
+    }
+
+    private void shareText(String title, List<SavedStore.Place> places) {
         StringBuilder b = new StringBuilder(title).append('\n');
-        for (SavedStore.Place p : places) b.append("\n").append(name(p)).append('\n').append(SavedPlaces.placeUrl(p)).append('\n');
+        for (SavedStore.Place p : places) {
+            if (LIST.equals(page)) {
+                try {
+                    org.json.JSONObject value = ListTransfer.entry(p, listId);
+                    ListTransfer.validate(value);
+                    b.append("\n").append(value.getString("title")).append('\n').append(value.getString("sourceUrl")).append('\n');
+                } catch (Exception e) {
+                    Toast.makeText(this, "List could not be shared: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    return;
+                }
+            } else b.append("\n").append(name(p)).append('\n').append(SavedPlaces.placeUrl(p)).append('\n');
+        }
         Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, b.toString().trim());
         startActivity(Intent.createChooser(send, "Share " + title));
@@ -906,16 +1210,18 @@ public final class YouActivity extends UiScreen {
         }
         String[] names = new String[in.size()];
         boolean[] ticked = new boolean[in.size()];
-        for (int i = 0; i < names.length; i++) names[i] = name(in.get(i));
+        for (int i = 0; i < names.length; i++) {
+            SavedStore.Place p = in.get(i);
+            String note = p.listNote(listId);
+            names[i] = p.listTitle(listId) + (note.isEmpty() ? "" : " — " + note);
+        }
         new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this))
                 .setTitle("Remove places")
                 .setMultiChoiceItems(names, ticked, (d, which, on) -> ticked[which] = on)
                 .setPositiveButton("Remove", (d, w) -> {
                     for (int i = 0; i < ticked.length; i++) {
                         if (!ticked[i]) continue;
-                        java.util.Set<String> lists = new java.util.LinkedHashSet<>(in.get(i).lists);
-                        lists.remove(listId);
-                        SavedStore.setLists(this, in.get(i), lists);
+                        SavedStore.setMembership(this, in.get(i), listId, false);
                     }
                     render();
                 })
@@ -986,7 +1292,7 @@ public final class YouActivity extends UiScreen {
     private void renderLabeled() {
         body.addView(aliasRow("Home", SavedStore.home, true));
         body.addView(aliasRow("Work", SavedStore.work, false));
-        for (Map.Entry<String, SavedStore.Place> e : new ArrayList<>(SavedStore.labels.entrySet())) {
+        for (Map.Entry<String, SavedStore.Place> e : SavedStore.labeledPlaces().entrySet()) {
             body.addView(labelRow(e.getKey(), e.getValue()));
         }
         body.addView(hint("Add a label with + above, or from any place's menu."));
@@ -1070,6 +1376,10 @@ public final class YouActivity extends UiScreen {
      * a HistoryStore kind = that use, KIND_SAVED = saved ([list] narrows it); [cat] and [q] search too.
      */
     private List<Item> items(int k, String list, String cat, String q) {
+        synchronized (SavedStore.class) { return itemsLocked(k, list, cat, q); }
+    }
+
+    private List<Item> itemsLocked(int k, String list, String cat, String q) {
         Map<String, Item> byKey = new LinkedHashMap<>();
         if (k != KIND_SAVED) for (HistoryStore.Entry e : HistoryStore.newestFirst()) {
             long t = k == 0 || k == KIND_HISTORY ? e.last : e.at[HistoryStore.index(k)];
@@ -1323,14 +1633,40 @@ public final class YouActivity extends UiScreen {
         }
         Uri uri = data.getData();
         if (uri == null) return;
-        try {
-            if (request == EXPORT_JSON) SavedStore.exportJson(this, uri);
-            else if (request == EXPORT_KML) SavedStore.exportKml(this, uri);
-            else if (request == EXPORT_RECENT) SavedStore.exportRecentKml(this, uri);
-            Toast.makeText(this, "Exported", Toast.LENGTH_SHORT).show();
-        } catch (Throwable t) {
-            Toast.makeText(this, "That didn't work: " + t.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        if (request != EXPORT_JSON && request != EXPORT_KML && request != EXPORT_RECENT &&
+                request != EXPORT_LIST && request != SHARE_LIST) return;
+        LIBRARY.execute(() -> {
+            try {
+                SavedStore.load(this);
+                if (request == EXPORT_LIST || request == SHARE_LIST) {
+                    String snapshot = ListTransfer.document(listId).toString(2);
+                    SavedStore.save(this);
+                    SavedStore.flush();
+                    SavedStore.write(this, uri, snapshot);
+                } else if (request == EXPORT_JSON) SavedStore.exportJson(this, uri);
+                else if (request == EXPORT_KML) SavedStore.exportKml(this, uri);
+                else SavedStore.exportRecentKml(this, uri);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    Toast.makeText(this, request == EXPORT_LIST || request == SHARE_LIST
+                            ? "Selected list exported; private data and Google caches excluded" : "Exported", Toast.LENGTH_LONG).show();
+                    if (request == SHARE_LIST) {
+                        Intent send = new Intent(Intent.ACTION_SEND).setType("application/json")
+                                .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        send.setClipData(android.content.ClipData.newRawUri("List snapshot", uri));
+                        try { startActivity(Intent.createChooser(send, "Share list snapshot")); }
+                        catch (android.content.ActivityNotFoundException e) {
+                            Toast.makeText(this, "Snapshot saved. No compatible sharing app was found.", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                android.util.Log.w("UA", "Library export failed", e);
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     /**
@@ -1350,19 +1686,23 @@ public final class YouActivity extends UiScreen {
             uris.add(data.getData());
         }
         if (uris.isEmpty()) return;
-        new Thread(() -> {
+        LIBRARY.execute(() -> {
             String title, message;
             try {
                 SavedStore.Imported r = SavedStore.importFiles(this, uris);
-                title = r.places == 0 ? "Nothing new" : "Imported";
+                title = !r.problems.isEmpty() ? "Import needs attention" : r.places == 0 ? "Nothing new" : "Imported";
                 message = r.places == 0 ? "Everything in " + (r.files == 1 ? "that file" : "those files") + " is here already."
                         : "Added " + count(r.places) + (r.lists == 0 ? "" : r.lists == 1 ? " and 1 list" : " and " + r.lists + " lists") + ".";
-                if (r.unlocated > 0) {
-                    message += "\n\n" + (r.unlocated == 1 ? "1 place has" : r.unlocated + " places have") + " no position yet: Google "
-                            + "Takeout's lists leave it out. Each place gets it the first time you open it in Maps; until then "
-                            + "it shows no distance, and Directions opens the place first.";
-                }
-            } catch (Throwable t) {
+                if (r.places == 0 && !r.problems.isEmpty()) message = "No new places were added. See the file warnings below.";
+                if (r.unlocated > 0) message += "\n\n" + r.unlocated + " entries still need verified coordinates.";
+                message += Shapes.localSavedPatched()
+                        ? "\n\nMaps will load available details and one representative thumbnail for resolvable entries. "
+                                + "No API key or Google sign-in is added. Requests still reach Google. You can pause, cancel or retry from the library."
+                        : "\n\nEntries are kept locally. Background enrichment is not included in this profile.";
+                if (!r.problems.isEmpty()) message += "\n\nFiles needing attention:\n" + android.text.TextUtils.join("\n", r.problems);
+                PlaceEnrichment.start(this);
+            } catch (Exception t) {
+                android.util.Log.w("UA", "Library import failed", t);
                 title = "That didn't work";
                 message = String.valueOf(t.getMessage());
             }
@@ -1372,7 +1712,7 @@ public final class YouActivity extends UiScreen {
                 render();
                 new AlertDialog.Builder(this, SavedPlaces.dialogTheme(this)).setTitle(ti).setMessage(m).setPositiveButton("OK", null).show();
             });
-        }, "UA-import").start();
+        });
     }
 
     // ---- words ----------------------------------------------------------------------------

@@ -11,6 +11,8 @@ Install Morphe Manager if you have not yet: https://morphe.software
 
 Select the app you want to patch inside Morphe Manager, follow all instructions shown.
 
+For Google Maps, see [saved-place imports and static list snapshots](docs/maps-library.md).
+
 ## Patches
 
 <!-- PATCHES_START -->
