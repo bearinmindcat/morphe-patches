@@ -5,10 +5,21 @@ import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.coloroscalculator.ColorOsCalculatorConstants.COMPATIBILITY_COLOROS_CALCULATOR
+import org.ungoogled.patches.coloros.privateFrameworkClassesPatch
 
 internal const val COLOROS_CALCULATOR_EXTENSION = "extensions/coloroscalculator.mpe"
 
 private const val RUNTIME = "Lorg/ungoogled/coloroscalculator/ColorOS;"
+
+/**
+ * On OPPO / OnePlus / realme phones and custom ROMs made for them (their oplus-fwk.jar), the phone's own ColorOS
+ * classes load before the extension's stand-ins and refuse an installed app (issue #155): the app uses private copies
+ * of its stand-ins instead (see privatizeFrameworkClasses).
+ */
+// Measured against 17.0.0: 59 classes.
+private val privateClassesPatch = privateFrameworkClassesPatch(
+    "OnePlusCalculator", COLOROS_CALCULATOR_EXTENSION, minimum = 50,
+)
 
 /**
  * Off ColorOS Calculator dies at once on com.oplus.content.OplusFeatureConfigManager (a ColorOS framework class). The
@@ -24,6 +35,7 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_CALCULATOR)
+    dependsOn(privateClassesPatch)
     extendWith(COLOROS_CALCULATOR_EXTENSION)
 
     execute {

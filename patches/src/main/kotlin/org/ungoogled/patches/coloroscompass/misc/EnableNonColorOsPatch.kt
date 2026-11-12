@@ -11,6 +11,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
 import org.ungoogled.patches.coloros.treatRefusedComponentsAsMissing
 import org.ungoogled.patches.coloroscompass.ColorOsCompassConstants.COMPATIBILITY_COLOROS_COMPASS
+import org.ungoogled.patches.coloros.privateFrameworkClassesPatch
 
 internal const val COLOROS_COMPASS_EXTENSION = "extensions/coloroscompass.mpe"
 
@@ -24,6 +25,16 @@ private object NeedRequestPermissionsFingerprint : Fingerprint(
     returnType = "Z",
     parameters = listOf("Landroid/content/Context;", "Ljava/util/List;"),
     strings = listOf("needRequestPermissions "),
+)
+
+/**
+ * On OPPO / OnePlus / realme phones and custom ROMs made for them (their oplus-fwk.jar), the phone's own ColorOS
+ * classes load before the extension's stand-ins and refuse an installed app (issue #155): the app uses private copies
+ * of its stand-ins instead (see privatizeFrameworkClasses).
+ */
+// Measured against 17.0.0: 29 classes.
+private val privateClassesPatch = privateFrameworkClassesPatch(
+    "OnePlusCompass", COLOROS_COMPASS_EXTENSION, minimum = 25,
 )
 
 /**
@@ -41,6 +52,7 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_COMPASS)
+    dependsOn(privateClassesPatch)
     extendWith(COLOROS_COMPASS_EXTENSION)
 
     execute {

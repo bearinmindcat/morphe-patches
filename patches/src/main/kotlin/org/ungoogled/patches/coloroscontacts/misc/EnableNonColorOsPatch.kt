@@ -20,6 +20,7 @@ import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectToWrappers
 import org.ungoogled.patches.samsung.rewriteStringLiterals
 import org.w3c.dom.Element
+import org.ungoogled.patches.coloros.privateFrameworkClassesPatch
 
 internal const val COLOROS_CONTACTS_EXTENSION = "extensions/coloroscontacts.mpe"
 
@@ -280,6 +281,16 @@ private val settingsPatch = bytecodePatch(
 }
 
 /**
+ * On OPPO / OnePlus / realme phones and custom ROMs made for them (their oplus-fwk.jar), the phone's own ColorOS
+ * classes load before the extension's stand-ins and refuse an installed app (issue #155): the app uses private copies
+ * of its stand-ins instead (see privatizeFrameworkClasses).
+ */
+// Measured against 16.80.15: 193 classes.
+private val privateClassesPatch = privateFrameworkClassesPatch(
+    "OnePlusContacts", COLOROS_CONTACTS_EXTENSION, minimum = 150,
+)
+
+/**
  * OnePlus Contacts (ColorOS 16's contacts and dial pad) as a contacts, dial pad and call history app beside the user's
  * own phone app, which keeps showing every call: ColorOS's in-call screen is a separate system app (InCallUI, part of
  * the phone process), so the app is never offered as the phone app. Off ColorOS it dies at once on ColorOS framework
@@ -295,7 +306,10 @@ val enableNonColorOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_COLOROS_CONTACTS)
-    dependsOn(manifestPatch, noDefaultDialerTipPatch, callsPatch, optionalCallLogPatch, telephonyPatch, providersPatch, settingsPatch)
+    dependsOn(
+        privateClassesPatch, manifestPatch, noDefaultDialerTipPatch, callsPatch, optionalCallLogPatch, telephonyPatch,
+        providersPatch, settingsPatch,
+    )
     extendWith(COLOROS_CONTACTS_EXTENSION)
 
     execute {
