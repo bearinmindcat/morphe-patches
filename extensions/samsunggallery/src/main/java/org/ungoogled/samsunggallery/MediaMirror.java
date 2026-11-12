@@ -358,7 +358,9 @@ public final class MediaMirror extends ContentProvider {
         derived.put("media_id", "_id");
         // 1 = on the phone (2 is only in Samsung Cloud).
         derived.put("is_cloud", "1");
-        // Date taken in ms, Samsung's timeline key.
+        // Date taken in ms, Samsung's timeline key and "date created" sort; ExifOrientation puts the EXIF date where
+        // MediaStore has none. Without any, the file's date, as on One UI (Gallery's "wrong date" check is datetime =
+        // date_modified * 1000).
         derived.put("datetime", "COALESCE(datetaken, date_modified * 1000, date_added * 1000)");
         derived.put("is_hide", "0");
         // Not part of a burst or similar-shots group.
