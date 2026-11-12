@@ -13,6 +13,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.coloros.exportDynamicReceivers
+import org.ungoogled.patches.coloros.privateFrameworkClassesPatch
 import org.ungoogled.patches.coloroslauncher.misc.redirectHiddenMembers
 import org.ungoogled.patches.onepluslauncher.HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.onepluslauncher.HIDDEN_CONSTRUCTORS_16_17
@@ -279,6 +280,17 @@ private val hiddenApisPatch = bytecodePatch(
     }
 }
 
+/**
+ * On OnePlus / OPPO phones and on custom ROMs made for them (their oplus-fwk.jar), the phone's own OPLUS classes load
+ * before the launcher's stubs and stand-ins, and an installed app may not use their members: opening any app stopped
+ * the launcher (OplusResourceManager.getInstance, issue #155). The launcher now uses copies of its own under other
+ * names (see privatizeFrameworkClasses).
+ */
+// Measured against 5.2.66: 1,591 classes (stubs, their interfaces and nested classes, and the extension's stand-ins).
+private val privateClassesPatch = privateFrameworkClassesPatch(
+    "OnePlusLauncher", ONEPLUS_LAUNCHER_EXTENSION, minimum = 1000, extra = { sdkStubClasses() },
+)
+
 /** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
 private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_ONEPLUS_LAUNCHER)
 
@@ -295,7 +307,7 @@ val enableNonOxygenOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_ONEPLUS_LAUNCHER)
-    dependsOn(versionCheckPatch, deviceCheckPatch, hiddenApisPatch, telemetryPatch, pageSizePatch)
+    dependsOn(versionCheckPatch, privateClassesPatch, deviceCheckPatch, hiddenApisPatch, telemetryPatch, pageSizePatch)
     extendWith(ONEPLUS_LAUNCHER_EXTENSION)
     dependsOn(org.ungoogled.patches.shared.launcherCoexistencePatch())
 }

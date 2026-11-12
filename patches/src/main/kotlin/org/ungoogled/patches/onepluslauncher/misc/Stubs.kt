@@ -130,6 +130,31 @@ private fun BytecodePatchContext.rebuildConstructor(
     )
 }
 
+/**
+ * The OPLUS SDK classes the APK carries: the classes with compile-time stub bodies and the code-less ones (interfaces,
+ * annotations, constants) in the same packages; their nested classes follow them (see privatizeFrameworkClasses). Read
+ * before neutralizeStubs changes the bodies.
+ */
+internal fun BytecodePatchContext.sdkStubClasses(): Set<String> {
+    val stubs = HashSet<String>()
+    val codeless = HashSet<String>()
+    classDefForEach { c ->
+        if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        var code = false
+        for (m in c.methods) {
+            val instructions = m.implementation?.instructions?.toList() ?: continue
+            code = true
+            if (stubStart(instructions) >= 0) {
+                stubs += c.type
+                break
+            }
+        }
+        if (!code) codeless += c.type
+    }
+    val packages = stubs.map { it.substringBeforeLast('/') }.toSet()
+    return stubs + codeless.filter { it.substringBeforeLast('/') in packages }
+}
+
 internal fun BytecodePatchContext.neutralizeStubs(): Int {
     val targets = mutableListOf<Pair<String, Method>>()
     classDefForEach { c ->
