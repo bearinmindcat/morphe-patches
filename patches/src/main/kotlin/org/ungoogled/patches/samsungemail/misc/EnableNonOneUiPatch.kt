@@ -72,6 +72,44 @@ private val providerObserversPatch = bytecodePatch(
     }
 }
 
+private const val QUERY = "query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;"
+private const val QUERY_CANCELLABLE = "query(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;Landroid/os/CancellationSignal;)Landroid/database/Cursor;"
+
+/** ContentResolver / ContentProviderClient calls that reach a provider (Calendars passes all but the calendar's on). */
+private val PROVIDER_CALLS = mapOf(
+    "Landroid/content/ContentResolver;" to setOf(
+        QUERY, QUERY_CANCELLABLE,
+        "query(Landroid/net/Uri;[Ljava/lang/String;Landroid/os/Bundle;Landroid/os/CancellationSignal;)Landroid/database/Cursor;",
+        "insert(Landroid/net/Uri;Landroid/content/ContentValues;)Landroid/net/Uri;",
+        "update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I",
+        "delete(Landroid/net/Uri;Ljava/lang/String;[Ljava/lang/String;)I",
+        "bulkInsert(Landroid/net/Uri;[Landroid/content/ContentValues;)I",
+        "applyBatch(Ljava/lang/String;Ljava/util/ArrayList;)[Landroid/content/ContentProviderResult;",
+        "call(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Landroid/os/Bundle;",
+        "call(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Landroid/os/Bundle;",
+    ),
+    "Landroid/content/ContentProviderClient;" to setOf(QUERY, QUERY_CANCELLABLE),
+)
+
+/**
+ * An Exchange account's calendar syncs into "com.android.calendar" as if it were Samsung's calendar provider, which has
+ * more columns and tables than Android's: off One UI the first calendar sync failed ("no such column: secExtra1") and
+ * no event arrived. Email's provider calls go through Calendars (the same shim as Samsung Calendar's port), which fits
+ * the calendar's to Android's provider and passes every other one on unchanged.
+ */
+private val calendarProviderPatch = bytecodePatch(
+    description = "Fits Exchange calendar sync to Android's calendar provider.",
+) {
+    extendWith(SAMSUNG_EMAIL_EXTENSION)
+
+    execute {
+        val moved = redirectCalls("$EXT/Calendars;", PROVIDER_CALLS)
+        log.info("Provider calls: $moved")
+        // Measured against 6.2.13.1: 1065 calls.
+        if (moved < 300) throw PatchException("only $moved provider calls found")
+    }
+}
+
 /** PackageInfo.needCheckingAppUpdate: whether Email asks the Galaxy Store for a newer Email (only with the Store present). */
 private object NeedCheckingAppUpdateFingerprint : Fingerprint(
     returnType = "Z",
@@ -101,6 +139,57 @@ private val updateCheckPatch = bytecodePatch(
     }
 }
 
+/** Device.getConsistentDeviceId(Context): the Exchange ActiveSync device ID, made from the IMEI or serial number. */
+private object ConsistentDeviceIdFingerprint : Fingerprint(
+    returnType = "Ljava/lang/String;",
+    parameters = listOf("Landroid/content/Context;"),
+    strings = listOf("get deviceId for phone model"),
+)
+
+/**
+ * Exchange and Outlook.com / Hotmail accounts are Exchange ActiveSync accounts, and setup refused them ("Device
+ * activation failed. Check your device ID, i.e. IMEI, MEID, or HW ID"): Email makes its ActiveSync device ID from the
+ * IMEI (tablets: the serial number), which only a preloaded app may read. The ID is now random, made once per install
+ * (extension DeviceIds), and the phone's identifiers it sends in the device report (IMEI, phone number / IMSI) are
+ * unknown instead of a SecurityException that cancelled the report and, from Exchange 2010 on, the provisioning.
+ */
+private val exchangeDeviceIdPatch = bytecodePatch(
+    description = "Gives Exchange accounts a random device ID instead of one made from the IMEI.",
+) {
+    extendWith(SAMSUNG_EMAIL_EXTENSION)
+
+    execute {
+        ConsistentDeviceIdFingerprint.method.addInstructions(
+            0,
+            """
+                invoke-static { p0 }, $EXT/DeviceIds;->easDeviceId(Landroid/content/Context;)Ljava/lang/String;
+                move-result-object v0
+                return-object v0
+            """,
+        )
+        val ids = redirectCalls(
+            "$EXT/Telephony;",
+            mapOf(
+                "Landroid/telephony/TelephonyManager;" to setOf(
+                    "getPrimaryImei()Ljava/lang/String;",
+                    "getDeviceId()Ljava/lang/String;",
+                    "getDeviceId(I)Ljava/lang/String;",
+                    "getImei()Ljava/lang/String;",
+                    "getImei(I)Ljava/lang/String;",
+                    "getMeid()Ljava/lang/String;",
+                    "getMeid(I)Ljava/lang/String;",
+                    "getSubscriberId()Ljava/lang/String;",
+                    "getSimSerialNumber()Ljava/lang/String;",
+                    "getLine1Number()Ljava/lang/String;",
+                ),
+            ),
+        )
+        log.info("Phone identifier reads: $ids")
+        // Measured against 6.2.13.1: 9 (Device 2, DeviceInformation 4, EasDevInfoSvc 3).
+        if (ids < 5) throw PatchException("only $ids phone identifier reads found")
+    }
+}
+
 /**
  * Off One UI Email dies at once on One UI classes (SemFloatingFeature, Knox, Samsung's S/MIME library). The extension
  * carries stand-ins for the One UI classes it uses (generated by .github/scripts/samsung-standins); on a Samsung phone
@@ -114,6 +203,9 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_EMAIL)
-    dependsOn(sprDrawablesPatch, oneUiMembersPatch, providerObserversPatch, updateCheckPatch)
+    dependsOn(
+        sprDrawablesPatch, oneUiMembersPatch, providerObserversPatch, updateCheckPatch, exchangeDeviceIdPatch,
+        calendarProviderPatch,
+    )
     extendWith(SAMSUNG_EMAIL_EXTENSION)
 }
