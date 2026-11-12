@@ -107,6 +107,9 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_WEATHER)
-    dependsOn(launcherIconPatch, launcherStatePatch, popOverOptionsPatch, oneUiMembersPatch, appSearchPatch, olderAndroidPatch)
+    dependsOn(
+        launcherIconPatch, launcherStatePatch, popOverOptionsPatch, oneUiMembersPatch, appSearchPatch, olderAndroidPatch,
+        widgetTextPatch,
+    )
     extendWith(SAMSUNG_WEATHER_EXTENSION)
 }
