@@ -138,6 +138,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor',
         '<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor',
     ),
+    "com.samsung.app.newtrim": (
+        '<img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite',
+        '<img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite',
+    ),
     "com.samsung.android.calendar": (
         '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
         '<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar',
