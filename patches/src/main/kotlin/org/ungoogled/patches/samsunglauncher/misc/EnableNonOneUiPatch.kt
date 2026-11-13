@@ -25,6 +25,7 @@ import org.ungoogled.patches.samsunglauncher.v16.HIDDEN_MEMBERS as V16_HIDDEN_ME
 import org.ungoogled.patches.samsunglauncher.v16.HIDDEN_SUPERCLASSES as V16_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
+import org.w3c.dom.Element
 
 internal const val SAMSUNG_LAUNCHER_EXTENSION = "extensions/samsunglauncher.mpe"
 
@@ -111,7 +112,7 @@ private val WALLPAPER_CALLS = mapOf(
  * can draw: they become vector drawables.
  */
 private val resourcesPatch = resourcePatch(
-    description = "Adds the widget permission screen and converts Samsung's SPR icons to vector drawables.",
+    description = "Adds the widget permission screen, converts Samsung's SPR icons to vector drawables and keeps a private space hidden.",
 ) {
     execute {
         val converted = convertSprDrawables()
@@ -128,6 +129,19 @@ private val resourcesPatch = resourcePatch(
             activity.setAttribute("android:excludeFromRecents", "true")
             activity.setAttribute("android:theme", "@android:style/Theme.Translucent.NoTitleBar")
             application.appendChild(activity)
+
+            // A Pixel's private space is a hidden profile that only a home app holding ACCESS_HIDDEN_PROFILES sees.
+            // 18.x asks for it, but has no private space screen: its apps were listed in the Work tab, also while the
+            // private space was locked. Without it the private space stays hidden, as with other installed launchers.
+            // (16.x asks for ACCESS_HIDDEN_PROFILES_FULL, which only system apps get.)
+            if (!isAndroid13Build(packageMetadata.versionName)) {
+                val permissions = manifest.getElementsByTagName("uses-permission")
+                val hiddenProfiles = (0 until permissions.length).map { permissions.item(it) as Element }.filter {
+                    it.getAttribute("android:name") == "android.permission.ACCESS_HIDDEN_PROFILES"
+                }
+                if (hiddenProfiles.isEmpty()) throw PatchException("no ACCESS_HIDDEN_PROFILES permission in the manifest")
+                hiddenProfiles.forEach { it.parentNode.removeChild(it) }
+            }
         }
     }
 }
@@ -367,6 +381,27 @@ private val systemPrivilegesPatch = bytecodePatch(
             } ?: throw PatchException("SystemUIControlUtils.updateSystemUI lambda not found")
             hideExceptions.addInstructions(0, "const/4 p2, 0x0")
         }
+
+        // Another user's content providers (a work profile's app timers) need INTERACT_ACROSS_USERS: 16.x queries them
+        // unguarded and died at start on a phone with a work profile. A provider address in another user is "none"
+        // (null), which every caller already skips.
+        val userUri = mutableClassDefBy("Lcom/honeyspace/common/reflection/UserManagerReflection;").methods.firstOrNull {
+            it.name == "getUserUri" && it.returnType == "Landroid/net/Uri;" &&
+                it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/net/Uri;", "Landroid/os/UserHandle;")
+        } ?: throw PatchException("UserManagerReflection.getUserUri not found")
+        userUri.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static { }, Landroid/os/Process;->myUserHandle()Landroid/os/UserHandle;
+                move-result-object v0
+                invoke-virtual { v0, p2 }, Landroid/os/UserHandle;->equals(Ljava/lang/Object;)Z
+                move-result v0
+                if-nez v0, :own
+                const/4 v0, 0x0
+                return-object v0
+            """,
+            ExternalLabel("own", userUri.implementation!!.instructions.first()),
+        )
 
         // Everything else that asks for a remote animation (widget and recents launches). The method has no spare
         // register, so it is rebuilt with one.
