@@ -1,3 +1,27 @@
+## [2.9.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.4...v2.9.5) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* coloros apps and oneplus system launcher start on roms with oplus framework; issue [#155](https://github.com/bearinmindcat/morphe-patches/issues/155) ([ee8875e](https://github.com/bearinmindcat/morphe-patches/commit/ee8875edabf47d5f1c9425a3573f098153c70e9a))
+* maps media playback controls turn on (android 17); issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([8f99686](https://github.com/bearinmindcat/morphe-patches/commit/8f996864ccb1637c0e1ec3948c0ae38a086bc3ac))
+* maps speeding chime can be muted; issue [#168](https://github.com/bearinmindcat/morphe-patches/issues/168) ([75bff91](https://github.com/bearinmindcat/morphe-patches/commit/75bff91757577992c04cdd1d26f5b4aecc3d3e03))
+* one hand operation+ works on android 16; issue [#132](https://github.com/bearinmindcat/morphe-patches/issues/132) ([00381d5](https://github.com/bearinmindcat/morphe-patches/commit/00381d5c593bc3277f1ded5663d461883cdfa52b))
+* oneplus camera opens photos in your gallery app ([a0d618e](https://github.com/bearinmindcat/morphe-patches/commit/a0d618ea85b926e59480fb0fa5c62b7f9a56f980))
+* oneplus clock alarms ring after a reboot on android 15+; issue [#156](https://github.com/bearinmindcat/morphe-patches/issues/156) ([e351704](https://github.com/bearinmindcat/morphe-patches/commit/e351704894cf6d9a32c28534dd86a1da670fa46e))
+* oneplus launcher opens apps on roms with oplus framework; issue [#155](https://github.com/bearinmindcat/morphe-patches/issues/155) ([4c470ec](https://github.com/bearinmindcat/morphe-patches/commit/4c470ec8f00ccf052e0b4809cfd6c930d928941c))
+* oneplus system launcher keeps the navigation bar visible and opens navigation settings; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([422877c](https://github.com/bearinmindcat/morphe-patches/commit/422877c2e32742a7aba481b340719a54bc21a7eb))
+* oneplus system launcher opens dock apps on android 11; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([f01d397](https://github.com/bearinmindcat/morphe-patches/commit/f01d397ebfd36385daf5ba3dc38c9fa280fc5391))
+* oneplus system launcher starts on android 13 and one ui; issue [#142](https://github.com/bearinmindcat/morphe-patches/issues/142) ([9e12332](https://github.com/bearinmindcat/morphe-patches/commit/9e123320420b53d54c8a26dd4006720fb23bc71e))
+* samsung email can add exchange and outlook accounts; issue [#172](https://github.com/bearinmindcat/morphe-patches/issues/172) ([e1778eb](https://github.com/bearinmindcat/morphe-patches/commit/e1778ebda727b274afb709daa67e56b44a4d71fa))
+* samsung gallery opens camera photos in their album; issue [#174](https://github.com/bearinmindcat/morphe-patches/issues/174) ([aeb1ba8](https://github.com/bearinmindcat/morphe-patches/commit/aeb1ba8a9353921268c86134ab67d0ec3aad6ce1))
+* samsung gallery plays gifs; issue [#167](https://github.com/bearinmindcat/morphe-patches/issues/167) ([c748287](https://github.com/bearinmindcat/morphe-patches/commit/c74828795f4dda2e3aa1215ab5eee1fa215f278c))
+* samsung gallery sorts by the date the photo was taken; issue [#175](https://github.com/bearinmindcat/morphe-patches/issues/175) ([b19d900](https://github.com/bearinmindcat/morphe-patches/commit/b19d90029406f40be276b6df9de2a93c1597a696))
+* samsung keyboard no longer crashes on android 13 (emoji, clipboard, language downloads); issue [#165](https://github.com/bearinmindcat/morphe-patches/issues/165) ([6b4693c](https://github.com/bearinmindcat/morphe-patches/commit/6b4693ce466868c34495e0cc3992af91850d15eb))
+* samsung weather widget text size; issue [#166](https://github.com/bearinmindcat/morphe-patches/issues/166) ([f7e1372](https://github.com/bearinmindcat/morphe-patches/commit/f7e137295c82c758a978c65ae23f090a7b7a48c0))
+* waze alert distances apply to speed cameras; issue [#157](https://github.com/bearinmindcat/morphe-patches/issues/157) ([aff5c52](https://github.com/bearinmindcat/morphe-patches/commit/aff5c520e8083e8d0bf6618471bfec1100bcc048))
+* xiaomi gallery hides the google photos prompt; issue [#173](https://github.com/bearinmindcat/morphe-patches/issues/173) ([0337ae6](https://github.com/bearinmindcat/morphe-patches/commit/0337ae6543f16cafba8f933182f2d0fca9b8759e))
+* xiaomi gallery private folder no longer freezes; issue [#173](https://github.com/bearinmindcat/morphe-patches/issues/173) ([4304f6b](https://github.com/bearinmindcat/morphe-patches/commit/4304f6beab9e646165804cdd6eb39972a230a57e))
+
 ## [2.9.4](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.3...v2.9.4) (2026-11-07)
 
 ### 🐛 Bug Fixes

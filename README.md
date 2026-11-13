@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.4](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.4)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;186 patches total
+> **[v2.9.5](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.5)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;187 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
 <br>
@@ -115,7 +115,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Speed cameras on streets<br>• Speed cameras on highways<br>• Speed cameras on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
+| [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Speed cameras<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Enforcement zones on streets<br>• Enforcement zones on highways<br>• Enforcement zones on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
 | [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
 | [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on. | • Position |
 | [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
@@ -995,7 +995,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;12 apps&nbsp;&nbsp;•&nbsp;&nbsp;14 patches</summary>
+<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;12 apps&nbsp;&nbsp;•&nbsp;&nbsp;15 patches</summary>
 <br>
 <blockquote>
 
@@ -1012,12 +1012,13 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-camera.png" width="20" height="20" align="top"> OnePlus Camera&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [No background running](#no-background-running) | Stops the camera's processing service once photos are saved. Root (mount) install only. |  |
+| [Open photos in your gallery app](#open-photos-in-your-gallery-app) | Opens photos in your gallery app when OPPO's gallery is disabled or removed. Root (mount) install only. |  |
 | [Remove telemetry](#remove-telemetry) | Stops usage statistics and automatic log reports to OPPO. Root (mount) install only. |  |
 
 </details>
