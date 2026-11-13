@@ -76,7 +76,7 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_GALLERY)
-    dependsOn(manifestPatch, oneUiMembersPatch, mediaChangesPatch)
+    dependsOn(manifestPatch, oneUiMembersPatch, mediaChangesPatch, videoEditPatch)
     extendWith(SAMSUNG_GALLERY_EXTENSION)
 
     execute {
