@@ -11,9 +11,11 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
@@ -34,6 +36,7 @@ private const val SEP = "$APP/baseutil/sep/SepWrapper"
 private const val RECORDER = "$APP/screenrecorder"
 private const val RECORDER_SERVICE = "$RECORDER/ScreenRecorderService;"
 private const val RECORDER_CONTROLLER = "$RECORDER/ScreenRecorderController;"
+private const val SETTINGS_FRAGMENT = "Lcom/samsung/android/app/settings/SettingsFragment;"
 
 private const val SETTINGS_NAME = "com.samsung.android.app.settings.SettingsActivity"
 private const val CONSENT_NAME = "org.ungoogled.samsungcapture.ConsentActivity"
@@ -239,6 +242,47 @@ private fun BytecodePatchContext.redirectIn(type: String, key: String, target: S
         }
     }
     return moved
+}
+
+private fun Method.calls(predicate: (MethodReference) -> Boolean) = implementation?.instructions?.any {
+    ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let(predicate) == true
+} == true
+
+/**
+ * Passes each stored "Show taps and touches" read (`loadBooleanState(context, "show_taps_and_touches", default)`) in
+ * [type]'s methods matching [where] through SystemOnly.showTaps; returns how many.
+ */
+private fun BytecodePatchContext.showTapsLoads(type: String, where: (Method) -> Boolean): Int {
+    var filtered = 0
+    mutableClassDefBy(type).methods.filter(where).forEach { method ->
+        val instructions = method.implementation!!.instructions
+        val keys = instructions.indices.filter {
+            ((instructions[it] as? ReferenceInstruction)?.reference as? StringReference)?.string == "show_taps_and_touches"
+        }
+        for (key in keys.reversed()) {
+            val keyRegister = (instructions[key] as OneRegisterInstruction).registerA
+            val load = (key + 1 until minOf(key + 4, instructions.size)).firstOrNull { i ->
+                val insn = instructions[i]
+                ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.name == "loadBooleanState" &&
+                    (insn as? FiveRegisterInstruction)?.registerE == keyRegister
+            } ?: continue
+            val result = instructions[load + 1]
+            if (result.opcode != Opcode.MOVE_RESULT) throw PatchException("unexpected ${result.opcode} after $type.loadBooleanState")
+            if (instructions.getOrNull(load + 2)?.location?.labels?.isNotEmpty() == true) {
+                throw PatchException("a branch lands after $type.loadBooleanState")
+            }
+            val register = (result as OneRegisterInstruction).registerA
+            method.addInstructions(
+                load + 2,
+                """
+                    invoke-static/range { v$register .. v$register }, $EXT/SystemOnly;->showTaps(Z)Z
+                    move-result v$register
+                """,
+            )
+            filtered++
+        }
+    }
+    return filtered
 }
 
 /**
@@ -516,9 +560,11 @@ private val SETTINGS_SHAPES = listOf(
  * and which One UI lets any app write in System, so a copy next to Samsung's changed Samsung's own options. Every
  * settings call goes through LocalSettings, which keeps this copy's options in its own files.
  *
- * The options only Samsung's preinstalled copy can carry out are hidden (extension SystemOnly): the screenshot options,
- * which One UI's SystemUI reads when it takes a screenshot, and "Show taps and touches", which One UI draws through a
- * hidden InputManager call for Samsung's system app only (an app sees no touches outside its own windows).
+ * The options only Samsung's preinstalled copy can carry out (extension SystemOnly): the screenshot options, which One
+ * UI's SystemUI reads when it takes a screenshot, are hidden. "Show taps and touches", which One UI draws through a
+ * hidden InputManager call for Samsung's system app only (an app sees no touches outside its own windows and may not
+ * change Android's Show taps), shows Android's Show taps instead, in the settings and in the recorder's sound question,
+ * and opens it in Developer options; Android's Show taps is recorded.
  */
 private val settingsPatch = bytecodePatch(
     description = "Keeps Samsung capture's own settings in the app.",
@@ -541,16 +587,18 @@ private val settingsPatch = bytecodePatch(
         // Measured against 6.2.12: 212.
         if (moved < 100) throw PatchException("only $moved settings calls found")
 
-        // The settings screen: hidden right after its options are read from their XML.
+        // The settings screen: set up right after its options are read from their XML.
         val preferences = "Landroidx/preference"
         if (mutableClassDefByOrNull("$preferences/PreferenceFragmentCompat;")?.methods
                 ?.none { it.name == "findPreference" && it.parameterTypes == listOf("Ljava/lang/CharSequence;") } != false ||
-            mutableClassDefByOrNull("$preferences/Preference;")?.methods
-                ?.none { it.name == "setVisible" && it.parameterTypes == listOf("Z") } != false
+            mutableClassDefByOrNull("$preferences/Preference;")?.methods?.let { methods ->
+                methods.none { it.name == "setVisible" && it.parameterTypes == listOf("Z") } ||
+                    methods.none { it.name == "setSummary" && it.parameterTypes == listOf("Ljava/lang/CharSequence;") }
+            } != false
         ) {
-            throw PatchException("androidx preference no longer has findPreference(CharSequence) and setVisible(boolean)")
+            throw PatchException("androidx preference no longer has findPreference, setVisible and setSummary")
         }
-        method("Lcom/samsung/android/app/settings/SettingsFragment;", "onCreate") {
+        method(SETTINGS_FRAGMENT, "onCreate") {
             it.parameterTypes == listOf("Landroid/os/Bundle;")
         }.apply {
             val read = implementation!!.instructions.indexOfFirst {
@@ -560,21 +608,64 @@ private val settingsPatch = bytecodePatch(
             addInstruction(read + 1, "invoke-static/range { p0 .. p0 }, $EXT/SystemOnly;->hidePreferences(Ljava/lang/Object;)V")
         }
 
-        // The recorder's sound question before a recording also offers "Show taps and touches".
-        val views = redirectIn(
-            RECORDER_CONTROLLER,
-            "Landroid/view/View;->findViewById(I)Landroid/view/View;",
-            "$EXT/SystemOnly;->findViewById(Landroid/view/View;I)Landroid/view/View;",
-        )
-        val showTaps = mutableClassDefBy(RECORDER_CONTROLLER).methods.any { m ->
-            m.implementation?.instructions?.any {
-                ((it as? ReferenceInstruction)?.reference as? StringReference)
-                    ?.string == "show_taps_and_touches"
-            } == true
+        // "Show taps and touches" shows Android's Show taps: on the settings screen (each time it shows) and in the
+        // recorder's sound question before a recording.
+        val shown = showTapsLoads(SETTINGS_FRAGMENT) { true } +
+            showTapsLoads(RECORDER_CONTROLLER) { m -> m.calls { it.name == "setOnCheckedChangeListener" } }
+        log.info("Show taps states shown: $shown")
+        // Measured against 6.2.12: SettingsFragment.updateScreenRecorderSettings, showSoundSettingSuggestionPopup.
+        if (shown != 2) throw PatchException("expected 2 shown show taps states, found $shown")
+
+        // Flipping it opens Android's Show taps; the settings switch keeps its state (the change is refused).
+        method(SETTINGS_FRAGMENT, "onPreferenceChange") {
+            it.parameterTypes == listOf("$preferences/Preference;", "Ljava/lang/Object;") && it.returnType == "Z"
+        }.apply {
+            if (implementation!!.registerCount <= 3) throw PatchException("SettingsFragment.onPreferenceChange has no spare register")
+            addInstructionsWithLabels(
+                0,
+                """
+                    invoke-virtual { p1 }, $preferences/Preference;->getKey()Ljava/lang/String;
+                    move-result-object v0
+                    invoke-static { v0 }, $EXT/SystemOnly;->preferenceChange(Ljava/lang/String;)Z
+                    move-result v0
+                    if-eqz v0, :change
+                    const/4 v0, 0x0
+                    return v0
+                """,
+                ExternalLabel("change", getInstruction(0)),
+            )
         }
-        log.info("Recorder view lookups: $views")
-        // Measured against 6.2.12: 18.
-        if (views < 2 || !showTaps) throw PatchException("the recorder's sound question no longer has its show taps switch")
+        val question = "$RECORDER_CONTROLLER->mSoundSettingSuggestionPopup:Landroidx/appcompat/app/AlertDialog;"
+        if (mutableClassDefBy(RECORDER_CONTROLLER).fields.none {
+                it.name == "mSoundSettingSuggestionPopup" && it.type == "Landroidx/appcompat/app/AlertDialog;"
+            }
+        ) {
+            throw PatchException("the recorder's sound question is no longer in mSoundSettingSuggestionPopup")
+        }
+        val switched = mutableClassDefBy(RECORDER_CONTROLLER).methods.filter { m ->
+            m.parameterTypes == listOf("Landroid/widget/CompoundButton;", "Z") && m.returnType == "V" &&
+                m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "show_taps_and_touches"
+                } == true
+        }
+        // Measured against 6.2.12: lambda$showSoundSettingSuggestionPopup$4.
+        if (switched.size != 1) throw PatchException("expected 1 sound question show taps listener, found ${switched.size}")
+        switched.single().apply {
+            if (AccessFlags.STATIC.isSet(accessFlags) || implementation!!.registerCount <= 4) {
+                throw PatchException("the sound question's show taps listener changed shape")
+            }
+            addInstructionsWithLabels(
+                0,
+                """
+                    iget-object v0, p0, $question
+                    invoke-static { p1, p2, v0 }, $EXT/SystemOnly;->showTapsSwitched(Landroid/widget/CompoundButton;ZLjava/lang/Object;)Z
+                    move-result v0
+                    if-eqz v0, :save
+                    return-void
+                """,
+                ExternalLabel("save", getInstruction(0)),
+            )
+        }
     }
 }
 
