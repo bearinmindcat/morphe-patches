@@ -559,7 +559,7 @@ val enableNonHyperOsLauncherPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_XIAOMI_LAUNCHER)
-    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, manifestPatch, offlinePatch)
+    dependsOn(versionCheckPatch, hiddenApisPatch, systemPrivilegesPatch, manifestPatch, offlinePatch, safeModeReportPatch)
     extendWith(XIAOMI_LAUNCHER_EXTENSION)
     // The file provider's authority is also built from the package name; on POCO phones the settings authority is POCO's.
     dependsOn(ownScreensPatch)
