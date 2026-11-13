@@ -78,6 +78,7 @@ The launcher ports are tested on Android 15 and newer; ASUS Launcher, Honor Home
 | Samsung Reminder | `com.samsung.android.app.reminder` | 12.8.00.62 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-reminder/samsung-reminder-12-8-00-62-release/) |
 | Samsung Screen Recorder | `com.sec.app.screenrecorder` | 4.0.23 | 9+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/record-screen/samsung-record-screen-4-0-23-release/) |
 | Sound Assistant | `com.samsung.android.soundassistant` | 8.1.00.6 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/soundassistant/sound-assistant-8-1-00-6-release/) |
+| Samsung Video Library | `com.samsung.android.videolist` | 1.4.22.81 | 13+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-video-library/samsung-video-library-1-4-22-81-release/) (Samsung's last build; discontinued 2024) |
 | Samsung Video Player | `com.samsung.android.video` | 7.3.47.1 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-video-player/samsung-video-player-7-3-47-1-release/) |
 | Samsung Voice Recorder | `com.sec.android.app.voicenote` | 21.5.91.33 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-voice-recorder/samsung-voice-recorder-21-5-91-33-release/) |
 | Samsung Weather | `com.sec.android.daemonapp` | 1.7.30.50 | 11+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-weather/samsung-weather-widget-1-7-30-50-release/) |
