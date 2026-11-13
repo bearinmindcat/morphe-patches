@@ -186,6 +186,10 @@ APP_RENAMES = {
         '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
         '<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder',
     ),
+    "com.samsung.android.app.galaxyfinder": (
+        '<img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder',
+        '<img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder',
+    ),
     "com.samsung.android.app.smartcapture": (
         '<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture',
         '<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture',
