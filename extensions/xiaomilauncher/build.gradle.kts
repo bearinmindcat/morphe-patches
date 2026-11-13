@@ -6,8 +6,9 @@ android {
     namespace = "org.ungoogled.xiaomilauncher"
 
     defaultConfig {
-        // The HyperOS launcher 7.50 requires Android 14 (API 34).
-        minSdk = 34
+        // The HyperOS launcher 5.39.40 runs on Android 13 (API 33), 7.50 on Android 14. Not higher: the dexer drops version
+        // checks below minSdk.
+        minSdk = 33
     }
 }
 

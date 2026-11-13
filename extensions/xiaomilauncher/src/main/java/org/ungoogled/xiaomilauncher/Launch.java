@@ -21,6 +21,11 @@ public final class Launch {
         return remoteAnimations;
     }
 
+    /** remoteAnimations for code without a Context at hand (5.39.40's transition manager permission check). */
+    public static boolean remoteAnimations() {
+        return remoteAnimations(App.context());
+    }
+
     /**
      * Whether the system launcher's widget holder can work here: it registers a per-widget update listener
      * (AppWidgetHost.setListener), which Android only lets the system use. The patch uses Launcher3's plain holder
@@ -166,6 +171,11 @@ public final class Launch {
      * launcher (Settings > Home screen layout sends a HOME key to show the layout preview on the home screen). A HOME key
      * starts the launcher's own home screen instead (on its release); any other key is not sent.
      */
+    /** A key the settings (5.39.40) inject by reflection: answered as injectInputEvent answers its key's release. */
+    public static void injectKey(int keyCode) {
+        injectInputEvent(null, new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode), 0);
+    }
+
     public static boolean injectInputEvent(Object inputManager, android.view.InputEvent event, int mode) {
         if (!(event instanceof android.view.KeyEvent)) return false;
         android.view.KeyEvent key = (android.view.KeyEvent) event;

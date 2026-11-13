@@ -1,6 +1,6 @@
 # HyperOS launcher (Xiaomi's System launcher) generators
 
-`com.miui.home` RELEASE-7.50.06.2372 (HyperOS 2) is Xiaomi's home screen, built against HyperOS's framework as a system
+`com.miui.home` RELEASE-7.50.06.2372 (HyperOS 2; RELEASE-5.39.40.11727 for Android 13) is Xiaomi's home screen, built against HyperOS's framework as a system
 app. Off HyperOS it needs two kinds of help, both generated so a new version is a re-run:
 
 - `gen.py` -- **stand-ins** for the HyperOS framework classes it calls (`miui.os.Build`, `miui.util.FeatureParser`,
@@ -23,7 +23,15 @@ java -Xmx6g -cp "$CP" $X/Missing.java boot <app.apk> work/
 python3 $L/gen.py work/ $J "HyperOS launcher" --apk <app.apk> --runtime org.ungoogled.xiaomilauncher
 python3 .github/scripts/coloros-launcher/hidden.py boot <app.apk> $J \
     patches/src/main/kotlin/org/ungoogled/patches/xiaomilauncher/XiaomiLauncherMembers.kt "HyperOS launcher"
+# 5.39.40.11727 (the Android 13 build) against every Android it runs on (a comma list gives the union)
+python3 .github/scripts/coloros-launcher/hidden.py a13,a15,a16,a17,canary <5.39.40.apk> $J \
+    patches/src/main/kotlin/org/ungoogled/patches/xiaomilauncher/v5/XiaomiLauncher5Members.kt "HyperOS launcher 5.39.40" \
+    --android "Android 13, 15, 16, 17 or the canary"
 ```
+
+5.39.40 needs no stand-ins 7.50 lacks beyond one member (`MiuiProcess.setThreadPriority(int, int, String)`); gen.py over
+its Missing.java output also proposes `FullBackupAgent.getApplicationContext()`, which the stand-in inherits from
+BackupAgent and must not declare.
 
 Run the stand-ins first: `hidden.py` reads the extension to know which classes and members the stand-ins declare. The
 extension's runtime (`org/ungoogled/xiaomilauncher`: Members, Fallbacks, LocalSettings, ... from the other launcher ports)

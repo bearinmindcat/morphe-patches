@@ -32,6 +32,9 @@ import org.ungoogled.patches.xiaomilauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.xiaomilauncher.HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.xiaomilauncher.SUPER_CONSTRUCTORS
 import org.ungoogled.patches.xiaomilauncher.XiaomiLauncherConstants.COMPATIBILITY_XIAOMI_LAUNCHER
+import org.ungoogled.patches.xiaomilauncher.v5.HIDDEN_CONSTRUCTORS as V5_HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.xiaomilauncher.v5.HIDDEN_MEMBERS as V5_HIDDEN_MEMBERS
+import org.ungoogled.patches.xiaomilauncher.v5.HIDDEN_SUPERCLASSES as V5_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.shared.enablePageSizeCompat
 import org.ungoogled.patches.shared.supportedVersionCheck
 
@@ -40,6 +43,12 @@ internal const val XIAOMI_LAUNCHER_EXTENSION = "extensions/xiaomilauncher.mpe"
 private const val EXT = "Lorg/ungoogled/xiaomilauncher"
 
 private val log = java.util.logging.Logger.getLogger("XiaomiLauncher")
+
+/**
+ * 5.39.40.11727 is the Android 13 build: its lists are generated against Android 13, 15, 16, 17 and the canary
+ * (v5/XiaomiLauncher5Members.kt).
+ */
+private fun isAndroid13Build(version: String?) = version == "RELEASE-5.39.40.11727-12151939"
 
 private val SETTINGS_SHAPES = listOf(
     "getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;" to "GetString",
@@ -180,16 +189,22 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(XIAOMI_LAUNCHER_EXTENSION)
 
     execute {
+        val android13Build = isAndroid13Build(packageMetadata.versionName)
+        // 5.39.40 carries the same partial ProcessManager copy and makes the same system-only status bar call.
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/Members;", "$EXT/Hidden;",
-            HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY + PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS,
+            (if (android13Build) V5_HIDDEN_MEMBERS else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY) +
+                PROCESS_MANAGER_GAPS + SYSTEM_ONLY_CALLS,
         )
         val constructors = redirectConstructors(
-            "$EXT/Members;", "$EXT/Hidden;", HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
+            "$EXT/Members;", "$EXT/Hidden;",
+            if (android13Build) V5_HIDDEN_CONSTRUCTORS else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
-        val superCalls = substituteSuperConstructors(SUPER_CONSTRUCTORS)
-        val rebased = rebaseSubclasses(HIDDEN_SUPERCLASSES + SUPERCLASSES_16_17)
-        val casts = nullCastsToRebasedBases(HIDDEN_SUPERCLASSES.keys + SUPERCLASSES_16_17.keys)
+        val superCalls = if (android13Build) 0 else substituteSuperConstructors(SUPER_CONSTRUCTORS)
+        // (5.39.40 has no TaskSnapshotListener copy.)
+        val superclasses = if (android13Build) V5_HIDDEN_SUPERCLASSES else HIDDEN_SUPERCLASSES + SUPERCLASSES_16_17
+        val rebased = rebaseSubclasses(superclasses)
+        val casts = nullCastsToRebasedBases(superclasses.keys)
         skipCastOfNull("$EXT/Hidden;")
         log.info("hidden members: $calls calls, $fields fields; constructors: $constructors; super calls: $superCalls; rebased classes: $rebased; casts to their old bases: $casts")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
@@ -206,6 +221,21 @@ private fun BytecodePatchContext.castSites(types: Set<String>): List<Pair<String
         for (m in c.methods) {
             if (m.implementation?.instructions?.any {
                     it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as TypeReference).type in types
+                } == true
+            ) sites += c.type to m
+        }
+    }
+    return sites
+}
+
+/** The methods of the app (not our extensions) that name [string]. */
+private fun BytecodePatchContext.methodsNaming(string: String): List<Pair<String, Method>> {
+    val sites = mutableListOf<Pair<String, Method>>()
+    classDefForEach { c ->
+        if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+        for (m in c.methods) {
+            if (m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == string
                 } == true
             ) sites += c.type to m
         }
@@ -258,7 +288,27 @@ private val systemPrivilegesPatch = bytecodePatch(
         val binds = redirectCalls(WIDGET_BINDS)
         val keys = redirectCalls(KEY_INJECTIONS)
         log.info("key injections: $keys")
-        if (keys == 0) throw PatchException("no InputManager.injectInputEvent calls found")
+        if (isAndroid13Build(packageMetadata.versionName)) {
+            // 5.39.40's settings inject the key by reflection (refused, caught: the layout preview never showed): its
+            // injector (the settings' only int-taking method naming injectInputEvent) sends it to Launch.injectKey.
+            val injectors = methodsNaming("injectInputEvent").filter { (type, m) ->
+                type.startsWith("Lcom/miui/home/settings/") && m.returnType == "V" &&
+                    m.parameterTypes.map { it.toString() } == listOf("I")
+            }
+            val (injectorType, injector) = injectors.singleOrNull()
+                ?: throw PatchException("expected one settings key injector, found ${injectors.size}")
+            val m = mutableMethod(injectorType, injector)
+            val key = if (AccessFlags.STATIC.isSet(m.accessFlags)) "p0" else "p1"
+            m.addInstructions(
+                0,
+                """
+                    invoke-static { $key }, $EXT/Launch;->injectKey(I)V
+                    return-void
+                """,
+            )
+        } else if (keys == 0) {
+            throw PatchException("no InputManager.injectInputEvent calls found")
+        }
         log.info("widget binds: $binds")
         if (binds == 0) throw PatchException("no AppWidgetManager.bindAppWidgetIdIfAllowed calls found")
         log.info("uninstall calls: $uninstalls")
@@ -317,10 +367,30 @@ private val systemPrivilegesPatch = bytecodePatch(
             )
         }
 
+        // 5.39.40 registers the home screen's remote animations and transitions when its transition manager is made,
+        // behind a permission check that always says yes: off HyperOS the registration (by reflection on a hidden
+        // Activity method) threw out of the launcher's onCreate, and the half-made launcher then died on its first
+        // widget event. The check now asks Android (see Launch.remoteAnimations).
+        if (isAndroid13Build(packageMetadata.versionName)) {
+            val permission = mutableClassDefByOrNull("Lcom/miui/home/recents/QuickstepAppTransitionManagerImpl;")
+                ?.methods?.firstOrNull {
+                    it.name == "hasControlRemoteAppTransitionPermission" && it.parameterTypes.isEmpty() && it.returnType == "Z"
+                } ?: throw PatchException("QuickstepAppTransitionManagerImpl.hasControlRemoteAppTransitionPermission not found")
+            permission.addInstructions(
+                0,
+                """
+                    invoke-static { }, $EXT/Launch;->remoteAnimations()Z
+                    move-result v0
+                    return v0
+                """,
+            )
+        }
+
         // Back to Home after a launch: the transition helper finishes the (never registered) remote transition with a
         // new WindowContainerTransaction, a class only the system may make (null here), and marks it "to home" by
         // reflection on it: a NullPointerException that killed the launcher, after which Android forgets the user's
-        // Home choice. A missing transaction is skipped.
+        // Home choice. A missing transaction is skipped. (5.39.40 has no such helper.)
+        if (isAndroid13Build(packageMetadata.versionName)) return@execute
         val transaction = "Landroid/window/WindowContainerTransaction;"
         val markers = mutableListOf<Pair<String, Method>>()
         classDefForEach { c ->
