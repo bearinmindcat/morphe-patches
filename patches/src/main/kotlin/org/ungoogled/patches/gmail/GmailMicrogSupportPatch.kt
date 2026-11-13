@@ -308,7 +308,7 @@ private const val GMS_VERSION_KEY = "com.google.android.gms.version"
 @Suppress("unused")
 val gmailMicrogSupportPatch = bytecodePatch(
     name = "Add microG-RE support",
-    description = "Builds microG Gmail, a separate app that signs in to your Google account through microG-RE. Not for root installs.",
+    description = "Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_GMAIL)
