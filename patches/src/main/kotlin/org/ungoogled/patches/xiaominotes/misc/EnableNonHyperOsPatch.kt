@@ -138,6 +138,6 @@ val enableNonHyperOsPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_XIAOMI_NOTES)
-    dependsOn(optionalLibrariesPatch, miuiMembersPatch, globalBuildPatch, reminderAlertPatch, jsonTestClassPatch)
+    dependsOn(optionalLibrariesPatch, miuiMembersPatch, globalBuildPatch, reminderAlertPatch, jsonTestClassPatch, statisticsPatch)
     extendWith(XIAOMI_NOTES_EXTENSION)
 }
