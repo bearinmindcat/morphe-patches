@@ -4,6 +4,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
@@ -20,6 +21,12 @@ private const val DIAGNOSTICS_AGENT = "com.sec.android.diagmonagent"
 
 /** The broadcast Samsung's SDKs send their feature-usage surveys with, to One UI's context service. */
 private const val FEATURE_SURVEY = "com.samsung.android.providers.context.log.action.USE_APP_FEATURE_SURVEY"
+
+/** Galaxy Store's server. Its "stub" API answers apps' own update checks (stubUpdateCheck.as, stubDownload.as). */
+private const val GALAXY_STORE = "vas.samsungapps.com"
+
+/** The same name under the reserved .invalid TLD (RFC 2606): it never resolves, so the check fails as if offline. */
+private const val NOWHERE = "vas.samsungapps.invalid"
 
 private val CONST_STRING = setOf(Opcode.CONST_STRING, Opcode.CONST_STRING_JUMBO)
 
@@ -96,4 +103,45 @@ internal fun BytecodePatchContext.muteFeatureSurveys(): Int {
     if (senders.isEmpty()) throw PatchException("no feature survey sender ($FEATURE_SURVEY) found")
     senders.forEach { mutable(it).addInstructions(0, "return-void") }
     return senders.size
+}
+
+private fun String.isStubUrl() = contains("$GALAXY_STORE/stub/")
+
+/**
+ * Samsung apps ask Galaxy Store's server for a newer version of themselves (model, carrier, CSC, often ANDROID_ID), some
+ * at every start, without asking and without Galaxy Store installed. Every stub URL, and the host where an app builds
+ * the URL from parts, now names a host that does not exist: the request fails like an offline phone's, a path every
+ * caller already handles ("no update"), and Samsung hears nothing. Returns how many strings were changed.
+ */
+internal fun BytecodePatchContext.pointGalaxyStoreChecksNowhere(): Int {
+    fun Method.strings() = implementation!!.instructions.mapNotNull { it.constString() }
+    val found = methodsWhere { m ->
+        val strings = m.strings()
+        strings.any { it.isStubUrl() } || (GALAXY_STORE in strings && strings.any { "stub/stub" in it })
+    }
+    var count = 0
+    for (method in found) {
+        val partsHere = method.strings().any { "stub/stub" in it }
+        val target = mutable(method)
+        target.implementation!!.instructions.toList().forEachIndexed { index, insn ->
+            val value = insn.constString() ?: return@forEachIndexed
+            if (value.isStubUrl() || (partsHere && value == GALAXY_STORE)) {
+                val register = (insn as OneRegisterInstruction).registerA
+                target.replaceInstruction(index, "const-string v$register, \"${value.replace(GALAXY_STORE, NOWHERE)}\"")
+                count++
+            }
+        }
+    }
+    if (count == 0) throw PatchException("no Galaxy Store update check ($GALAXY_STORE/stub/) found")
+    return count
+}
+
+/** A step for an app's "Enable non-One UI ROM support": its Galaxy Store update checks go nowhere (see above). */
+internal fun galaxyStoreChecksPatch(app: String) = bytecodePatch(
+    description = "Stops $app asking Galaxy Store's server for updates.",
+) {
+    execute {
+        val changed = pointGalaxyStoreChecksNowhere()
+        java.util.logging.Logger.getLogger(app).info("Galaxy Store update check URLs: $changed")
+    }
 }

@@ -6,6 +6,7 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import org.ungoogled.patches.samsung.convertSprDrawables
+import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -181,6 +182,9 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_CALENDAR)
-    dependsOn(oneUiMembersPatch, systemServicesPatch, calendarProviderPatch, phoneStatePatch, displayPatch, alertSoundPatch, sprDrawablesPatch)
+    dependsOn(
+        oneUiMembersPatch, systemServicesPatch, calendarProviderPatch, phoneStatePatch, displayPatch, alertSoundPatch, sprDrawablesPatch,
+        galaxyStoreChecksPatch("Samsung Calendar"),
+    )
     extendWith(SAMSUNG_CALENDAR_EXTENSION)
 }

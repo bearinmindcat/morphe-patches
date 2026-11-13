@@ -1,6 +1,8 @@
 package org.ungoogled.patches.samsungvoicerecorder.misc
 
+import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
@@ -9,6 +11,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.convertSprDrawables
+import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -113,6 +116,27 @@ private val buttonAnimatorPatch = bytecodePatch(
     }
 }
 
+/** UpdateProvider.isCheckUpdateAvailable(force): whether it is time to ask Galaxy Store's server for a newer version. */
+private object UpdateCheckDueFingerprint : Fingerprint(
+    returnType = "I",
+    parameters = listOf("Z"),
+    strings = listOf("checkUpdate: start check update available."),
+)
+
+/**
+ * The main screen asked Samsung's server for a newer Voice Recorder once a day (with ANDROID_ID) without asking. The
+ * check is never due now (3, "checked recently"): the main screen skips it and About shows the installed version as
+ * the latest.
+ */
+private val updateCheckPatch = bytecodePatch(
+    description = "Skips Voice Recorder's daily update check.",
+) {
+    execute {
+        val due = UpdateCheckDueFingerprint.methodOrNull ?: throw PatchException("Voice Recorder's update check was not found")
+        due.addInstructions(0, "const/4 v0, 0x3\nreturn v0")
+    }
+}
+
 /**
  * Off One UI Voice Recorder dies at once on SemFloatingFeature (a One UI class). The extension carries stand-ins for
  * the 42 One UI classes it calls; on a Samsung phone the framework's own classes load first, so they never run there.
@@ -124,6 +148,9 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_VOICE_RECORDER)
-    dependsOn(sprDrawablesPatch, oneUiMembersPatch, buttonAnimatorPatch, recorderProgressPatch)
+    dependsOn(
+        sprDrawablesPatch, oneUiMembersPatch, buttonAnimatorPatch, recorderProgressPatch,
+        galaxyStoreChecksPatch("Samsung Voice Recorder"), updateCheckPatch,
+    )
     extendWith(SAMSUNG_VOICE_RECORDER_EXTENSION)
 }

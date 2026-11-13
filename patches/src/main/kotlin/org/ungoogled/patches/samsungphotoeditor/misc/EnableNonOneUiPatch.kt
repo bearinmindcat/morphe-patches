@@ -3,6 +3,7 @@ package org.ungoogled.patches.samsungphotoeditor.misc
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.implementOneUiInterfaceMethods
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.stubNativeLibraries
@@ -185,6 +186,9 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_PHOTO_EDITOR)
-    dependsOn(manifestPatch, oneUiMembersPatch, sprDrawablesPatch, nativeLibrariesPatch, sdkStubsPatch, absentProvidersPatch)
+    dependsOn(
+        manifestPatch, oneUiMembersPatch, sprDrawablesPatch, nativeLibrariesPatch, sdkStubsPatch, absentProvidersPatch,
+        galaxyStoreChecksPatch("Samsung Photo Editor"),
+    )
     extendWith(SAMSUNG_PHOTO_EDITOR_EXTENSION)
 }

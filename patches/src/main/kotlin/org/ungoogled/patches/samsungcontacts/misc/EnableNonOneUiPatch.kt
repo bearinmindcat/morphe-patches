@@ -1,10 +1,16 @@
 package org.ungoogled.patches.samsungcontacts.misc
 
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.samsung.addOneUiFrameworkResources
 import org.ungoogled.patches.samsung.convertSprDrawables
+import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiFrameworkLookups
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -174,6 +180,45 @@ private val sprDrawablesPatch = resourcePatch(
     }
 }
 
+/** CheckForContactUpdatesModel.checkForUpdates: asks Galaxy Store's server whether a newer Contacts exists. */
+private object ContactsUpdateCheckFingerprint : Fingerprint(
+    strings = listOf("CheckForContactUpdatesModel", "Not requested due to locked"),
+)
+
+/**
+ * Contacts asked Samsung's server for a newer version (with ANDROID_ID) at its first start and every two days after,
+ * without asking. The check now gives the answer it gives on a locked phone, "not requested", before anything else:
+ * the start-up task skips it and About shows no update button.
+ */
+private val updateCheckPatch = bytecodePatch(
+    description = "Skips Contacts' automatic update check.",
+) {
+    execute {
+        val check = ContactsUpdateCheckFingerprint.methodOrNull ?: throw PatchException("Contacts' update check was not found")
+        val insns = check.implementation!!.instructions.toList()
+        val locked = insns.indexOfFirst {
+            it.opcode == Opcode.CONST_STRING && ((it as ReferenceInstruction).reference as StringReference).string == "Not requested due to locked"
+        }
+        // The locked case's own answer after its log line: the NOT_REQUESTED constant, wrapped and returned.
+        val answer = insns.drop(locked + 1).take(6)
+        val constant = answer.indexOfFirst { it.opcode == Opcode.SGET_OBJECT }
+        val field = answer.getOrNull(constant) as? ReferenceInstruction
+        val wrap = answer.drop(constant + 1).firstOrNull()?.takeIf { it.opcode == Opcode.INVOKE_STATIC } as? ReferenceInstruction
+        if (locked < 0 || constant < 0 || field == null || wrap == null || answer.none { it.opcode == Opcode.RETURN_OBJECT }) {
+            throw PatchException("Contacts' \"not requested\" answer was not found")
+        }
+        check.addInstructions(
+            0,
+            """
+                sget-object v0, ${field.reference}
+                invoke-static { v0 }, ${wrap.reference}
+                move-result-object v0
+                return-object v0
+            """,
+        )
+    }
+}
+
 /**
  * Off One UI Contacts crashes on refused phone state and settings calls, and its list, editor and details fail on
  * Android's contacts provider. The extension also carries stand-ins for the One UI classes it calls.
@@ -188,6 +233,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         manifestPatch, telephonyPatch, providersPatch, displayPatch, settingsPatch, oneUiMembersPatch, systemServicesPatch,
         sprDrawablesPatch,
+        galaxyStoreChecksPatch("Samsung Contacts"), updateCheckPatch,
     )
     extendWith(SAMSUNG_CONTACTS_EXTENSION)
 }

@@ -10,6 +10,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.convertSprDrawables
+import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -418,6 +419,7 @@ val enableNonOneUiPatch = bytecodePatch(
         manifestPatch, launcherIconPatch, foregroundPatch, engineHostPatch, pendingIntentsPatch, batteryEventPatch, zenPatch,
         settingsPatch, activityStartsPatch, notificationsPatch, oneUiMembersPatch, systemServicesPatch, sprDrawablesPatch,
         wifiPatch,
+        galaxyStoreChecksPatch("Modes and Routines"),
     )
     extendWith(SAMSUNG_ROUTINES_EXTENSION)
 }
