@@ -9,9 +9,13 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 internal const val SAMSUNG_KEYBOARD_EXTENSION = "extensions/samsungkeyboard.mpe"
 private const val SYSTEM_ACCESS = "Lorg/ungoogled/samsungkeyboard/SystemAccess;"
+
+/** The hidden WindowManager.LayoutParams field the keyboard writes by reflection. */
+private const val INPUT_FEATURES = "inputFeatures"
 
 /** Classes whose calls SystemAccess can take, and the prefix of its methods for each. */
 private val OWNERS = mapOf(
@@ -31,7 +35,8 @@ private val OWNERS = mapOf(
  * broadcast to every user it sends as it shows, the system window sticker suggestions open as you type and the call
  * listener it registers as it starts. The serial number and IMEI its language pack downloads ask for are never read
  * (Android 13 has no getPrimaryImei: the download died on it). Every call SystemAccess has a method for moves (an
- * instance call passes its receiver first); nothing else does.
+ * instance call passes its receiver first); nothing else does. Its reflective write of its window's input features
+ * goes through SystemAccess too (the spy bit needs a system permission: emoji and clipboard crashed on Android 13/14).
  */
 internal val systemAccessPatch = bytecodePatch(
     description = "Lets the keyboard run without the system app's privileges.",
@@ -89,6 +94,40 @@ internal val systemAccessPatch = bytecodePatch(
         }
         // Measured against 5.9.40.75 (about 500 calls); far fewer means the app changed shape.
         if (moved < 300) throw PatchException("only $moved system calls found to move")
-        java.util.logging.Logger.getLogger("SamsungKeyboard").info("System access: $moved calls moved")
+
+        // The window input features the keyboard writes by reflection (a hidden field it names as a string): each write
+        // goes through SystemAccess.fieldSet, which leaves out the spy bit only a system keyboard may set.
+        val featureWriters = mutableListOf<Pair<String, Method>>()
+        classDefForEach { classDef ->
+            if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            classDef.methods.filter { m ->
+                m.implementation?.instructions?.any { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == INPUT_FEATURES } == true
+            }.forEach { featureWriters += classDef.type to it }
+        }
+        var featureWrites = 0
+        for ((type, method) in featureWriters) {
+            val mutableMethod = mutableClassDefBy(type).methods.first {
+                it.name == method.name && it.parameterTypes == method.parameterTypes && it.returnType == method.returnType
+            }
+            val instructions = mutableMethod.implementation!!.instructions
+            for (index in instructions.indices) {
+                val insn = instructions[index]
+                if (insn.opcode != Opcode.INVOKE_VIRTUAL) continue
+                val r = (insn as ReferenceInstruction).reference as MethodReference
+                if (r.definingClass != "Ljava/lang/reflect/Field;" || r.name != "set" ||
+                    r.parameterTypes.map(CharSequence::toString) != listOf("Ljava/lang/Object;", "Ljava/lang/Object;")
+                ) continue
+                val i = insn as FiveRegisterInstruction
+                mutableMethod.replaceInstruction(
+                    index,
+                    "invoke-static { v${i.registerC}, v${i.registerD}, v${i.registerE} }, " +
+                        "$SYSTEM_ACCESS->fieldSet(Ljava/lang/reflect/Field;Ljava/lang/Object;Ljava/lang/Object;)V",
+                )
+                featureWrites++
+            }
+        }
+        // Measured against all 8 builds: one method, two writes (on and off).
+        if (featureWrites == 0) throw PatchException("the keyboard's window input feature write was not found")
+        java.util.logging.Logger.getLogger("SamsungKeyboard").info("System access: $moved calls moved; input feature writes: $featureWrites")
     }
 }

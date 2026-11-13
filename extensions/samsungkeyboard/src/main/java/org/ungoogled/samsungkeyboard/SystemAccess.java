@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telephony.PhoneStateListener;
@@ -16,6 +17,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
@@ -327,6 +329,41 @@ public final class SystemAccess {
             refused(name, e);
             return false;
         }
+    }
+
+    // WindowManager.LayoutParams.inputFeatures
+
+    /** INPUT_FEATURE_SPY: a window that sees every touch on the screen, for apps holding MONITOR_INPUT only. */
+    private static final int INPUT_FEATURE_SPY = 1 << 2;
+    private static Boolean monitorInput;
+
+    private static boolean mayMonitorInput() {
+        if (monitorInput == null) {
+            try {
+                Application app = (Application) Class.forName("android.app.ActivityThread")
+                        .getMethod("currentApplication").invoke(null);
+                monitorInput = app != null
+                        && app.checkSelfPermission("android.permission.MONITOR_INPUT") == PackageManager.PERMISSION_GRANTED;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                return false;
+            }
+        }
+        return monitorInput;
+    }
+
+    /**
+     * The keyboard turns off "user activity" for its window while emoji, stickers or the clipboard are open, by setting
+     * a bit in the window's hidden inputFeatures field. Android hides that bit's constant from apps, and the keyboard's
+     * fallback for it, 4, is INPUT_FEATURE_SPY, which needs MONITOR_INPUT (a system keyboard's permission): Android 13
+     * and 14 then killed the keyboard at its next layout ("Cannot use INPUT_FEATURE_SPY"), Android 15 refused the
+     * layout. The spy bit is dropped unless the app holds that permission; every other field is set as asked.
+     */
+    public static void fieldSet(Field field, Object target, Object value) throws IllegalAccessException {
+        if (target instanceof WindowManager.LayoutParams && value instanceof Integer
+                && "inputFeatures".equals(field.getName()) && !mayMonitorInput()) {
+            value = (Integer) value & ~INPUT_FEATURE_SPY;
+        }
+        field.set(target, value);
     }
 
     // Hardware identifiers
