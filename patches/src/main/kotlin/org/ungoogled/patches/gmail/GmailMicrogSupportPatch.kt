@@ -90,8 +90,17 @@ private fun ownName(value: String): String? {
     return null
 }
 
+/** microG-RE's name for a Play services name in Gmail's code, its push actions included; null if it is none. */
+private fun playServicesName(value: String): String? = MicrogRe.route(value) ?: MicrogRe.PUSH_ACTION_ROUTES[value]
+
 /** microG Gmail's name for a whole string in Gmail's code: Play services' (microG-RE's) or Gmail's own; null if neither. */
-private fun rename(value: String): String? = MicrogRe.route(value) ?: ownName(value)
+private fun rename(value: String): String? = playServicesName(value) ?: ownName(value)
+
+/** The push actions Gmail's FCM client uses: without microG-RE's names it gets no token and no new-mail pushes. */
+private val PUSH_ACTIONS_USED = listOf(
+    "com.google.android.c2dm.intent.REGISTER", "com.google.android.c2dm.intent.REGISTRATION",
+    "com.google.android.c2dm.intent.RECEIVE", "com.google.iid.TOKEN_REQUEST",
+)
 
 private fun Document.elements(tag: String): List<Element> =
     getElementsByTagName(tag).let { list -> (0 until list.length).map { list.item(it) as Element } }
@@ -162,6 +171,13 @@ private val gmailMicrogResourcesPatch = resourcePatch(
                     element.setAttribute("android:taskAffinity", moved(affinity))
                     count("task affinity")
                 }
+            }
+
+            // Push messages: microG-RE delivers them only with its own RECEIVE action.
+            for (action in manifest.elements("action")) {
+                val to = MicrogRe.PUSH_ACTION_ROUTES[action.getAttribute("android:name")] ?: continue
+                action.setAttribute("android:name", to)
+                count("push action")
             }
 
             // Every provider of Gmail's own: authorities are unique on a phone.
@@ -272,7 +288,7 @@ private val gmailMicrogResourcesPatch = resourcePatch(
         val expected = mapOf(
             // 3 account types (+1 Exchange package string of the same name), 3 sync authorities, 2 account-list URIs.
             "own permission" to 11, "Play services permission" to 4, "own name in strings" to 9,
-            "Google sync adapter" to 1, "shortcut package" to 1, "label" to 1, "icon" to 2,
+            "Google sync adapter" to 1, "shortcut package" to 1, "label" to 1, "icon" to 2, "push action" to 1,
         )
         val short = expected.filter { (k, v) -> (counts[k] ?: 0) < v }
         if (short.isNotEmpty()) throw PatchException("microG Gmail found less than expected: " + short.keys.joinToString { "$it ${counts[it] ?: 0}/${expected[it]}" })
@@ -379,6 +395,7 @@ val gmailMicrogSupportPatch = bytecodePatch(
             }
         }
         val rewritten = linkedMapOf<String, Int>()
+        val pushActions = mutableSetOf<String>()
         for (type in holders) {
             for (method in mutableClassDefBy(type).methods) {
                 val instructions = method.implementation?.instructions?.toList() ?: continue
@@ -387,8 +404,9 @@ val gmailMicrogSupportPatch = bytecodePatch(
                     val to = rename(value) ?: return@forEachIndexed
                     val opcode = if (insn.opcode == Opcode.CONST_STRING) "const-string" else "const-string/jumbo"
                     method.replaceInstruction(index, "$opcode v${(insn as OneRegisterInstruction).registerA}, \"$to\"")
-                    val kind = if (MicrogRe.route(value) != null) "Play services" else "Gmail"
+                    val kind = if (playServicesName(value) != null) "Play services" else "Gmail"
                     rewritten[kind] = (rewritten[kind] ?: 0) + 1
+                    if (value in MicrogRe.PUSH_ACTION_ROUTES) pushActions += value
                 }
             }
         }
@@ -396,5 +414,7 @@ val gmailMicrogSupportPatch = bytecodePatch(
         if ((rewritten["Play services"] ?: 0) < 100 || (rewritten["Gmail"] ?: 0) < 20) {
             throw PatchException("rewrote only $rewritten names; Gmail changed shape")
         }
+        val missing = PUSH_ACTIONS_USED - pushActions
+        if (missing.isNotEmpty()) throw PatchException("Gmail's FCM client no longer uses $missing; new-mail push not routed to microG-RE")
     }
 }
