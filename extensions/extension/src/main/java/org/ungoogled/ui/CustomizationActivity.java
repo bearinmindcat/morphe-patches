@@ -135,6 +135,7 @@ public final class CustomizationActivity extends Activity {
         section(body, PAGE_UI, names(
                 Shapes.rectShapesPatched(), "Rectangle Shapes",
                 Shapes.blackThemePatched(), "Black theme",
+                Shapes.lightMapPatched(), "Light map",
                 Shapes.highRefreshPatched(), "120 refresh rate"));
         section(body, PAGE_HIDE, names(
                 Shapes.hideAdsPatched(), "Sponsored content",
@@ -185,6 +186,17 @@ public final class CustomizationActivity extends Activity {
             body.addView(toggleRow("Black theme", "Choosing a theme in Maps settings turns this off", black));
             black.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 Shapes.setBlackEnabled(this, on);
+                restartSoon(b);
+            });
+        }
+
+        if (Shapes.lightMapPatched()) {
+            Switch light = new Switch(this);
+            light.setChecked(Shapes.lightMapEnabled(this));
+            body.addView(toggleRow("Light map", "Keeps the map light when menus are dark", light));
+            light.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+                Shapes.setLightMapEnabled(this, on);
+                // the map picks its style when it is created
                 restartSoon(b);
             });
         }
