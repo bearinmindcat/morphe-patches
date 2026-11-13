@@ -147,6 +147,7 @@ public final class CustomizationActivity extends Activity {
                 Shapes.navZoomPatched(), "Zoom controls in navigation",
                 Shapes.betterOfflinePatched(), "Better offline maps",
                 Shapes.locationSourcePatched(), "Location source",
+                Shapes.mapRegionPatched(), "Map region",
                 Shapes.proxyPatched(), "Proxy",
                 Shapes.playingMediaPatched(), "Follow playing media"));
     }
@@ -306,6 +307,27 @@ public final class CustomizationActivity extends Activity {
                         .show();
             });
             body.addView(locRow);
+        }
+
+        if (Shapes.mapRegionPatched()) {
+            // Every country with a name in the phone's language, "Automatic" (Maps' own) first.
+            String[] codes = java.util.Locale.getISOCountries();
+            String[][] byName = new String[codes.length][];
+            for (int i = 0; i < codes.length; i++) byName[i] = new String[] {new java.util.Locale("", codes[i]).getDisplayCountry(), codes[i]};
+            java.util.Arrays.sort(byName, (x, y) -> java.text.Collator.getInstance().compare(x[0], y[0]));
+            final String[] regions = new String[codes.length + 1], labels = new String[codes.length + 1];
+            regions[0] = "";
+            labels[0] = "Automatic";
+            for (int i = 0; i < byName.length; i++) { labels[i + 1] = byName[i][0]; regions[i + 1] = byName[i][1]; }
+            final int current = Math.max(0, java.util.Arrays.asList(regions).indexOf(Shapes.mapRegion(this)));
+            View regionRow = row("Map region", current == 0 ? "Automatic (your SIM's country)" : labels[current]);
+            regionRow.setOnClickListener(v -> choose("Map region", labels, current, which -> {
+                if (which == current) return;
+                Shapes.setMapRegion(this, regions[which]);
+                // read when the map asks for tiles; a restart drops the ones already drawn
+                restartSoon(v);
+            }));
+            body.addView(regionRow);
         }
 
         if (Shapes.proxyPatched()) {

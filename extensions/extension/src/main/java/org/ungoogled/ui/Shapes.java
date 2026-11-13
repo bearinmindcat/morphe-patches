@@ -92,6 +92,7 @@ public final class Shapes {
     public static boolean wazeAlertsPatched() { return false; }
     public static boolean playingMediaPatched() { return false; }
     public static boolean lightMapPatched() { return false; }
+    public static boolean mapRegionPatched() { return false; }
     /** Offline saved places, saving to the phone (not microG Maps', which saves to the account). */
     public static boolean localSavedPatched() { return false; }
     /** Add microG support: microG Maps, which signs in through microG. */
@@ -200,6 +201,8 @@ public final class Shapes {
         try {
             if (microgPatched()) MicroG.processStart(c);
             refreshLightMap(c);
+            refreshMapRegion(c);
+            dropStaleTiles(c);
             refreshPlayLocation(c);
             applyProxy(c);
         } catch (Throwable ignored) {}
@@ -829,6 +832,61 @@ public final class Shapes {
         }
     }
 
+    // ---- Map region -----------------------------------------------------------------
+    // Every batch of map tiles is asked for in a language and for a region, the country
+    // whose names and borders the server draws (like hl and gl on the web). Maps takes the
+    // region from the SIM or the network; a region picked here goes into the tile requests
+    // instead. Nothing else Maps sends changes.
+
+    public static final String KEY_MAP_REGION = "map_region";
+    public static volatile String MAP_REGION = "";
+
+    /** The picked region (an ISO country code), "" for Maps' own. */
+    public static String mapRegion(Context c) {
+        return mapRegionPatched() ? prefs(c).getString(KEY_MAP_REGION, "") : "";
+    }
+
+    /** Set with a new region: the tiles on disk were drawn for the old one. */
+    private static final String KEY_MAP_REGION_STALE = "map_region_stale";
+
+    public static void setMapRegion(Context c, String region) {
+        prefs(c).edit().putString(KEY_MAP_REGION, region == null ? "" : region)
+                .putBoolean(KEY_MAP_REGION_STALE, true).commit();
+        refreshMapRegion(c);
+    }
+
+    static void refreshMapRegion(Context c) {
+        try { MAP_REGION = mapRegion(c); } catch (Throwable ignored) {}
+    }
+
+    /**
+     * From processStart, before the map opens its tile cache: after a region change, the
+     * cache (map_cache.db in diskcache/ next to each external files dir, or in the cache
+     * dir) goes, as Maps' own wipe does it, so no tile drawn for the old region comes back.
+     */
+    static void dropStaleTiles(Context c) {
+        try {
+            if (!prefs(c).getBoolean(KEY_MAP_REGION_STALE, false)) return;
+            java.util.List<java.io.File> dirs = new java.util.ArrayList<>();
+            try {
+                for (java.io.File f : c.getExternalFilesDirs(null)) {
+                    if (f != null && f.getParentFile() != null) dirs.add(new java.io.File(new java.io.File(f.getParentFile(), "cache"), "diskcache"));
+                }
+            } catch (Throwable ignored) {}
+            dirs.add(new java.io.File(c.getCacheDir(), "diskcache"));
+            for (java.io.File d : dirs) {
+                for (String n : new String[] {"map_cache.db", "map_cache.db-shm", "map_cache.db-wal"}) new java.io.File(d, n).delete();
+            }
+            prefs(c).edit().remove(KEY_MAP_REGION_STALE).commit();
+        } catch (Throwable ignored) {}
+    }
+
+    /** The region a tile batch is asked for. */
+    public static String tileRegion(String detected) {
+        String r = MAP_REGION;
+        return r == null || r.isEmpty() ? detected : r;
+    }
+
     /**
      * Called from the Activity base class right before its super.attachBaseContext
      * (after the app's own locale wrapping). The override holds only what is ours --
@@ -845,6 +903,7 @@ public final class Shapes {
             RECT = enabled(base);
             BLACK = blackEnabled(base) && !themePickedInMaps(base);
             refreshLightMap(base);
+            refreshMapRegion(base);
             HIDE_ADS = hideAdsEnabled(base);
             HIDE_EXPLORE = hideExploreEnabled(base);
             HIDE_TABS = hideTabsEnabled(base);
