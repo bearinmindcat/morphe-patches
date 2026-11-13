@@ -38,6 +38,7 @@ public final class Downloads {
     /** Samsung's answer to one of the keyboard's requests (the XML it received, empty when the request failed). */
     public static void answer(String xml) {
         refused = xml != null && xml.contains("<resultCode>1004</resultCode>");
+        if (refused) Languages.refusedByServer();
     }
 
     /** The keyboard's list of running downloads, as it is made, and the name of its method that ends one. */

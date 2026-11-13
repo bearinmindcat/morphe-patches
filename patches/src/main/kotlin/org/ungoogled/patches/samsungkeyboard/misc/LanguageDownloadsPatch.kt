@@ -10,15 +10,22 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 private const val DOWNLOADS = "Lorg/ungoogled/samsungkeyboard/Downloads;"
+private const val LANGUAGES = "Lorg/ungoogled/samsungkeyboard/Languages;"
 private const val DOWNLOAD_MANAGER = "Lcom/samsung/android/honeyboard/base/languagedownload/lmdownload/LanguageDownloadManager;"
 private const val LANGUAGE = "Lcom/samsung/android/honeyboard/base/languagepack/language/Language;"
 
 /** Logged by the keyboard's request to Samsung's Galaxy Store server when it cannot close the answer's stream. */
 private const val FETCH_LOG = "failed to close session"
+
+/** The Languages page's row for one language (its toString names it), and the label of its "preloaded" flag there. */
+private const val LANGUAGE_ROW = "LanguageDownloadItem(language="
+private const val PRELOADED_LABEL = ", isPreloaded="
 
 /** Logged by a language download that ends without a download address from Samsung. */
 private const val FILE_INFO_ERROR = "LM_DOWNLOAD_FILE_INFO_ERROR"
@@ -32,9 +39,13 @@ private fun Method.strings() =
  * then ended the download silently and, unless its Languages page was open, left the language "downloading" for good.
  * Each answer from the server goes to Downloads; a download that ends in error is cleared as the Languages page clears
  * it, and the user is told why when Samsung refused the phone.
+ *
+ * The download is only the word predictions: every language's layout ships in the app. Where downloads can't complete,
+ * the Languages page offers each language (but Chinese and Japanese, which need the dictionaries to type) with an on/off
+ * switch, as it does preloaded ones, instead of a download button (Languages.preloaded).
  */
 internal val languageDownloadsPatch = bytecodePatch(
-    description = "Says why language downloads fail off Galaxy phones.",
+    description = "Offers typing languages without Samsung's download off Galaxy phones.",
 ) {
     extendWith(SAMSUNG_KEYBOARD_EXTENSION)
 
@@ -134,6 +145,54 @@ internal val languageDownloadsPatch = bytecodePatch(
         }
         if (lists == 0) throw PatchException("${ender.definingClass} has no constructor")
 
-        java.util.logging.Logger.getLogger("SamsungKeyboard").info("Galaxy Store answers: $answers; download lists: $lists")
+        // The Languages page's row: the field its toString prints after ", isPreloaded=", and each constructor that
+        // stores a parameter there gets that parameter from Languages.preloaded first.
+        val rowClasses = mutableListOf<com.android.tools.smali.dexlib2.iface.ClassDef>()
+        classDefForEach { c ->
+            if (c.methods.any { it.name == "toString" && it.parameterTypes.isEmpty() && LANGUAGE_ROW in it.strings() }) rowClasses += c
+        }
+        val rowClass = rowClasses.singleOrNull() ?: throw PatchException("Languages page row ($LANGUAGE_ROW): ${rowClasses.size} candidates")
+        val toString = rowClass.methods.first { it.name == "toString" && it.parameterTypes.isEmpty() }
+        val toStringInsns = toString.implementation!!.instructions.toList()
+        val labelAt = toStringInsns.indexOfFirst { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == PRELOADED_LABEL }
+        if (labelAt < 0) throw PatchException("$PRELOADED_LABEL not in ${rowClass.type}.toString")
+        val preloadedField = toStringInsns.drop(labelAt).firstOrNull { it.opcode == Opcode.IGET_BOOLEAN }
+            ?.let { (it as ReferenceInstruction).reference as FieldReference }
+            ?.takeIf { it.definingClass == rowClass.type }
+            ?: throw PatchException("${rowClass.type}: no preloaded flag after $PRELOADED_LABEL")
+        var rows = 0
+        for (constructor in mutableClassDefBy(rowClass.type).methods.filter { it.name == "<init>" }) {
+            val implementation = constructor.implementation ?: continue
+            val parameters = constructor.parameterTypes.map(CharSequence::toString)
+            // Parameter registers: p0 is this, then one per parameter (two for long and double).
+            val firstParameter = implementation.registerCount - 1 - parameters.sumOf { if (it == "J" || it == "D") 2 else 1 }
+            fun parameterRegister(index: Int) =
+                firstParameter + 1 + parameters.take(index).sumOf { if (it == "J" || it == "D") 2 else 1 }
+            val languageIndex = parameters.indexOf(LANGUAGE)
+            if (languageIndex < 0) continue
+            val store = implementation.instructions.firstOrNull {
+                it.opcode == Opcode.IPUT_BOOLEAN && ((it as ReferenceInstruction).reference as FieldReference).let { f ->
+                    f.definingClass == preloadedField.definingClass && f.name == preloadedField.name
+                }
+            } as? TwoRegisterInstruction ?: continue
+            val preloadedIndex = parameters.indices.firstOrNull { parameters[it] == "Z" && parameterRegister(it) == store.registerA } ?: continue
+            val language = parameterRegister(languageIndex)
+            val preloaded = parameterRegister(preloadedIndex)
+            if (language > 15 || preloaded > 15) throw PatchException("${rowClass.type}.<init>: parameters past v15")
+            constructor.addInstructions(
+                0,
+                """
+                    invoke-static { v$language, v$preloaded }, $LANGUAGES->preloaded(Ljava/lang/Object;Z)Z
+                    move-result v$preloaded
+                """,
+            )
+            rows++
+        }
+        // Measured against 5.9.40.48 (one constructor) and 5.9.40.12 (the full one; Kotlin's defaults one delegates).
+        if (rows == 0) throw PatchException("${rowClass.type}: no constructor stores the preloaded flag")
+
+        java.util.logging.Logger.getLogger("SamsungKeyboard").info(
+            "Galaxy Store answers: $answers; download lists: $lists; language rows: ${rowClass.type} ($rows)",
+        )
     }
 }
