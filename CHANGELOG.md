@@ -1,3 +1,15 @@
+## [2.9.6](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.5...v2.9.6) (2026-11-13)
+
+### 🐛 Bug Fixes
+
+* add samsung editor lite non-one ui support; issue [#163](https://github.com/bearinmindcat/morphe-patches/issues/163) ([994329d](https://github.com/bearinmindcat/morphe-patches/commit/994329dd0636c7d2b07a2aa90757294c34c4e9f3))
+* add samsung finder non-one ui support; issue [#158](https://github.com/bearinmindcat/morphe-patches/issues/158) ([0ec3d29](https://github.com/bearinmindcat/morphe-patches/commit/0ec3d29508af23067c264de8ddb5117c3c8170cd))
+* gmail microg keeps getting notifications ([fc0790a](https://github.com/bearinmindcat/morphe-patches/commit/fc0790acba055514f285e8fff0de1c5bfaf57861))
+* samsung capture keeps its own screenshot settings and hides show taps; issue [#145](https://github.com/bearinmindcat/morphe-patches/issues/145) ([e9d6c8a](https://github.com/bearinmindcat/morphe-patches/commit/e9d6c8a1005215d9be89e540b03a42fccd7fd986))
+* samsung capture opens on userdebug roms ([400935b](https://github.com/bearinmindcat/morphe-patches/commit/400935b159076f028e718dc8e1f06bdd0ee666b4))
+* samsung gallery edit opens a video editor; issue [#163](https://github.com/bearinmindcat/morphe-patches/issues/163) ([9a57916](https://github.com/bearinmindcat/morphe-patches/commit/9a579165052748fa24a933b52a8b675a33f052d1))
+* samsung keyboard no longer crashes opening emoji and clipboard (input spy window); issue [#171](https://github.com/bearinmindcat/morphe-patches/issues/171) ([c6b6256](https://github.com/bearinmindcat/morphe-patches/commit/c6b6256631b8245148e86da7d233859c6934552d))
+
 ## [2.9.5](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.4...v2.9.5) (2026-11-13)
 
 ### 🐛 Bug Fixes
