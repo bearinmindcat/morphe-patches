@@ -3,6 +3,7 @@ package org.ungoogled.patches.nothinglauncher.misc
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
@@ -26,6 +27,9 @@ import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_16_17
 import org.ungoogled.patches.nothinglauncher.HIDDEN_MEMBERS_CANARY
 import org.ungoogled.patches.nothinglauncher.NothingLauncherConstants.COMPATIBILITY_NOTHING_LAUNCHER
+import org.ungoogled.patches.nothinglauncher.v2.HIDDEN_CONSTRUCTORS as V2_HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.nothinglauncher.v2.HIDDEN_MEMBERS as V2_HIDDEN_MEMBERS
+import org.ungoogled.patches.nothinglauncher.v2.HIDDEN_SUPERCLASSES as V2_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS as V3_HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS_16_17 as V3_HIDDEN_CONSTRUCTORS_16_17
 import org.ungoogled.patches.nothinglauncher.v3.HIDDEN_CONSTRUCTORS_CANARY as V3_HIDDEN_CONSTRUCTORS_CANARY
@@ -103,6 +107,19 @@ private val SETTINGS_CALLS: Map<String, String> = buildMap {
  */
 private fun isAndroid15Build(version: String?) = version == "3.3.14"
 
+/**
+ * 2.2.8 (Android 13) is the Android 13 Launcher3: its lists are generated against Android 13, 15, 16, 17 and the canary
+ * (v2/NothingLauncher2Members.kt), and it lacks most of the newer builds' system-launcher parts (view capture, the
+ * shared clock, the background widget host, Smart App Drawer, Nothing's wallpaper app link).
+ */
+private fun isAndroid13Build(version: String?) = version == "2.2.8"
+
+/** DeviceConfig reads (Launcher3's device flags): Android 13 refuses them to an installed app (see Calls). */
+private val DEVICE_CONFIG_CALLS = mapOf(
+    "Landroid/provider/DeviceConfig;->getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z" to
+        "$EXT/Calls;->getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z",
+)
+
 /** Context.getDisplay() on contexts that are not visual (see Windows). */
 private val DISPLAY_CALLS = listOf("Landroid/content/Context;", "Landroid/content/ContextWrapper;").associate { owner ->
     "$owner->getDisplay()Landroid/view/Display;" to "$EXT/Windows;->getDisplay(${owner})Landroid/view/Display;"
@@ -132,6 +149,7 @@ private val hiddenApisPatch = bytecodePatch(
 
     execute {
         val android15Build = isAndroid15Build(packageMetadata.versionName)
+        val android13Build = isAndroid13Build(packageMetadata.versionName)
         // On a debuggable ROM the launcher records its views for debugging through system-only tracing (a window
         // manager and trace sources only the system may create); it now takes its release path there too.
         val viewCapture = mutableListOf<Pair<String, String>>()
@@ -158,24 +176,27 @@ private val hiddenApisPatch = bytecodePatch(
                 }
             }
         }
-        // Measured against 4.0.20 and 3.3.14: one check, in the view capture factory.
-        if (debuggable == 0) throw PatchException("view capture debuggable check not found")
+        // Measured against 4.0.20 and 3.3.14: one check, in the view capture factory (2.2.8 has no view capture).
+        if (!android13Build && debuggable == 0) throw PatchException("view capture debuggable check not found")
 
         // Settings first: some of its calls are hidden per-user ones, which LocalSettings answers for the app's user.
         val settings = redirectCalls(SETTINGS_CALLS)
         val displays = redirectCalls(DISPLAY_CALLS)
         log.info("display lookups: $displays")
-        // Measured against 4.0.20: 32, the home screen preview's (Customization > Home screen layout) among them; 3.3.14: 24.
+        // Measured against 4.0.20: 32, the home screen preview's (Customization > Home screen layout) among them; 3.3.14: 24;
+        // 2.2.8: 8.
         if (displays == 0) throw PatchException("no Context.getDisplay calls found")
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/Members;", "$EXT/Hidden;",
-            (if (android15Build) V3_HIDDEN_MEMBERS + V3_HIDDEN_MEMBERS_16_17 + V3_HIDDEN_MEMBERS_CANARY
+            (if (android13Build) V2_HIDDEN_MEMBERS
+            else if (android15Build) V3_HIDDEN_MEMBERS + V3_HIDDEN_MEMBERS_16_17 + V3_HIDDEN_MEMBERS_CANARY
             else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17 + HIDDEN_MEMBERS_CANARY) +
                 REFUSED_CALLS,
         )
         val constructors = redirectConstructors(
             "$EXT/Members;", "$EXT/Hidden;",
-            if (android15Build) V3_HIDDEN_CONSTRUCTORS + V3_HIDDEN_CONSTRUCTORS_16_17 + V3_HIDDEN_CONSTRUCTORS_CANARY
+            if (android13Build) V2_HIDDEN_CONSTRUCTORS
+            else if (android15Build) V3_HIDDEN_CONSTRUCTORS + V3_HIDDEN_CONSTRUCTORS_16_17 + V3_HIDDEN_CONSTRUCTORS_CANARY
             else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17 + HIDDEN_CONSTRUCTORS_CANARY,
         )
         // 3.3.14's widget host extends AppWidgetHost through a hidden constructor; the public one with the same first
@@ -183,7 +204,8 @@ private val hiddenApisPatch = bytecodePatch(
         val superCalls = if (android15Build) substituteSuperConstructors(V3_SUPER_CONSTRUCTORS) else 0
         // The view capture's trace sources (perfetto) keep their base, as in 4.0.20: only debug builds create them.
         val rebased = rebaseSubclasses(
-            if (android15Build) V3_HIDDEN_SUPERCLASSES.filterKeys { !it.startsWith("Landroid/tracing/perfetto/") } else REBASES,
+            if (android13Build) V2_HIDDEN_SUPERCLASSES
+            else if (android15Build) V3_HIDDEN_SUPERCLASSES.filterKeys { !it.startsWith("Landroid/tracing/perfetto/") } else REBASES,
         )
         skipCastOfNull("$EXT/Hidden;")
         log.info(
@@ -191,19 +213,28 @@ private val hiddenApisPatch = bytecodePatch(
                 "super calls: $superCalls; rebased: $rebased",
         )
         // Measured against 4.0.20: 63 settings calls, 1,446 calls, 332 field accesses, 90 constructors, 20 rebased classes;
-        // 3.3.14: 60 settings calls, 1,166 calls, 212 field accesses, 78 constructors, 1 super call, 10 rebased classes.
+        // 3.3.14: 60 settings calls, 1,166 calls, 212 field accesses, 78 constructors, 1 super call, 10 rebased classes;
+        // 2.2.8: 54 settings calls, 873 calls, 134 field accesses, 53 constructors, 7 rebased classes.
         if (android15Build && superCalls == 0) throw PatchException("AppWidgetHost super constructor call not found")
         if (settings < 10) throw PatchException("only $settings settings calls found")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0 || rebased == 0) throw PatchException("hidden constructors not found")
+        if (android13Build) {
+            // Launcher3's device flags read DeviceConfig, which Android 13 refuses to an installed app.
+            val deviceConfig = redirectCalls(DEVICE_CONFIG_CALLS)
+            log.info("device config: $deviceConfig")
+            // Measured against 2.2.8: one, Launcher3's DeviceFlag.
+            if (deviceConfig == 0) throw PatchException("no DeviceConfig reads found")
+        }
 
         // Clocks in widgets share one time-tick listener, a kind of object only the system may create: they keep
-        // their own, as in any other app.
+        // their own, as in any other app. (2.2.8 has no shared clock.)
         val launcher = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepLauncher;")
         val createView = launcher.methods.firstOrNull {
             it.name == "onCreateView" && it.parameterTypes.size == 4 && it.returnType == "Landroid/view/View;"
-        } ?: throw PatchException("QuickstepLauncher.onCreateView not found")
-        createView.addInstructionsWithLabels(
+        }
+        if (createView == null && !android13Build) throw PatchException("QuickstepLauncher.onCreateView not found")
+        createView?.addInstructionsWithLabels(
             0,
             """
                 invoke-static { p2 }, $EXT/Launch;->ownClock(Ljava/lang/String;)Z
@@ -235,9 +266,14 @@ private val hiddenApisPatch = bytecodePatch(
         // The system launcher reads the window's size, rotation and cutout from hidden parts of the configuration;
         // Launcher3's own answers, made for launchers that are not the system's, are used instead.
         val proxy = mutableClassDefBy("Lcom/android/quickstep/util/SystemWindowManagerProxy;")
-        val own = setOf("estimateInternalDisplayBounds", "getCurrentBounds", "getRotation", "getStatusBarHeight", "rotateCutout") +
-            // 4.0.20's taskbar answers (3.3.14 has none).
-            if (android15Build) emptySet() else setOf("showDesktopTaskbarForFreeformDisplay", "showLockedTaskbarOnHome")
+        val own = if (android13Build) {
+            // 2.2.8's: displays by hidden ids and categories, the rotation from the hidden window configuration.
+            setOf("getDisplayId", "getDisplays", "getRotation", "isInternalDisplay")
+        } else {
+            setOf("estimateInternalDisplayBounds", "getCurrentBounds", "getRotation", "getStatusBarHeight", "rotateCutout") +
+                // 4.0.20's taskbar answers (3.3.14 has none).
+                if (android15Build) emptySet() else setOf("showDesktopTaskbarForFreeformDisplay", "showLockedTaskbarOnHome")
+        }
         val before = proxy.methods.size
         proxy.methods.removeIf { it.name in own }
         if (before - proxy.methods.size != own.size) {
@@ -257,10 +293,20 @@ private val systemPrivilegesPatch = bytecodePatch(
 
     execute {
         val android15Build = isAndroid15Build(packageMetadata.versionName)
+        val android13Build = isAndroid13Build(packageMetadata.versionName)
         val manager = "Lcom/android/launcher3/QuickstepTransitionManager;"
         val wrapper = "Lcom/android/launcher3/util/ActivityOptionsWrapper;"
         val runnables = "Lcom/android/launcher3/util/RunnableList;"
-        // 4.0.20 takes (View, ItemInfo), 3.3.14 the View alone.
+        // 4.0.20 and 3.3.14 keep a QuickstepLauncher, 2.2.8 a BaseQuickstepLauncher; 2.2.8's p0 may be above v15, which
+        // iget-object cannot name: it is moved first.
+        val launcherType = mutableClassDefBy(manager).fields.firstOrNull { it.name == "mLauncher" }?.type
+            ?: throw PatchException("QuickstepTransitionManager.mLauncher not found")
+        val loadLauncher = if (android13Build) {
+            "move-object/from16 v0, p0\niget-object v0, v0, $manager->mLauncher:$launcherType"
+        } else {
+            "iget-object v0, p0, $manager->mLauncher:$launcherType"
+        }
+        // 4.0.20 takes (View, ItemInfo), 3.3.14 and 2.2.8 the View alone.
         val launchOptions = mutableClassDefBy(manager).methods.firstOrNull {
             it.name == "getActivityLaunchOptions" && it.parameterTypes.size in 1..2 &&
                 it.parameterTypes.first().toString() == "Landroid/view/View;" && it.returnType == wrapper
@@ -268,7 +314,7 @@ private val systemPrivilegesPatch = bytecodePatch(
         launchOptions.addInstructionsWithLabels(
             0,
             """
-                iget-object v0, p0, $manager->mLauncher:Lcom/android/launcher3/uioverrides/QuickstepLauncher;
+                $loadLauncher
                 invoke-static { v0 }, $EXT/Launch;->remoteAnimations(Landroid/content/Context;)Z
                 move-result v0
                 if-nez v0, :remote
@@ -318,14 +364,16 @@ private val systemPrivilegesPatch = bytecodePatch(
             }
         }
         log.info("app prediction lookups: $gated")
-        // Measured against 4.0.20 and 3.3.14: 4 lookups.
+        // Measured against 4.0.20 and 3.3.14: 4 lookups; 2.2.8: 1.
         if (gated == 0) throw PatchException("no app prediction service lookups found")
 
         // Widgets: the system launcher's widget holder routes each widget's updates through a listener only the system
         // may register, so every widget stayed "Loading...". Without it the launcher uses Launcher3's own holder, which
         // gets its updates the way any home app does (same widget host id, 1024).
         val holder = "Lcom/android/launcher3/widget/LauncherWidgetHolder;"
-        if (android15Build) {
+        if (android13Build) {
+            // 2.2.8's Launcher3 has no background widget host: its widgets get their updates the way any home app does.
+        } else if (android15Build) {
             // 3.3.14 picks the holder by a feature flag (widget updates in the background): it now also needs the listener.
             val oldFactory = mutableClassDefBy("Lcom/android/launcher3/uioverrides/QuickstepWidgetHolder\$QuickstepHolderFactory;")
             val pick = oldFactory.methods.firstOrNull {
@@ -379,47 +427,9 @@ private val systemPrivilegesPatch = bytecodePatch(
 
         // The home screen menu's "Customization" opens Nothing's wallpaper app, which links to the launcher's own
         // Customization page (grid, icon pack, wallpaper scrolling). Without that app it opens that page directly. The
-        // menu item ends in a helper that builds the wallpaper intent (the one with "app_launched_launcher").
-        val jumpers = mutableListOf<String>()
-        classDefForEach { c ->
-            if (c.type != "Lcom/android/launcher3/views/OptionsPopupView;" && c.methods.any { m ->
-                    m.implementation?.instructions?.any {
-                        ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "app_launched_launcher"
-                    } == true
-                }
-            ) jumpers += c.type
-        }
-        // Measured against 4.0.20 and 3.3.14: one, Nothing's activity starter (in 4.0.20 Launcher3's own OptionsPopupView
-        // copy has the string too, unused).
-        val jumperType = jumpers.singleOrNull()
-            ?: throw PatchException("expected one wallpaper intent helper (app_launched_launcher), found $jumpers")
-        val jumperClass = mutableClassDefBy(jumperType)
-        val wallpaperIntent = jumperClass.methods.firstOrNull { m ->
-            m.returnType == "Landroid/content/Intent;" && m.implementation?.instructions?.any {
-                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "app_launched_launcher"
-            } == true
-        } ?: throw PatchException("wallpaper intent builder not found in $jumperType")
-        val menuEntry = jumperClass.methods.filter { m ->
-            m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf("Landroid/view/View;") &&
-                m.implementation?.instructions?.any {
-                    ((it as? ReferenceInstruction)?.reference as? com.android.tools.smali.dexlib2.iface.reference.MethodReference)
-                        ?.let { r -> r.definingClass == jumperType && r.name == wallpaperIntent.name } == true
-                } == true
-        }
-        // Measured against 4.0.20 and 3.3.14: one, the menu's (the Customization page's own entry takes a Context).
-        if (menuEntry.size != 1) throw PatchException("expected one Customization menu entry in $jumperType, found ${menuEntry.size}")
-        val entry = menuEntry.single()
-        val view = if (com.android.tools.smali.dexlib2.AccessFlags.STATIC.isSet(entry.accessFlags)) "p0" else "p1"
-        entry.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { $view }, $EXT/Launch;->customization(Landroid/view/View;)Z
-                move-result v0
-                if-eqz v0, :nothing
-                return-void
-            """,
-            ExternalLabel("nothing", entry.implementation!!.instructions.first()),
-        )
+        // menu item ends in a helper that builds the wallpaper intent (the one with "app_launched_launcher"). (2.2.8's
+        // menu opens the launcher's own page.)
+        if (!android13Build) customizationPage()
 
         // The launcher's own home/close transitions are registered with Android as remote animations and transitions,
         // which likewise needs the permission: without it they are not registered (Android's own animations play).
@@ -434,7 +444,7 @@ private val systemPrivilegesPatch = bytecodePatch(
             method.addInstructionsWithLabels(
                 0,
                 """
-                    iget-object v0, p0, $manager->mLauncher:Lcom/android/launcher3/uioverrides/QuickstepLauncher;
+                    $loadLauncher
                     invoke-static { v0 }, $EXT/Launch;->remoteAnimations(Landroid/content/Context;)Z
                     move-result v0
                     if-nez v0, :remote
@@ -444,6 +454,50 @@ private val systemPrivilegesPatch = bytecodePatch(
             )
         }
     }
+}
+
+/** The home screen menu's "Customization" (4.0.20 and 3.3.14): see systemPrivilegesPatch. */
+private fun BytecodePatchContext.customizationPage() {
+    val jumpers = mutableListOf<String>()
+    classDefForEach { c ->
+        if (c.type != "Lcom/android/launcher3/views/OptionsPopupView;" && c.methods.any { m ->
+                m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "app_launched_launcher"
+                } == true
+            }
+        ) jumpers += c.type
+    }
+    // Measured against 4.0.20 and 3.3.14: one, Nothing's activity starter (in 4.0.20 Launcher3's own OptionsPopupView
+    // copy has the string too, unused).
+    val jumperType = jumpers.singleOrNull()
+        ?: throw PatchException("expected one wallpaper intent helper (app_launched_launcher), found $jumpers")
+    val jumperClass = mutableClassDefBy(jumperType)
+    val wallpaperIntent = jumperClass.methods.firstOrNull { m ->
+        m.returnType == "Landroid/content/Intent;" && m.implementation?.instructions?.any {
+            ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "app_launched_launcher"
+        } == true
+    } ?: throw PatchException("wallpaper intent builder not found in $jumperType")
+    val menuEntry = jumperClass.methods.filter { m ->
+        m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf("Landroid/view/View;") &&
+            m.implementation?.instructions?.any {
+                ((it as? ReferenceInstruction)?.reference as? com.android.tools.smali.dexlib2.iface.reference.MethodReference)
+                    ?.let { r -> r.definingClass == jumperType && r.name == wallpaperIntent.name } == true
+            } == true
+    }
+    // Measured against 4.0.20 and 3.3.14: one, the menu's (the Customization page's own entry takes a Context).
+    if (menuEntry.size != 1) throw PatchException("expected one Customization menu entry in $jumperType, found ${menuEntry.size}")
+    val entry = menuEntry.single()
+    val view = if (com.android.tools.smali.dexlib2.AccessFlags.STATIC.isSet(entry.accessFlags)) "p0" else "p1"
+    entry.addInstructionsWithLabels(
+        0,
+        """
+            invoke-static { $view }, $EXT/Launch;->customization(Landroid/view/View;)Z
+            move-result v0
+            if-eqz v0, :nothing
+            return-void
+        """,
+        ExternalLabel("nothing", entry.implementation!!.instructions.first()),
+    )
 }
 
 /**
@@ -457,6 +511,8 @@ private val offlinePatch = bytecodePatch(
     description = "Keeps the launcher offline: Smart App Drawer sorts apps on the phone only, no Firebase.",
 ) {
     execute {
+        // 2.2.8 has neither Firebase nor Smart App Drawer.
+        if (isAndroid13Build(packageMetadata.versionName)) return@execute
         if (isAndroid15Build(packageMetadata.versionName)) {
             // Firebase starts from its content provider (FirebaseApp.initializeApp, which starts Analytics, the
             // installation and messaging); the provider now starts nothing.
@@ -530,18 +586,36 @@ private val offlinePatch = bytecodePatch(
 }
 
 /**
+ * 2.2.8 was built against Android 13's first framework, where these private attribute ids (0x01120024, 0x01120025,
+ * 0x0112002d, 0x01120030, 0x011200ef) were the accent and surface colors its overview and taskbar drawables use; the
+ * resource decoder reads them with a later Android 13 (or 14) table, where they have other names. Decoded name ->
+ * attribute meant.
+ */
+private val ANDROID_13_PRIVATE_ATTRIBUTES = mapOf(
+    "clickColor" to "colorAccentPrimary",
+    "closeItemLayout" to "colorAccentPrimaryVariant",
+    "colorPopupBackground" to "colorSurface",
+    "colorSurfaceHeader" to "colorSurfaceVariant",
+    "preferenceFragmentPaddingSide" to "textColorOnAccent",
+    "preferenceFragmentListStyle" to "textColorOnAccent",
+)
+
+/**
  * 3.3.14's layouts and styles name Android 15's private theme colors, which Android 16 and 17 no longer have: it
- * stopped at start there (the overview's clear-all button). They become colors of the app's own, as for Xperia Home
- * (see replacePrivateThemeColors; its resource table has 32-bit entry offsets, so Xperia Home's even entry counts are
- * not needed). 4.0.20 is built for Android 16 and is left as it is.
+ * stopped at start there (the overview's clear-all button). 2.2.8's name Android 13's, whose ids are other attributes
+ * from Android 14 on. They become colors of the app's own, as for Xperia Home (see replacePrivateThemeColors; these
+ * resource tables have 32-bit entry offsets, so Xperia Home's even entry counts are not needed). 4.0.20 is built for
+ * Android 16 and is left as it is.
  */
 private val themeColorsPatch = resourcePatch(
-    description = "Makes Nothing Launcher 3.3.14's theme colors work on Android 16 and 17.",
+    description = "Makes the theme colors of Nothing Launcher 3.3.14 and 2.2.8 work on newer Android versions.",
 ) {
     execute {
-        if (!isAndroid15Build(packageMetadata.versionName)) return@execute
-        val colors = replacePrivateThemeColors()
+        val version = packageMetadata.versionName
+        if (!isAndroid15Build(version) && !isAndroid13Build(version)) return@execute
+        val colors = replacePrivateThemeColors(if (isAndroid13Build(version)) ANDROID_13_PRIVATE_ATTRIBUTES else emptyMap())
         log.info("private theme colors: $colors")
+        // Measured against 3.3.14: 92 references; 2.2.8: 11.
         if (colors == 0) throw PatchException("no private theme colors found")
     }
 }

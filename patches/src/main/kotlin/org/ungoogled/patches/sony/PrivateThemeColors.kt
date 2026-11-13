@@ -41,9 +41,11 @@ private fun materialColor(role: String): Pair<String, String> {
  * drawables and styles name. Android 16 dropped them and gave their ids to other attributes, so the launcher stopped
  * at its first layout ("Failed to resolve attribute"). Each becomes a color of the app's own (day and night values from
  * Android's public system colors, as Android 15's DeviceDefault themes set them), on every Android version alike.
+ * [aliases] names the attribute meant where the resource decoder's framework table gives the id another name (an app
+ * built against an older framework, whose private ids differ from the decoder's: decoded name -> attribute meant).
  * Returns the references changed.
  */
-internal fun ResourcePatchContext.replacePrivateThemeColors(): Int {
+internal fun ResourcePatchContext.replacePrivateThemeColors(aliases: Map<String, String> = emptyMap()): Int {
     val reference = Regex("""\?android:\^attr-private/(\w+)""")
     // Only where the references can be: decoding other resources (anim, xml) made Morphe add entries of their types.
     val where = Regex("""res/((layout|drawable|color)[^/]*/[^/]+|values[^/]*/(styles|colors)\.xml)""")
@@ -58,7 +60,7 @@ internal fun ResourcePatchContext.replacePrivateThemeColors(): Int {
         if (!reference.containsMatchIn(text)) continue
         file.writeText(
             reference.replace(text) { match ->
-                val name = match.groupValues[1]
+                val name = match.groupValues[1].let { aliases[it] ?: it }
                 if (name !in OLDER_ATTRIBUTES && !name.startsWith("materialColor")) {
                     throw PatchException("$path: private theme attribute $name has no color known")
                 }
