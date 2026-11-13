@@ -69,7 +69,14 @@ private fun com.android.tools.smali.dexlib2.iface.instruction.Instruction.isStri
     (opcode == Opcode.CONST_STRING || opcode == Opcode.CONST_STRING_JUMBO) &&
         ((this as ReferenceInstruction).reference as StringReference).string == value
 
-private fun route(value: String): String? = MicrogRe.route(value)
+/** microG-RE's name for a Play services name in Maps' code, its push actions included; null if it is none. */
+private fun route(value: String): String? = MicrogRe.route(value) ?: MicrogRe.PUSH_ACTION_ROUTES[value]
+
+/** The push actions Maps' FCM client uses: without microG-RE's names it gets no token and no notifications. */
+private val PUSH_ACTIONS_USED = listOf(
+    "com.google.android.c2dm.intent.REGISTER", "com.google.android.c2dm.intent.REGISTRATION",
+    "com.google.android.c2dm.intent.RECEIVE", "com.google.iid.TOKEN_REQUEST",
+)
 
 private val microgManifestPatch = resourcePatch(
     description = "Points the manifest's Play services permissions at microG and tells microG which app to vouch for.",
@@ -93,6 +100,15 @@ private val microgManifestPatch = resourcePatch(
                 }
             }
             if (routed != PERMISSION_ROUTES.size) throw PatchException("expected 4 Play services permissions, found $routed")
+
+            // 1b. Push messages: microG-RE delivers them only with its own RECEIVE action.
+            var pushActions = 0
+            for (action in all("action")) {
+                val to = MicrogRe.PUSH_ACTION_ROUTES[action.getAttribute("android:name")] ?: continue
+                action.setAttribute("android:name", to)
+                pushActions++
+            }
+            if (pushActions == 0) throw PatchException("Maps' push receiver (com.google.android.c2dm.intent.RECEIVE) not found")
 
             // 2. Android 11+ package visibility: Maps must be allowed to see microG.
             val root = manifest.documentElement
@@ -501,20 +517,25 @@ val microgSupportPatch = bytecodePatch(
             if (routes) holders += classDef.type
         }
         var rewritten = 0
+        val pushActions = mutableSetOf<String>()
         for (type in holders) {
             for (method in mutableClassDefBy(type).methods) {
                 val instructions = method.implementation?.instructions?.toList() ?: continue
                 instructions.forEachIndexed { index, insn ->
                     if (insn.opcode != Opcode.CONST_STRING && insn.opcode != Opcode.CONST_STRING_JUMBO) return@forEachIndexed
-                    val to = route(((insn as ReferenceInstruction).reference as StringReference).string) ?: return@forEachIndexed
+                    val value = ((insn as ReferenceInstruction).reference as StringReference).string
+                    val to = route(value) ?: return@forEachIndexed
                     val register = (insn as OneRegisterInstruction).registerA
                     val opcode = if (insn.opcode == Opcode.CONST_STRING) "const-string" else "const-string/jumbo"
                     method.replaceInstruction(index, "$opcode v$register, \"$to\"")
                     rewritten++
+                    if (value in MicrogRe.PUSH_ACTION_ROUTES) pushActions += value
                 }
             }
         }
         // Measured on this Maps version: 90 package, 64 account type, and the rest.
         if (rewritten < 160) throw PatchException("rewrote only $rewritten Play services names; Maps changed shape")
+        val missing = PUSH_ACTIONS_USED - pushActions
+        if (missing.isNotEmpty()) throw PatchException("Maps' FCM client no longer uses $missing; push not routed to microG-RE")
     }
 }
