@@ -158,9 +158,19 @@ private val olderAndroidResourcesPatch = resourcePatch {
 /**
  * UserManager.getUserInfo needs QUERY_USERS for any user: 16.4.30 asks it about each profile at start (looking for a work
  * profile) and crashed in a loop on phones with a work profile or private space. It goes through Members, which answers
- * a profile of the app's own user from public calls (see Fallbacks.profileInfo).
+ * a profile of the app's own user from public calls (see Fallbacks.profileInfo). PackageManager's lookups in another
+ * user need INTERACT_ACROSS_USERS: with a work profile the loader and the badge loader died at every start (grey home
+ * screen); Members answers them for the app's own profiles from LauncherApps (see Profiles).
  */
-private val REFUSED_USER_CALLS = setOf("Landroid/os/UserManager;->getUserInfo(I)Landroid/content/pm/UserInfo;")
+private val REFUSED_USER_CALLS = setOf(
+    "Landroid/os/UserManager;->getUserInfo(I)Landroid/content/pm/UserInfo;",
+    "Landroid/content/pm/PackageManager;->queryIntentActivitiesAsUser(Landroid/content/Intent;II)Ljava/util/List;",
+    "Landroid/content/pm/PackageManager;->queryIntentActivitiesAsUser(Landroid/content/Intent;ILandroid/os/UserHandle;)Ljava/util/List;",
+    "Landroid/content/pm/PackageManager;->getPackageUidAsUser(Ljava/lang/String;I)I",
+    "Landroid/content/pm/PackageManager;->getPackageUidAsUser(Ljava/lang/String;II)I",
+    "Landroid/content/pm/PackageManager;->getApplicationInfoAsUser(Ljava/lang/String;II)Landroid/content/pm/ApplicationInfo;",
+    "Landroid/content/pm/PackageManager;->getApplicationInfoAsUser(Ljava/lang/String;ILandroid/os/UserHandle;)Landroid/content/pm/ApplicationInfo;",
+)
 
 /** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
 private class HiddenLists(

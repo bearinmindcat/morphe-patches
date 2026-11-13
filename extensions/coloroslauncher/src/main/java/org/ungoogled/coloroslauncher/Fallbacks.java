@@ -70,6 +70,9 @@ final class Fallbacks {
         } catch (ClassCastException e) {
             return NONE;
         }
+        // Another user's packages: the work profile's from LauncherApps (see Profiles).
+        Object profiles = Profiles.call(receiver, key, args);
+        if (profiles != NONE) return profiles;
         // A configuration's window configuration (hidden; the launcher reads it through Configuration's hidden field,
         // which an app gets as null): the full-screen bounds and rotation of the default display (see Reflect).
         if (key.startsWith("Landroid/app/WindowConfiguration;->") && (args == null || args.length == 0)) {
