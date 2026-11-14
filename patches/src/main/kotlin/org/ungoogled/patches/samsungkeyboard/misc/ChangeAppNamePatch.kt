@@ -1,9 +1,11 @@
 package org.ungoogled.patches.samsungkeyboard.misc
 
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.ResourcePatchContext
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
 import org.ungoogled.patches.samsungkeyboard.SamsungKeyboardConstants.COMPATIBILITY_SAMSUNG_KEYBOARD
+import org.ungoogled.patches.samsungkeyboard.sboard.SBoardSelection
 import org.w3c.dom.Element
 
 /**
@@ -32,27 +34,33 @@ val samsungKeyboardChangeAppNamePatch = resourcePatch(
     )
 
     execute {
-        var relabeled = 0
-        document("AndroidManifest.xml").use { manifest ->
-            val elements = manifest.getElementsByTagName("*")
-            for (i in 0 until elements.length) {
-                val element = elements.item(i) as Element
-                if (element.getAttribute("android:label") == STOCK_LABEL) {
-                    element.setAttribute("android:label", NEW_LABEL)
-                    relabeled++
-                }
+        if (SBoardSelection.builds(this, "Change app name")) return@execute
+        relabelKeyboard(appName.value!!)
+    }
+}
+
+/** Points every manifest label that reads "Samsung Keyboard" at a new, untranslated string [name]. */
+internal fun ResourcePatchContext.relabelKeyboard(name: String) {
+    var relabeled = 0
+    document("AndroidManifest.xml").use { manifest ->
+        val elements = manifest.getElementsByTagName("*")
+        for (i in 0 until elements.length) {
+            val element = elements.item(i) as Element
+            if (element.getAttribute("android:label") == STOCK_LABEL) {
+                element.setAttribute("android:label", NEW_LABEL)
+                relabeled++
             }
         }
-        if (relabeled == 0) throw PatchException("no manifest labels reference $STOCK_LABEL")
+    }
+    if (relabeled == 0) throw PatchException("no manifest labels reference $STOCK_LABEL")
 
-        document("res/values/strings.xml").use { strings ->
-            val resources = strings.getElementsByTagName("resources").item(0) as Element
-            resources.appendChild(
-                strings.createElement("string").apply {
-                    setAttribute("name", "patched_keyboard_name")
-                    textContent = appName.value!!
-                },
-            )
-        }
+    document("res/values/strings.xml").use { strings ->
+        val resources = strings.getElementsByTagName("resources").item(0) as Element
+        resources.appendChild(
+            strings.createElement("string").apply {
+                setAttribute("name", "patched_keyboard_name")
+                textContent = name
+            },
+        )
     }
 }

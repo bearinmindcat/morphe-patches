@@ -65,6 +65,7 @@ VENDOR_GROUPS = [
 def vendor_group(pkg):
     """The vendor group an app is listed under, or None for a top-level app. A package named outright in a group
     (the launchers) wins over a vendor's package prefix."""
+    pkg = entry_pkg(pkg)
     for group in VENDOR_GROUPS:
         if pkg in group[3]:
             return group
@@ -447,13 +448,34 @@ APP_RENAMES = {
 }
 
 
+# Builds of an app that a patch category stands for: the patches in that category get a spoiler of their own,
+# labelled like APP_RENAMES, instead of the app's. (package, category) -> (source app, patched build).
+APP_BUILDS = {
+    ("com.samsung.android.honeyboard", "SBoard"): (
+        '<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard',
+        '<img src="docs/icons/sboard.png" width="20" height="20" align="top"> SBoard',
+    ),
+}
+
+
+def entry_key(pkg, patch):
+    """Where a patch is listed: its app's package, or "<package>#<category>" for a build in APP_BUILDS."""
+    category = patch.get("category")
+    return f"{pkg}#{category}" if (pkg, category) in APP_BUILDS else pkg
+
+
+def entry_pkg(key):
+    """The package a listing key belongs to."""
+    return key.split("#", 1)[0]
+
+
 # Shown under the patch list, every time the list is generated.
 FOOTER = "Can't find an APK in Morphe Manager? See [where to get each APK](docs/APK-SOURCES.md)."
 
 
 def pkg_label(pkg, entry):
     """Spoiler label for one app."""
-    pair = APP_RENAMES.get(pkg)
+    pair = APP_BUILDS.get(tuple(pkg.split("#", 1))) if "#" in pkg else APP_RENAMES.get(pkg)
     if pair:
         src, dst = pair
         return f"{src}&nbsp;&nbsp;-&gt;&nbsp;&nbsp;{dst}"
@@ -469,7 +491,7 @@ SCREENSHOT_TYPES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 def screenshots_row(pkg):
     """One row of screenshots for an app, or "" when it has none."""
-    folder = SCREENSHOT_DIR / pkg
+    folder = SCREENSHOT_DIR / pkg.replace("#", "-")
     if not folder.is_dir():
         return ""
     files = sorted(p for p in folder.iterdir() if p.suffix.lower() in SCREENSHOT_TYPES)
@@ -496,7 +518,7 @@ for patch in data["patches"]:
             universal[patch["name"]] = patch
         continue
     for pkg_entry in cp:
-        pkg  = pkg_entry["packageName"]
+        pkg  = entry_key(pkg_entry["packageName"], patch)
         name = pkg_entry.get("name") or pkg  # fall back to package name if no label
         if pkg not in by_pkg:
             by_pkg[pkg] = {
@@ -611,7 +633,7 @@ def build_content(expanded=False):
             for p in (prefix if isinstance(prefix, tuple) else (prefix,)):
                 text = text.removeprefix(p)
             return text
-        names = sorted(group, key=name)
+        names = sorted(group, key=lambda pkg: (name(pkg), "#" in pkg))
         count = sum(len(group[pkg]["patches"]) for pkg in group)
         apps  = "app" if len(group) == 1 else "apps"
         noun  = "patch" if count == 1 else "patches"
