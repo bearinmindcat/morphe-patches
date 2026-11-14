@@ -269,6 +269,8 @@ private const val API_UNAVAILABLE = 16
 /** Play services' own checks in Gmail: is this package signed by Google, and is Play services there. */
 private const val SIGNATURE_HISTORY = "Unable to obtain package certificate history."
 private const val GMS_VERSION_KEY = "com.google.android.gms.version"
+/** The manifest's app component factory: it makes Gmail's Application and every screen. */
+private const val COMPONENT_FACTORY = "Landroidx/core/app/CoreComponentFactory;"
 
 @Suppress("unused")
 val gmailMicrogSupportPatch = bytecodePatch(
@@ -347,6 +349,27 @@ val gmailMicrogSupportPatch = bytecodePatch(
                 ExternalLabel("report", implementation!!.instructions.first()),
             )
         }
+
+        // Without microG-RE, microG Gmail crashed at every start once any account existed (issue #187): Gmail asks
+        // Play services for the id of every account, Exchange/IMAP/POP3 ones too. While microG-RE is missing, every
+        // screen opens as one that says so (NeedsMicrog in the extension), through the manifest's component factory.
+        val factory = mutableClassDefBy(COMPONENT_FACTORY)
+        factory.methods.singleOrNull { it.name == "instantiateApplication" && it.returnType == "Landroid/app/Application;" }?.apply {
+            val returns = implementation!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_OBJECT }
+            val ret = returns.singleOrNull() ?: throw PatchException("app component factory: expected one return, found ${returns.size}")
+            val register = (ret.value as OneRegisterInstruction).registerA
+            addInstructions(ret.index, "invoke-static { v$register }, Lorg/ungoogled/gmail/NeedsMicrog;->app(Landroid/app/Application;)V")
+        } ?: throw PatchException("app component factory ($COMPONENT_FACTORY) no longer makes the Application")
+        factory.methods.singleOrNull {
+            it.name == "instantiateActivity" && it.parameterTypes.map(CharSequence::toString) ==
+                listOf("Ljava/lang/ClassLoader;", "Ljava/lang/String;", "Landroid/content/Intent;")
+        }?.addInstructions(
+            0,
+            """
+                invoke-static { p2 }, Lorg/ungoogled/gmail/NeedsMicrog;->activity(Ljava/lang/String;)Ljava/lang/String;
+                move-result-object p2
+            """,
+        ) ?: throw PatchException("app component factory ($COMPONENT_FACTORY) no longer makes the screens")
     }
 
     // Every Play services name and every name of Gmail's own in Gmail's code: in finalize, after every other
