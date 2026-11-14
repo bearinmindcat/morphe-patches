@@ -237,6 +237,7 @@ final class HistoryStore {
 
     /** From an imported backup: merged in, keeping the latest time of each use. */
     static synchronized void merge(Context c, JSONArray a) throws Exception {
+        SavedStore.removeImportedPhotos(a);
         load(c);
         readArray(a);
         save(c);
