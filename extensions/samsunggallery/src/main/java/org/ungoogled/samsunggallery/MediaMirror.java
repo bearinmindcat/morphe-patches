@@ -243,6 +243,9 @@ public final class MediaMirror extends ContentProvider {
                 + "sec_media_id INTEGER, tag TEXT, server_id TEXT, _data TEXT, UNIQUE (sec_media_id, tag) ON CONFLICT IGNORE)");
         d.execSQL("CREATE INDEX IF NOT EXISTS " + SAVED + ".usertag_media ON usertag (sec_media_id)");
         d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".mirror_schema (tbl TEXT, col TEXT, PRIMARY KEY (tbl, col))");
+        // Albums the user hid (Albums > More > Hide albums): One UI keeps is_hide on every file of the album in Samsung's
+        // media provider; here by album (bucket id), so files added later are hidden too and the state outlives the copy.
+        d.execSQL("CREATE TABLE IF NOT EXISTS " + SAVED + ".hidden_album (bucket_id INTEGER PRIMARY KEY, path TEXT)");
         ExifOrientation.createTable(d, SAVED);
         SearchIndex.createTables(d, SAVED);
         // One UI's view puts every kind of tag together; tag_type 0 = the user's own, 4 and 5 what the photo shows.
@@ -274,6 +277,44 @@ public final class MediaMirror extends ContentProvider {
             }
         }
         return mirrored;
+    }
+
+    /**
+     * Hides or shows an album (Gallery's "Hide albums"): kept in the saved database, applied to the copy's files at once,
+     * and Gallery's lists reload. Returns the album's files in the copy (Gallery counts a change of 0 rows as failed).
+     */
+    static int setAlbumHidden(long bucket, boolean hidden) {
+        MediaMirror mirror = instance;
+        if (mirror == null) return 0;
+        int files;
+        synchronized (mirror) {
+            SQLiteDatabase d = mirror.db();
+            d.beginTransaction();
+            try {
+                if (hidden) {
+                    d.execSQL("INSERT OR REPLACE INTO " + SAVED + ".hidden_album (bucket_id, path) VALUES (?, "
+                            + "(SELECT relative_path FROM files WHERE bucket_id = ? LIMIT 1))", new Object[]{bucket, bucket});
+                } else {
+                    d.execSQL("DELETE FROM " + SAVED + ".hidden_album WHERE bucket_id = ?", new Object[]{bucket});
+                }
+                d.execSQL("UPDATE files SET is_hide = " + (hidden ? 1 : 0) + " WHERE bucket_id = ?", new Object[]{bucket});
+                try (Cursor c = d.rawQuery("SELECT count(*) FROM files WHERE bucket_id = ?", new String[]{Long.toString(bucket)})) {
+                    files = c.moveToFirst() ? c.getInt(0) : 0;
+                }
+                mirror.stampOffset += 1L << 40;
+                d.execSQL("UPDATE local_metadata SET generation_modified = " + (mirror.syncedGeneration + mirror.stampOffset));
+                d.execSQL("UPDATE mirror_state SET stamp = " + (mirror.syncedGeneration + mirror.stampOffset));
+                d.setTransactionSuccessful();
+            } catch (SQLiteException e) {
+                Log.w(TAG, "mirror: album not " + (hidden ? "hidden" : "shown") + ": " + e.getMessage());
+                return 0;
+            } finally {
+                d.endTransaction();
+            }
+        }
+        Log.i(TAG, "mirror: album " + bucket + (hidden ? " hidden, " : " shown, ") + files + " files");
+        mirror.getContext().getContentResolver().notifyChange(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null);
+        return files;
     }
 
     /**
@@ -477,7 +518,7 @@ public final class MediaMirror extends ContentProvider {
         // MediaStore has none. Without any, the file's date, as on One UI (Gallery's "wrong date" check is datetime =
         // date_modified * 1000).
         derived.put("datetime", "COALESCE(datetaken, date_modified * 1000, date_added * 1000)");
-        derived.put("is_hide", "0");
+        derived.put("is_hide", "CASE WHEN bucket_id IN (SELECT bucket_id FROM " + SAVED + ".hidden_album) THEN 1 ELSE 0 END");
         // Not part of a burst or similar-shots group.
         derived.put("group_id", "0");
         derived.put("burst_group_id", "0");

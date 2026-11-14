@@ -2,6 +2,7 @@ package org.ungoogled.patches.samsunggallery.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
@@ -9,6 +10,9 @@ import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import org.w3c.dom.Element
 
 private const val FAVORITES = "Lorg/ungoogled/samsunggallery/Favorites;"
@@ -28,6 +32,9 @@ private const val THUMBNAIL_REQUEST = "Lcom/samsung/android/gallery/module/thumb
 private const val MEDIA_PLAYER = "Lcom/samsung/android/gallery/support/library/v0/media/GedMediaPlayerCompat;"
 private const val MEDIA_MIRROR = "Lorg/ungoogled/samsunggallery/MediaMirror;"
 private const val MEDIA_MOVES = "Lorg/ungoogled/samsunggallery/MediaMoves;"
+private const val HIDDEN_ALBUMS = "Lorg/ungoogled/samsunggallery/HiddenAlbums;"
+/** Gallery's album writes to Samsung's media provider (hide state), unobfuscated. */
+private const val ALBUM_API = "Lcom/samsung/android/gallery/database/dal/mp/helper/AlbumApi;"
 private const val FILE_OPERATION_SERVICE = "Lcom/samsung/android/gallery/app/service/FileOperationService;"
 private const val PROGRESS_SERVICE = "Lcom/samsung/android/gallery/app/service/abstraction/AbsProgressService;"
 private const val FILE_EDITOR = "Lcom/samsung/android/gallery/module/fileio/redact/FileEditor;"
@@ -255,6 +262,25 @@ internal val mediaChangesPatch = bytecodePatch(
                     iget-object v0, p0, $FILE_EDITOR->mFiles:[$FILE_ITEM
                     invoke-static { v0 }, $MEDIA_MOVES->beforeEdit([Ljava/lang/Object;)V
                 """,
+            )
+        }
+
+        // "Hide albums" (Albums > More) set is_hide on the album's files in Samsung's media provider, a column MediaStore
+        // does not have, and nothing was hidden: the media copy keeps hidden albums instead.
+        method(ALBUM_API, "updateAlbumsDbForSec", listOf("Landroid/content/ContentValues;", "Ljava/lang/String;")).apply {
+            val instructions = implementation!!.instructions
+            val update = instructions.indexOfFirst {
+                it.opcode == Opcode.INVOKE_VIRTUAL &&
+                    (it as ReferenceInstruction).reference.toString() ==
+                    "Landroid/content/ContentResolver;->update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I"
+            }
+            val call = instructions.getOrNull(update) as? FiveRegisterInstruction
+                ?: throw PatchException("Gallery's album hide state no longer goes through ContentResolver.update")
+            replaceInstruction(
+                update,
+                "invoke-static { v${call.registerC}, v${call.registerD}, v${call.registerE}, v${call.registerF}, v${call.registerG} }, " +
+                    "$HIDDEN_ALBUMS->update(Landroid/content/ContentResolver;Landroid/net/Uri;Landroid/content/ContentValues;" +
+                    "Ljava/lang/String;[Ljava/lang/String;)I",
             )
         }
 
