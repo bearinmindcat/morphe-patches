@@ -5,6 +5,12 @@ import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import org.w3c.dom.Element
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
@@ -12,18 +18,43 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.maps.microg.MicrogSelection
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
+/** Firebase Analytics off in the manifest: Maps ships it switched on, and nothing else reads these. */
+private val firebaseAnalyticsOffPatch = resourcePatch(
+    description = "Turns Firebase Analytics off in the manifest.",
+) {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val application = manifest.getElementsByTagName("application").item(0) as Element
+            val metas = manifest.getElementsByTagName("meta-data").let { n -> (0 until n.length).map { n.item(it) as Element } }
+            fun meta(name: String, value: String) {
+                val element = metas.firstOrNull { it.getAttribute("android:name") == name }
+                    ?: manifest.createElement("meta-data").also {
+                        it.setAttribute("android:name", name)
+                        application.appendChild(it)
+                    }
+                element.setAttribute("android:value", value)
+            }
+            if (metas.none { it.getAttribute("android:name") == "firebase_analytics_collection_enabled" }) {
+                throw PatchException("Firebase Analytics is no longer switched on in the manifest")
+            }
+            meta("firebase_analytics_collection_enabled", "false")
+            meta("firebase_analytics_collection_deactivated", "true")
+        }
+    }
+}
+
 @Suppress("unused")
 val removeTelemetryPatch = bytecodePatch(
     name = "Remove telemetry",
     description = "Points the Firebase Installations and Play services compliance check-ins at " +
-        "an unresolvable host, stops every ad impression and click ping from being sent, and " +
+        "an unresolvable host, turns Firebase Analytics off, stops every ad impression and click ping from being sent, and " +
         "deregisters Google's logging, performance-monitoring, survey and Location History libraries " +
         "and the on-device federated-learning services. With Add microG-RE support, Firebase Installations " +
         "and Location History are left alone, so Timeline, account sync and push messages keep working.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(telemetryRegistrationsPatch)
+    dependsOn(telemetryRegistrationsPatch, firebaseAnalyticsOffPatch)
 
     execute {
         // Both check-ins are configured in exactly one place each, by loading a
@@ -74,5 +105,36 @@ val removeTelemetryPatch = bytecodePatch(
         // path of their own that builds the www.google.com/adview URL first.
         // Returning at entry, before its monitor-enter, drops only the beacon.
         AdViewImpressionFingerprint.method.addInstruction(0, "return-void")
+
+        // Firebase Analytics: Maps' events (app open, directions requests, route mode changes...) and the
+        // automatic session events go out through Play services' measurement service (measured: session_start
+        // uploaded). The manifest switch above stops collection, but a root mount install keeps the stock manifest;
+        // so the measurement client also takes the way out it has for an app without FirebaseAnalytics: marked
+        // unavailable right after it is made, every later call a no-op, nothing started or registered.
+        MeasurementClientFingerprint.method.apply {
+            val code = implementation!!.instructions.toList()
+            val unavailable = code.indices.firstOrNull { i ->
+                code[i].opcode == Opcode.IPUT_BOOLEAN && code.getOrNull(i + 1)?.opcode == Opcode.RETURN_VOID &&
+                    ((code[i] as ReferenceInstruction).reference as FieldReference).definingClass == definingClass
+            }?.let { (code[it] as ReferenceInstruction).reference as FieldReference }
+                ?: throw PatchException("measurement client no longer marks itself unavailable")
+            val made = code.indices.firstOrNull { i ->
+                code[i].opcode == Opcode.IPUT_OBJECT &&
+                    ((code[i] as ReferenceInstruction).reference as FieldReference).type == "Lcom/google/android/gms/measurement/api/AppMeasurementSdk;"
+            } ?: throw PatchException("measurement client no longer keeps its AppMeasurementSdk")
+            // The register that carried the SDK into its field is free right after.
+            val free = (code[made] as TwoRegisterInstruction).registerA
+            if (free > 15 || (code[made] as TwoRegisterInstruction).registerB != implementation!!.registerCount - parameterTypes.size - 1) {
+                throw PatchException("measurement client's constructor changed shape")
+            }
+            addInstructions(
+                made + 1,
+                """
+                    const/4 v$free, 0x1
+                    iput-boolean v$free, p0, ${unavailable.definingClass}->${unavailable.name}:Z
+                    return-void
+                """,
+            )
+        }
     }
 }

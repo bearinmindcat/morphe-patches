@@ -53,3 +53,17 @@ internal object AdViewImpressionFingerprint : Fingerprint(
     parameters = listOf("Ljava/lang/String;", "Lcom/google/android/apps/gmm/util/clearcut/metrics/Metrics\$IntegerMetric;"),
     filters = listOf(string("HTTPS"), string("www.google.com")),
 )
+
+/**
+ * The measurement client behind Firebase Analytics (and Firebase's analytics connector, which Firebase starts with
+ * the app): its constructor gives up for good -- every later call a no-op -- when FirebaseAnalytics is not in the
+ * app, which it tests by class name.
+ */
+internal object MeasurementClientFingerprint : Fingerprint(
+    parameters = listOf("Landroid/content/Context;", "Landroid/os/Bundle;"),
+    filters = listOf(
+        string("com.google.firebase.analytics.FirebaseAnalytics"),
+        methodCall(definingClass = "Ljava/lang/Class;", name = "forName"),
+    ),
+    custom = { method, _ -> method.name == "<init>" },
+)
