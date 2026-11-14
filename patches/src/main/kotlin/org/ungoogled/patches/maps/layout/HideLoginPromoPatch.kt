@@ -1,6 +1,6 @@
 package org.ungoogled.patches.maps.layout
 
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import org.ungoogled.patches.shared.addInstructionsAtLabel
 import app.morphe.patcher.patch.bytecodePatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
@@ -20,7 +20,9 @@ internal val hideLoginPromoPatch = bytecodePatch(
         // overwrites it, so nothing downstream reads the old value.
         val loginPromoBranch = CanShowLoginPromoFingerprint.instructionMatches.first().index
 
-        CanShowLoginPromoFingerprint.method.addInstructions(
+        // At the string's own label: since 26.43 the branch for this provider jumps straight to it, so code put
+        // in front of the label never ran.
+        CanShowLoginPromoFingerprint.method.addInstructionsAtLabel(
             loginPromoBranch,
             """
                 const/4 v0, 0x0

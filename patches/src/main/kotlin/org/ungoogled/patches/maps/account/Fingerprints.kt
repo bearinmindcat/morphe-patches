@@ -2,19 +2,32 @@ package org.ungoogled.patches.maps.account
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterWithin
+import app.morphe.patcher.StringComparisonType
 import app.morphe.patcher.checkCast
 import app.morphe.patcher.methodCall
+import app.morphe.patcher.string
 import com.android.tools.smali.dexlib2.Opcode
 
 /**
- * The account sheet's "Sign in" pill: a FrameLayout wrapping a MaterialButton.
- * R8 kept this class's Kotlin setter names, so the class is found through one
- * of them; the patch then works on the class's constructors.
+ * The account sheet's "Sign in" pill: a FrameLayout wrapping a MaterialButton and the list of texts it
+ * may show (its setter names did not survive R8 in 26.43+), found through its onMeasure. The patch
+ * works on the class's constructors. (Shape after JohninNL's Dutch App Patches.)
  */
 internal object SignInButtonWrapperFingerprint : Fingerprint(
-    name = "setButtonPossibleTexts",
+    name = "onMeasure",
     returnType = "V",
-    parameters = listOf("Ljava/util/List;"),
+    parameters = listOf("I", "I"),
+    custom = { _, classDef ->
+        classDef.superclass == "Landroid/widget/FrameLayout;" &&
+            classDef.fields.any { it.type == "Lcom/google/android/material/button/MaterialButton;" } &&
+            classDef.fields.any { it.type == "Lcom/google/common/collect/ImmutableList;" }
+    },
+)
+
+/** A custom action of the account sheet (the modern "Your profile" row is one); its toString names its parts. */
+internal object CustomActionToStringFingerprint : Fingerprint(
+    name = "toString",
+    filters = listOf(string("Action(id=", StringComparisonType.STARTS_WITH), string("onClick=", StringComparisonType.CONTAINS)),
 )
 
 /**

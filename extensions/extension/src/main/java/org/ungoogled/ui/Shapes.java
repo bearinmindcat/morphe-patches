@@ -143,18 +143,18 @@ public final class Shapes {
 
     /** The OneGoogle account-menu shower -- stashed every time the menu is shown -- and the
      *  "reopen the menu when this page closes" flag set by the account sheet's Settings row.
-     *  Every fragment destroy is reported to fragmentDestroyed(); when the Settings page itself
-     *  goes away, the menu comes back. */
+     *  The Settings pages' onDestroy reports to fragmentDestroyed(); when the page goes away, the
+     *  menu comes back. */
     public static volatile Object MENU;
     public static volatile boolean REOPEN_MENU;
-    private static final String[] SETTINGS_FRAGMENTS = {"avrz", "avrw"};   // Maps 26.36.04: new / legacy Settings page
+
+    /** The shower's show method; set at patch time by Keep account sheet open. */
+    static String menuShowMethod() { return ""; }
 
     public static void fragmentDestroyed(Object fragment) {
         if (!REOPEN_MENU || fragment == null) return;
-        String n = fragment.getClass().getName();
-        for (String f : SETTINGS_FRAGMENTS) {
-            if (n.equals(f)) { REOPEN_MENU = false; reopenAccountMenu(); return; }
-        }
+        REOPEN_MENU = false;
+        reopenAccountMenu();
     }
 
     public static void reopenAccountMenu() {
@@ -167,7 +167,7 @@ public final class Shapes {
         private final Object menu;
         ReopenMenu(Object menu) { this.menu = menu; }
         @Override public void run() {
-            try { menu.getClass().getMethod("b").invoke(menu); } catch (Throwable ignored) {}
+            try { menu.getClass().getMethod(menuShowMethod()).invoke(menu); } catch (Throwable ignored) {}
         }
     }
 
