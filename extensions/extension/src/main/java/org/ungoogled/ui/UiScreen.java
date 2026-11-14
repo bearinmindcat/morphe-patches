@@ -12,6 +12,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -35,6 +36,8 @@ abstract class UiScreen extends Activity {
     private static final int BG_D = 0xFF131314, TEXT_D = 0xFFE3E3E3, SUMMARY_D = 0xFFC4C7C5, ACCENT_D = 0xFF7FD0DC;
     boolean dark, black;
     LinearLayout body;
+    FrameLayout content;
+    ScrollView scroll;
     Typeface sans, sansMedium, text, textMedium;
 
     int bg() { return black ? 0xFF000000 : dark ? BG_D : BG; }
@@ -107,10 +110,12 @@ abstract class UiScreen extends Activity {
         body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(0, dp(4), 0, dp(24));
-        ScrollView sv = new ScrollView(this);
-        sv.setVerticalScrollBarEnabled(false);
-        sv.addView(body);
-        root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
+        scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(body);
+        content = new FrameLayout(this);
+        content.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(root);
     }
 

@@ -11,17 +11,23 @@ android {
         // crashed every screen of ours there), so lint has to hold us to API 29.
         minSdk = 29
     }
+
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 // The extension is plain Java. Without this the Kotlin Gradle plugin's default
 // stdlib dependency gets dexed into the extension -- ~1,100 kotlin.* classes
 // merged into Maps for nothing.
 configurations.configureEach {
-    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-    exclude(group = "org.jetbrains", module = "annotations")
+    if (!name.contains("Test", ignoreCase = true)) {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+        exclude(group = "org.jetbrains", module = "annotations")
+    }
 }
 
 dependencies {
     // Cronet's proxy API, which Maps bundles; see stub/.
     compileOnly(project(":extensions:extension:stub"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

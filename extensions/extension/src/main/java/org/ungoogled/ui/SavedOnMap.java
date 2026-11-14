@@ -34,6 +34,12 @@ public final class SavedOnMap {
     /** Our places in the generator's list now: taken out before the next ones go in. */
     private static final Set<Object> ours = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Handler main = new Handler(Looper.getMainLooper());
+    private static final Runnable refreshPending = () -> {
+        Object labels = generator.get();
+        if (labels == null) return;
+        try { redraw(labels); }
+        catch (RuntimeException e) { android.util.Log.w("UA", "saved places on the map", e); }
+    };
 
     /** From the start of the generator's place setter: [places] (the account's) with the phone's added. */
     public static Object withLocal(Object labels, Object places) {
@@ -77,15 +83,8 @@ public final class SavedOnMap {
 
     /** Draws the phone's places again: after any change to Local saved. */
     static void refresh() {
-        Object labels = generator.get();
-        if (labels == null) return;
-        main.post(() -> {
-            try {
-                redraw(labels);
-            } catch (Throwable t) {
-                android.util.Log.w("UA", "saved places on the map", t);
-            }
-        });
+        main.removeCallbacks(refreshPending);
+        main.postDelayed(refreshPending, 250);
     }
 
     /** Rewritten by the patch: the generator draws its place list again (through withLocal). */
@@ -122,7 +121,14 @@ public final class SavedOnMap {
             for (Map.Entry<String, SavedStore.Place> e : SavedStore.labels.entrySet()) {
                 add(out, drawn, e.getValue(), e.getKey(), LABEL, null, null, null, false);
             }
+            Map<String, SavedStore.Place> markers = new java.util.LinkedHashMap<>();
             for (SavedStore.Place p : SavedStore.places.values()) {
+                if (!p.located()) continue;
+                String key = markerKey(p);
+                SavedStore.Place previous = markers.get(key);
+                if (previous == null || priority(shownList(p)) < priority(shownList(previous))) markers.put(key, p);
+            }
+            for (SavedStore.Place p : markers.values()) {
                 // One icon a place, picked the way Maps' Save button picks: Favorites, Want to go,
                 // Travel plans, Starred, then any other list -- of the lists shown on the map.
                 String list = shownList(p);
@@ -149,15 +155,35 @@ public final class SavedOnMap {
         return null;
     }
 
+    private static int priority(String list) {
+        if (list == null) return 6;
+        if (SavedStore.FAVOURITES.equals(list)) return 0;
+        if (SavedStore.WANT_TO_GO.equals(list)) return 1;
+        if (SavedStore.TRAVEL.equals(list)) return 2;
+        if (SavedStore.STARRED.equals(list)) return 3;
+        return list.isEmpty() ? 5 : 4;
+    }
+
+    private static String markerKey(SavedStore.Place p) {
+        String cid = SavedPlaces.cid(p.ftid);
+        if (cid == null) cid = p.cid;
+        return cid != null && !"0".equals(cid) ? "cid:" + cid : String.format(java.util.Locale.US, "%.6f,%.6f", p.lat, p.lng);
+    }
+
     private static void add(List<Object> out, Set<String> drawn, SavedStore.Place p, String title, int alias,
             String listId, String listType, String listName, boolean starred) {
-        if (p == null || !p.located() || !drawn.add(p.key())) return;
+        if (p == null || !p.located() || !drawn.add(markerKey(p))) return;
         long high = 0, low = 0;
         // The feature id "0x89b7b7bce3d77213:0xbd541016f552a256": two hex longs.
         int colon = p.ftid == null ? -1 : p.ftid.indexOf(':');
         if (colon > 2 && p.ftid.startsWith("0x") && p.ftid.startsWith("0x", colon + 1)) {
-            high = Long.parseUnsignedLong(p.ftid.substring(2, colon), 16);
-            low = Long.parseUnsignedLong(p.ftid.substring(colon + 3), 16);
+            try {
+                high = Long.parseUnsignedLong(p.ftid.substring(2, colon), 16);
+                low = Long.parseUnsignedLong(p.ftid.substring(colon + 3), 16);
+            } catch (NumberFormatException e) {
+                high = low = 0;
+                android.util.Log.w("UA", "Imported marker has an invalid feature ID; drawing its verified position only");
+            }
         }
         String name = title != null && !title.isEmpty() ? title : p.name != null ? p.name : "";
         // A list of the user's own is drawn with its emoji when it has one (issue #128).
