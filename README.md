@@ -14,9 +14,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.6](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.6)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;189 patches total
+> **[v2.9.7](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.7)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;198 patches total
 <details>
-<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;32 patches</summary>
+<summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
 
 <p>
@@ -48,7 +48,9 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Follow playing media](#follow-playing-media) | Navigation's media controls show what any app is playing (needs notification access). |  |
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG-RE support, microG's C sits in the pin's circle. |  |
+| [Light map](#light-map) | Adds a Customization switch that keeps the map light while Maps' menus are dark. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG-RE's or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
+| [Map region](#map-region) | Adds a Customization option to pick the country the map's names and borders are shown for. |  |
 | [Media panel can be closed](#media-panel-can-be-closed) | Navigation's media button stays above the media controls, so they can be closed again. |  |
 | [Offline saved places](#offline-saved-places) | Save places without a Google account, kept only on the phone: Save opens Maps' own "Place saved" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a "Local saved" row on the account sheet rebuilds Maps' You tab -- your recent places, your lists and labels (Home, Work, your own) -- with export and import (backup file, KML, Google Takeout's saved lists and Saved Places.json, several files or the whole Takeout .zip at once). It also has a Timeline: where the phone has been, grouped into days and visits, kept only on the phone, with GPX export. Recording is off until switched on there; it shows a notification while it runs. With Add microG-RE support, Maps' own Save keeps syncing to your account and Local saved instead copies the account's saved lists to the phone (Pull from Google account). |  |
 | [Power saving mode](#power-saving-mode) | Brings the Pixel-only power saving mode to every phone: while driving with navigation, press the power button and Maps shows only key information such as the next turn on a black screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a row on the account sheet under Customization, which also has: a navigation button that opens the power saving screen without locking the phone, switching to it by itself when idle, a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps. |  |
@@ -93,7 +95,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app that signs in to your Google account through microG-RE. Not for root installs. |  |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. |  |
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
@@ -104,6 +106,21 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Skip Play Protect screen](#skip-play-protect-screen) | Keeps Gmail working where Google shows "This device isn't Play Protect certified". |  |
 | [Strip link trackers](#strip-link-trackers) | Opens links without Google's redirect and without utm and click-tracking parameters. |  |
 | [Turn off Smart Compose](#turn-off-smart-compose) | Turns off Smart Compose and Smart Reply, so what you type isn't sent to Google for suggestions. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/photos.png" width="20" height="20" align="top"> Google Photos&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/photos.png" width="20" height="20" align="top"> Google Photos&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
+<br>
+
+**Supported version(s):** 8.1.0.1016919706
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs. |  |
+| [Hide AI](#hide-ai) | Hides Ask Photos, Gemini, Help me edit, Magic Editor, Remix and the other generative tools. |  |
+| [Hide promos](#hide-promos) | Hides Google One storage offers, backup nags, print offers and "try this" promos. |  |
+| [Remove telemetry](#remove-telemetry) | Stops Firebase Analytics, logging, surveys and promo fetches. |  |
 
 </details>
 
@@ -188,7 +205,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** RELEASE-7.50.06.2372-06261924 — needs Android 14 or newer
+**Supported version(s):** RELEASE-7.50.06.2372-06261924 — needs Android 14 or newer, RELEASE-5.39.40.11727-12151939 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -212,7 +229,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/nothing-launcher.png" width="20" height="20" align="top"> Nothing Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 4.0.20 — needs Android 16 or newer, 3.3.14 — needs Android 15 or newer
+**Supported version(s):** 4.0.20 — needs Android 16 or newer, 3.3.14 — needs Android 15 or newer, 2.2.8 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -272,7 +289,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;30 apps&nbsp;&nbsp;•&nbsp;&nbsp;55 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;31 apps&nbsp;&nbsp;•&nbsp;&nbsp;58 patches</summary>
 <br>
 <blockquote>
 
@@ -610,6 +627,20 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Sound Assistant on non-One UI ROMs, where only Individual app volumes work. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<br>
+
+**Supported version(s):** 1.4.22.81 — needs Android 13 or newer
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
+| [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Video Library installable on Android 15+ and usable on non-One UI ROMs. |  |
+| [Hide end of support notice](#hide-end-of-support-notice) | Removes the notice that Samsung discontinued the app. |  |
 
 </details>
 
