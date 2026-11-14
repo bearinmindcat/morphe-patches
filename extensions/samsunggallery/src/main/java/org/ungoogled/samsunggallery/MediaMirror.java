@@ -50,6 +50,15 @@ public final class MediaMirror extends ContentProvider {
     /** Added to local_metadata's generation each time the copy changed without MediaStore (see orientationsRead). */
     private long stampOffset;
     private String syncedVersion;
+    /** Whether this run already derived the copy's own values (a kept copy is only checked against MediaStore). */
+    private boolean derivedThisRun;
+    /**
+     * The copy's shape: a copy kept from a run with another value is made again. Raise it whenever what the copy holds
+     * changes (columns left out, values derived).
+     */
+    private static final int LAYOUT = 2;
+    /** MediaStore's columns the copy leaves out: no statement of Gallery's reads them, and they are large. */
+    private static final Set<String> NOT_COPIED = new HashSet<>(java.util.Arrays.asList("xmp"));
 
     private static volatile String authority;
     private static volatile MediaMirror instance;
@@ -130,22 +139,54 @@ public final class MediaMirror extends ContentProvider {
         return Log.isLoggable(TAG, Log.DEBUG);
     }
 
+    /**
+     * The copy, kept between runs: Gallery opened its lists only after a full copy of MediaStore on every start (seconds
+     * with a large library). A copy made by another layout, or whose state is unknown, is made again.
+     */
     private synchronized SQLiteDatabase db() {
         if (db == null) {
             Context c = getContext();
-            c.deleteDatabase("media_mirror.db");
             db = SQLiteDatabase.openOrCreateDatabase(c.getDatabasePath("media_mirror.db"), null);
-            db.execSQL("CREATE TABLE files (_id INTEGER PRIMARY KEY)");
+            if (!loadState(db)) {
+                db.close();
+                c.deleteDatabase("media_mirror.db");
+                db = SQLiteDatabase.openOrCreateDatabase(c.getDatabasePath("media_mirror.db"), null);
+                db.execSQL("CREATE TABLE files (_id INTEGER PRIMARY KEY)");
+                db.execSQL("CREATE TABLE mirror_state (layout INTEGER, version TEXT, generation INTEGER, stamp INTEGER)");
+            }
             attachSaved(db);
             addKnownSchema(db);
         }
         return db;
     }
 
+    /** Reads what the kept copy was made from; false when it is not a copy this layout can carry on from. */
+    private boolean loadState(SQLiteDatabase d) {
+        try (Cursor c = d.rawQuery("SELECT layout, version, generation, stamp FROM mirror_state", null)) {
+            if (!c.moveToFirst() || c.getInt(0) != LAYOUT || c.isNull(1)) return false;
+            syncedVersion = c.getString(1);
+            syncedGeneration = c.getLong(2);
+            stampOffset = c.isNull(3) ? 0 : c.getLong(3) - syncedGeneration;
+            if (debug()) Log.d(TAG, "mirror: kept copy of generation " + syncedGeneration);
+            return true;
+        } catch (SQLiteException none) {
+            syncedVersion = null;
+            syncedGeneration = -1;
+            stampOffset = 0;
+            return false;
+        }
+    }
+
+    private void saveState(SQLiteDatabase d, String version, long generation) {
+        d.execSQL("DELETE FROM mirror_state");
+        d.execSQL("INSERT INTO mirror_state (layout, version, generation, stamp) VALUES (?, ?, ?, ?)",
+                new Object[]{LAYOUT, version, generation, generation + stampOffset});
+    }
+
     /**
-     * The tables and columns Gallery asked for in earlier runs, added at once: the copy is rebuilt on every start, and
-     * adding each one when a statement fails (heal) took seconds on a cold start -- long enough for Gallery to give up
-     * opening a photo within its album (it waits 2 s).
+     * The tables and columns Gallery asked for in earlier runs, added at once: a new copy (first run, a new layout,
+     * MediaStore's database made again) starts without them, and adding each one when a statement fails (heal) took
+     * seconds on a cold start -- long enough for Gallery to give up opening a photo within its album (it waits 2 s).
      */
     private static void addKnownSchema(SQLiteDatabase d) {
         long started = System.currentTimeMillis();
@@ -183,8 +224,8 @@ public final class MediaMirror extends ContentProvider {
     }
 
     /**
-     * What the user adds to Gallery lives in a database of its own, attached to the copy (which is rebuilt from
-     * MediaStore on every start) so that Gallery's statements find it under One UI's names: the user's tags (One UI's
+     * What the user adds to Gallery lives in a database of its own, attached to the copy (which is made again from
+     * MediaStore when it no longer fits) so that Gallery's statements find it under One UI's names: the user's tags (One UI's
      * usertag table), what Search by content found (One UI's scene table) and the tag view over both that Gallery
      * searches.
      */
@@ -247,6 +288,7 @@ public final class MediaMirror extends ContentProvider {
                 ExifOrientation.fill(this, d, SAVED);
                 stampOffset += 1L << 40;
                 d.execSQL("UPDATE local_metadata SET generation_modified = " + (syncedGeneration + stampOffset));
+                d.execSQL("UPDATE mirror_state SET stamp = " + (syncedGeneration + stampOffset));
                 d.setTransactionSuccessful();
             } catch (SQLiteException e) {
                 Log.w(TAG, "mirror: " + e.getMessage());
@@ -262,19 +304,43 @@ public final class MediaMirror extends ContentProvider {
         return db();
     }
 
-    /** Copies MediaStore's photos and videos when its contents changed since the last copy. */
+    /**
+     * Copies MediaStore's photos and videos when its contents changed since the last copy: the rows MediaStore changed
+     * since then (its generation), and drops the rows it no longer has. A first copy, or one after MediaStore's database
+     * was made again, takes every row.
+     */
     private synchronized void sync() {
         Context c = getContext();
         String version = MediaStore.getVersion(c);
         long generation = MediaStore.getGeneration(c, MediaStore.VOLUME_EXTERNAL_PRIMARY);
-        if (generation == syncedGeneration && version.equals(syncedVersion)) return;
         SQLiteDatabase d = db();
+        if (generation == syncedGeneration && version.equals(syncedVersion)) {
+            // A copy kept from the last run: what was still being read from the photos then is read now.
+            if (!derivedThisRun) {
+                derivedThisRun = true;
+                d.beginTransaction();
+                try {
+                    ExifOrientation.fill(this, d, SAVED);
+                    d.setTransactionSuccessful();
+                } finally {
+                    d.endTransaction();
+                }
+            }
+            return;
+        }
+        boolean full = !version.equals(syncedVersion) || generation < syncedGeneration || syncedGeneration < 0;
         Uri files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL);
         String where = MediaStore.Files.FileColumns.MEDIA_TYPE + " IN (1,3)";
+        // The generation is the phone storage's own counter: rows on a memory card (counted apart) are copied every time.
+        String changed = full ? where : where + " AND (" + MediaStore.MediaColumns.GENERATION_MODIFIED + " > " + syncedGeneration
+                + " OR " + MediaStore.MediaColumns.VOLUME_NAME + " != '" + MediaStore.VOLUME_EXTERNAL_PRIMARY + "')";
         long started = System.currentTimeMillis();
+        long queried;
         int rows = 0;
-        try (Cursor src = c.getContentResolver().query(files, null, where, null, null)) {
+        int removed = 0;
+        try (Cursor src = queryFiles(c, files, projection(c, files), changed)) {
             if (src == null) return;
+            queried = System.currentTimeMillis();
             Set<String> have = columns(d, "files");
             String[] names = src.getColumnNames();
             // One transaction for the new columns too: each ALTER on its own is a disk sync.
@@ -283,7 +349,7 @@ public final class MediaMirror extends ContentProvider {
                 for (String n : names) {
                     if (!have.contains(n)) d.execSQL("ALTER TABLE files ADD COLUMN " + n + " NUMERIC");
                 }
-                d.execSQL("DELETE FROM files");
+                if (full) d.execSQL("DELETE FROM files");
                 ContentValues v = new ContentValues();
                 while (src.moveToNext()) {
                     v.clear();
@@ -296,9 +362,12 @@ public final class MediaMirror extends ContentProvider {
                             default: v.putNull(names[i]);
                         }
                     }
-                    d.insert("files", null, v);
+                    if (full) d.insert("files", null, v);
+                    else d.replace("files", null, v);
                     rows++;
                 }
+                if (!full) removed = dropRemoved(c, d, files, where);
+                long copied = System.currentTimeMillis();
                 fillSamsungColumns(d);
                 if (!columns(d, "files").contains("orientation_tag")) {
                     d.execSQL("ALTER TABLE files ADD COLUMN orientation_tag NUMERIC");
@@ -314,14 +383,60 @@ public final class MediaMirror extends ContentProvider {
                 d.execSQL("DELETE FROM local_metadata");
                 d.execSQL("INSERT INTO local_metadata (generation_modified) VALUES (" + (generation + stampOffset) + ")");
                 refindTags(d);
+                saveState(d, version, generation);
                 d.setTransactionSuccessful();
+                derivedThisRun = true;
+                if (debug()) {
+                    Log.d(TAG, "mirror: " + (full ? "copied " : "changed ") + rows + " files" + (full ? "" : ", removed " + removed)
+                            + " in " + (System.currentTimeMillis() - started) + " ms (query " + (queried - started)
+                            + ", rows " + (copied - queried) + ", derived " + (System.currentTimeMillis() - copied) + ")");
+                }
             } finally {
                 d.endTransaction();
             }
         }
         syncedGeneration = generation;
         syncedVersion = version;
-        if (debug()) Log.d(TAG, "mirror: " + rows + " files in " + (System.currentTimeMillis() - started) + " ms");
+    }
+
+    private static Cursor queryFiles(Context c, Uri files, String[] projection, String selection) {
+        if (projection != null) {
+            try {
+                return c.getContentResolver().query(files, projection, selection, null, null);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "mirror: " + e + ", copying every column");
+            }
+        }
+        return c.getContentResolver().query(files, null, selection, null, null);
+    }
+
+    /** MediaStore's columns less the ones the copy leaves out (null: all of them). */
+    private static String[] projection(Context c, Uri files) {
+        try (Cursor none = c.getContentResolver().query(files, null, MediaStore.MediaColumns._ID + " = -1", null, null)) {
+            if (none == null) return null;
+            java.util.List<String> keep = new java.util.ArrayList<>();
+            for (String n : none.getColumnNames()) {
+                if (!NOT_COPIED.contains(n)) keep.add(n);
+            }
+            return keep.toArray(new String[0]);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Drops the rows MediaStore no longer lists (deleted, trashed, no longer a photo or video). */
+    private static int dropRemoved(Context c, SQLiteDatabase d, Uri files, String where) {
+        d.execSQL("CREATE TEMP TABLE IF NOT EXISTS listed (_id INTEGER PRIMARY KEY)");
+        d.execSQL("DELETE FROM temp.listed");
+        try (Cursor ids = c.getContentResolver().query(files, new String[]{MediaStore.MediaColumns._ID}, where, null, null)) {
+            if (ids == null) return 0;
+            android.database.sqlite.SQLiteStatement add = d.compileStatement("INSERT OR IGNORE INTO temp.listed (_id) VALUES (?)");
+            while (ids.moveToNext()) {
+                add.bindLong(1, ids.getLong(0));
+                add.executeInsert();
+            }
+        }
+        return d.delete("files", "_id NOT IN (SELECT _id FROM temp.listed)", null);
     }
 
     /**

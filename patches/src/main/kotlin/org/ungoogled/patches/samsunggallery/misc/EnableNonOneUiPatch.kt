@@ -43,6 +43,10 @@ private const val LAUNCH_INTENT = "Lcom/samsung/android/gallery/module/abstracti
 private const val LOCAL_ALBUM_LAUNCHER = "Lcom/samsung/android/gallery/app/activity/external/launcher/LocalAlbumViewLauncher;"
 private const val LATCH = "Ljava/util/concurrent/CountDownLatch;"
 private const val OPEN_IN_ALBUM = "Lorg/ungoogled/samsunggallery/OpenInAlbum;"
+/** Gallery's activity (its back-callback switch, the Back key it types for its own back buttons), unobfuscated. */
+private const val GALLERY_ACTIVITY = "Lcom/samsung/android/gallery/app/activity/GalleryActivity;"
+private const val PREDICTIVE_BACK = "Lcom/samsung/android/gallery/widget/predictiveback/PredictiveBackDelegate;"
+private const val BACK_NAVIGATION = "Lorg/ungoogled/samsunggallery/BackNavigation;"
 
 /**
  * Off One UI the libraries Samsung's system provides are missing; Gallery asks for 45, one of them required
@@ -235,6 +239,49 @@ val enableNonOneUiPatch = bytecodePatch(
                         "$OPEN_IN_ALBUM->awaitAlbumItem($LATCH" + "JLjava/util/concurrent/TimeUnit;)Z",
                 )
             } ?: throw PatchException("no loadLocalAlbumItem(String) in $LOCAL_ALBUM_LAUNCHER")
+
+        // The viewer's back arrow and its swipe down to close did nothing, and the system's back in selection mode closed
+        // Gallery: from Android 15 Gallery's window takes back through callbacks (its manifest, as on One UI 7), but off
+        // One UI Gallery kept its older ways -- its own back typed a Back key, which such a window drops, and its activity
+        // registered no back callback, so the screen in front never handled back first. From Android 15 the activity
+        // registers its callback as on One UI 7; a typed Back key becomes a back through the dispatcher (before Android
+        // 15 the activity's onBackPressed), run after the touch that asked for it.
+        val galleryActivity = mutableClassDefByOrNull(GALLERY_ACTIVITY) ?: throw PatchException("Samsung Gallery has no $GALLERY_ACTIVITY")
+        galleryActivity.methods.firstOrNull { it.name == "<init>" && it.parameterTypes.isEmpty() }?.let { init ->
+            val instructions = init.implementation!!.instructions.toList()
+            val read = instructions.indexOfFirst {
+                it.opcode == Opcode.SGET_BOOLEAN &&
+                    (it as ReferenceInstruction).reference.toString() == "$PREDICTIVE_BACK->ENABLE_ON_BACK_INVOKED_CALLBACK:Z"
+            }
+            val stored = read >= 0 && instructions.drop(read + 1).take(4).any {
+                it.opcode == Opcode.IPUT_BOOLEAN &&
+                    (it as ReferenceInstruction).reference.toString() == "$GALLERY_ACTIVITY->ENABLE_ON_BACK_INVOKED_CALLBACK:Z"
+            }
+            if (!stored) throw PatchException("$GALLERY_ACTIVITY no longer copies the back-callback switch")
+            val register = (instructions[read] as OneRegisterInstruction).registerA
+            init.addInstructions(
+                read + 1,
+                """
+                    invoke-static { v$register }, $BACK_NAVIGATION->usesBackCallbacks(Z)Z
+                    move-result v$register
+                """,
+            )
+        } ?: throw PatchException("no $GALLERY_ACTIVITY<init>()")
+        mapOf("simulateUserKeyEvent" to "simulateKey", "simulateUserKeyEventWithDelay" to "simulateKeyWithDelay")
+            .forEach { (name, target) ->
+                galleryActivity.methods.firstOrNull { it.name == name && it.parameterTypes == listOf("I") }?.let { simulate ->
+                    simulate.addInstructionsWithLabels(
+                        0,
+                        """
+                            invoke-static { p0, p1 }, $BACK_NAVIGATION->$target(Landroid/app/Activity;I)Z
+                            move-result v0
+                            if-eqz v0, :type_key
+                            return-void
+                        """,
+                        ExternalLabel("type_key", simulate.implementation!!.instructions.first()),
+                    )
+                } ?: throw PatchException("no $name(int) in $GALLERY_ACTIVITY")
+            }
 
         // Off One UI Gallery reads One UI version 0 and keeps to its generic-device paths, which work; but it turns
         // "MX albums" (One UI 5's album model) on only from One UI 5, and this build has the screens only for that
