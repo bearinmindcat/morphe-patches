@@ -52,6 +52,16 @@ private const val INVALID_CALL = "Invalid call, onCreate needs to be called befo
 private fun Instruction.methodRef() = (this as? ReferenceInstruction)?.reference as? MethodReference
 private fun Instruction.fieldRef() = (this as? ReferenceInstruction)?.reference as? FieldReference
 
+/**
+ * A small conditional's opcodes without its gotos and returns, which R8 lays out either way
+ * (`cond ? a : b` as two returns in 26.36, as a goto to one return in 26.44); null unless it ends in a return.
+ */
+private fun Iterable<Instruction>.branchShape(): List<Opcode>? {
+    val opcodes = map { it.opcode }
+    if (opcodes.lastOrNull() != Opcode.RETURN_OBJECT) return null
+    return opcodes.filter { it != Opcode.RETURN_OBJECT && it != Opcode.GOTO && it != Opcode.GOTO_16 && it != Opcode.GOTO_32 }
+}
+
 /** Index of `move-result vX` right after a `Boolean.booleanValue()` call. */
 private fun MutableMethod.isBooleanValueResult(index: Int): Boolean {
     val call = implementation!!.instructions.getOrNull(index - 1)?.methodRef() ?: return false
@@ -76,9 +86,7 @@ val lightMapPatch = bytecodePatch(
         val mapTypes = MapTypeEnumFingerprint.classDef
         val dayNight = mapTypes.methods.filter { m ->
             m.parameterTypes.map { it.toString() } == listOf("Z") && m.returnType.startsWith("L") &&
-                m.implementation?.instructions?.map { it.opcode } == listOf(
-                    Opcode.IF_EQZ, Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT, Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT,
-                )
+                m.implementation?.instructions?.branchShape() == listOf(Opcode.IF_EQZ, Opcode.IGET_OBJECT, Opcode.IGET_OBJECT)
         }.singleOrNull() ?: throw PatchException("the map types' day/night pick not found in ${mapTypes.type}")
         dayNight.addInstructions(
             0,
@@ -141,10 +149,8 @@ val lightMapPatch = bytecodePatch(
                 for (m in c.methods) {
                     if (m.parameterTypes.map { it.toString() } != listOf("Z") || !m.returnType.startsWith("L")) continue
                     val code = m.implementation?.instructions?.toList() ?: continue
-                    if (code.map { it.opcode } != listOf(
-                            Opcode.IF_EQZ, Opcode.SGET_OBJECT, Opcode.IF_NE, Opcode.SGET_OBJECT, Opcode.RETURN_OBJECT,
-                            Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT,
-                        ) || code[1].fieldRef()?.definingClass != c.type || code[3].fieldRef()?.type != m.returnType
+                    if (code.branchShape() != listOf(Opcode.IF_EQZ, Opcode.SGET_OBJECT, Opcode.IF_NE, Opcode.SGET_OBJECT, Opcode.IGET_OBJECT) ||
+                        code[1].fieldRef()?.definingClass != c.type || code[3].fieldRef()?.type != m.returnType
                     ) continue
                     picks += com.android.tools.smali.dexlib2.immutable.reference.ImmutableMethodReference(c.type, m.name, m.parameterTypes, m.returnType)
                 }
