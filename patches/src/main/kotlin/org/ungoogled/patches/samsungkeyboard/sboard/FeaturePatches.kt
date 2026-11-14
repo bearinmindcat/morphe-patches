@@ -28,6 +28,7 @@ private const val SMART_TIP_BINDING = "Lcom/samsung/android/honeyboard/base/data
 val hideTipsPatch = bytecodePatch(
     name = "Hide tips",
     description = "Stops the keyboard's pop-up tips.",
+    default = false,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
     category(SBOARD)
@@ -86,6 +87,7 @@ private const val STORE_NAME_LOG = "getStoreName failed"
 val hideStoreLinksPatch = bytecodePatch(
     name = "Hide store links",
     description = "Removes the Galaxy Store sticker button and Contact us.",
+    default = false,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
     category(SBOARD)
@@ -126,48 +128,14 @@ val hideStoreLinksPatch = bytecodePatch(
     }
 }
 
-/** The keyboard keeps its recent emoji under this preference; the list is capped when an emoji is added. */
-private const val RECENT_EMOJI = "LatestEmoticonList"
-private const val RECENT_CAP = 40
-
-@Suppress("unused")
-val moreRecentEmojiPatch = bytecodePatch(
-    name = "More recent emoji",
-    description = "Keeps 80 recent emoji instead of 40.",
-) {
-    compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
-    category(SBOARD)
-
-    execute {
-        var caps = 0
-        // The class that saves the list caps it as an emoji is added: size() > 40 -> remove(40).
-        val owners = methodsWithString(RECENT_EMOJI).map { it.definingClass }.toSet()
-        val writers = methodsWhere { m ->
-            m.definingClass in owners && m.calls().any { it.endsWith("->size()I") } &&
-                m.calls().any { it.endsWith("->remove(I)Ljava/lang/Object;") }
-        }
-        for (writer in writers) mutable(writer).apply {
-            val instructions = implementation!!.instructions
-            for (index in instructions.indices) {
-                val insn = instructions[index]
-                if (insn.opcode != Opcode.CONST_16 && insn.opcode != Opcode.CONST_4 && insn.opcode != Opcode.CONST) continue
-                if ((insn as NarrowLiteralInstruction).narrowLiteral != RECENT_CAP) continue
-                replaceInstruction(index, "const/16 v${(insn as OneRegisterInstruction).registerA}, ${RECENT_CAP * 2}")
-                caps++
-            }
-        }
-        if (caps == 0) throw PatchException("the recent emoji cap ($RECENT_CAP, \"$RECENT_EMOJI\") was not found")
-        sboardLog.info("More recent emoji: $caps caps in ${writers.size} writers")
-    }
-}
-
 /** Read by the key-press vibration: 1-255 plays a one-shot of that many ms; anything else is the phone's own click. */
 private const val VIBRATION_LENGTH = "custom_vibrate_duration_setting"
 
 @Suppress("unused")
 val keyVibrationLengthPatch = resourcePatch(
     name = "Key vibration length",
-    description = "Adds a key vibration length slider to Key-tap feedback.",
+    description = "Adds a key vibration length slider to Touch feedback (One UI).",
+    default = false,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
     category(SBOARD)
@@ -222,7 +190,7 @@ val fasterBackspacePatch = bytecodePatch(
             val instructions = implementation!!.instructions
             for (index in instructions.indices.filter { instructions[it].opcode == Opcode.RETURN }.reversed()) {
                 val register = (instructions[index] as OneRegisterInstruction).registerA
-                val before = instructions.size
+                val before = countReal()
                 val smali = "invoke-static/range {v$register .. v$register}, $SBOARD_EXTENSION_CLASS->backspaceInterval(I)I\nmove-result v$register"
                 addInstructionsAtLabel(index, smali)
                 checkInserted(before, smali)
@@ -279,6 +247,7 @@ private const val SIZE_TABLE_NAME = "NORMAL_HEIGHT"
 val biggerSizeRangePatch = bytecodePatch(
     name = "Bigger size range",
     description = "Lets the keyboard be resized smaller and taller.",
+    default = false,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
     category(SBOARD)
@@ -299,7 +268,7 @@ val biggerSizeRangePatch = bytecodePatch(
             val returns = instructions.indices.filter { instructions[it].opcode == Opcode.RETURN_OBJECT }
             for (index in returns.reversed()) {
                 val register = (instructions[index] as OneRegisterInstruction).registerA
-                val before = instructions.size
+                val before = countReal()
                 val smali = "invoke-static {$type, v$register}, $SBOARD_EXTENSION_CLASS->sizeRange(I[F)[F\nmove-result-object v$register"
                 addInstructionsAtLabel(index, smali)
                 checkInserted(before, smali)
@@ -353,7 +322,7 @@ val moreToolbarButtonsPatch = bytecodePatch(
             val instructions = implementation!!.instructions
             for (index in instructions.indices.filter { instructions[it].opcode == Opcode.RETURN }.reversed()) {
                 val register = (instructions[index] as OneRegisterInstruction).registerA
-                val before = instructions.size
+                val before = countReal()
                 val smali = "invoke-static/range {v$register .. v$register}, $SBOARD_EXTENSION_CLASS->toolbarLimit(I)I\nmove-result v$register"
                 addInstructionsAtLabel(index, smali)
                 checkInserted(before, smali)

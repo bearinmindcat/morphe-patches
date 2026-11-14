@@ -77,7 +77,7 @@ internal fun BytecodePatchContext.answerSwitch(key: String, getter: String, answ
             val result = instructions.getOrNull(read + 1)
                 ?.takeIf { it.opcode == Opcode.MOVE_RESULT || it.opcode == Opcode.MOVE_RESULT_OBJECT } ?: continue
             val smali = answer.replace("{r}", "v${(result as OneRegisterInstruction).registerA}")
-            val before = instructions.size
+            val before = countReal()
             addInstructionsAtLabel(read + 2, smali)
             checkInserted(before, smali)
             reads++
@@ -94,17 +94,20 @@ private val VISIBILITY_MARKERS = listOf("landscape_view_type", "split_keyboard_l
  * Hides settings rows by key: the settings' one visibility check (Context, key, Bundle) -> shown answers false for
  * [keys] before it looks at anything else.
  */
-internal fun BytecodePatchContext.hideSettingsRows(vararg keys: String) {
-    // (Context, String, Bundle) in one build family, (String, Context, Bundle) in the other.
+/** The settings' row visibility check and the register of its key parameter. */
+private fun BytecodePatchContext.visibilityCheck(): Pair<MutableMethod, String> {
     val shape = setOf("Landroid/content/Context;", "Ljava/lang/String;", "Landroid/os/Bundle;")
     val check = methodsWhere { m ->
         m.returnType == "Z" && m.parameterTypes.size == 3 && m.parameterTypes.map(CharSequence::toString).toSet() == shape &&
             m.strings().containsAll(VISIBILITY_MARKERS)
     }.singleOrNull() ?: throw PatchException("the settings' row visibility check was not found")
     val index = check.parameterTypes.map(CharSequence::toString).indexOf("Ljava/lang/String;")
-    val key = "p${index + if (check.isStatic) 0 else 1}"
-    val method = mutable(check)
-    val before = method.implementation!!.instructions.size
+    return mutable(check) to "p${index + if (check.isStatic) 0 else 1}"
+}
+
+internal fun BytecodePatchContext.hideSettingsRows(vararg keys: String) {
+    val (method, key) = visibilityCheck()
+    val before = method.countReal()
     val smali =
         // The key is a high register in these big methods: copied to v1 first (invoke takes v0-v15 only).
         "move-object/from16 v1, $key\n" +
@@ -114,30 +117,48 @@ internal fun BytecodePatchContext.hideSettingsRows(vararg keys: String) {
     method.checkInserted(before, smali)
 }
 
-/** Morphe's smali step leaves out an instruction it can't encode (e.g. a 4-bit register above v15): fail instead. */
+/**
+ * Morphe's smali step leaves out an instruction it can't encode (e.g. a 4-bit register above v15): fail instead. Nops
+ * don't count -- the method's payload alignment adds or drops one.
+ */
 internal fun MutableMethod.checkInserted(before: Int, smali: String) {
-    val expected = smali.lines().map(String::trim).count { it.isNotEmpty() && !it.startsWith(":") && !it.startsWith("#") }
-    val added = implementation!!.instructions.size - before
+    val expected = smali.lines().map(String::trim)
+        .count { it.isNotEmpty() && !it.startsWith(":") && !it.startsWith("#") && it != "nop" }
+    val added = implementation!!.instructions.count { it.opcode != Opcode.NOP } - before
     if (added != expected) throw PatchException("$definingClass->$name: $added of $expected instructions inserted")
 }
+
+/** Instructions other than nops, the count checkInserted compares against. */
+internal fun MutableMethod.countReal() = implementation!!.instructions.count { it.opcode != Opcode.NOP }
 
 /** Inserts [smali] at the very start of the method. */
 internal fun MutableMethod.prepend(smali: String) = addInstructions(0, smali)
 
-/** Every toolbar button's visibility (2 = hidden) is asked through its BeeItem, whose name R8 keeps. */
-private const val BEE_ITEM = "Lcom/samsung/android/honeyboard/beehive/data/BeeItem;"
+/** Logged as each toolbar button is registered (its one-argument registration method). */
+private const val ADD_BUTTON_LOG = "addBee : "
 
-/** Hides toolbar buttons by id: a button's visibility answers 2 (hidden) for [ids] before anything else. */
+/**
+ * Removes toolbar buttons by id: the toolbar's registration of each button drops (and destroys) those, as it already
+ * does for buttons that are "dead" on a phone. Their visibility can only grey a button out, not remove it.
+ */
 internal fun BytecodePatchContext.hideToolbarButtons(vararg ids: String) {
-    val method = mutableClassDefByOrNull(BEE_ITEM)?.methods?.singleOrNull {
-        it.name == "getBeeVisibility" && it.returnType == "I" && it.parameterTypes.isEmpty()
-    } ?: throw PatchException("$BEE_ITEM->getBeeVisibility()I not found")
-    // Two scratch registers below `this`.
-    if (method.implementation!!.registerCount < 3) throw PatchException("$BEE_ITEM->getBeeVisibility()I has no spare registers")
-    val before = method.implementation!!.instructions.size
-    val smali = "invoke-virtual/range {p0 .. p0}, $BEE_ITEM->getBeeId()Ljava/lang/String;\nmove-result-object v1\n" +
-        ids.joinToString("\n") { "const-string v0, \"$it\"\ninvoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v0\nif-nez v0, :sboard_hide" } +
-        "\ngoto :sboard_show\n:sboard_hide\nconst/4 v0, 0x2\nreturn v0\n:sboard_show\nnop"
+    val registration = methodsWithString(ADD_BUTTON_LOG).singleOrNull { it.returnType == "V" && it.parameterTypes.size == 1 }
+        ?: throw PatchException("the toolbar's button registration ($ADD_BUTTON_LOG) was not found")
+    val method = mutable(registration)
+    val code = method.implementation!!.instructions
+    fun reference(name: String, type: String) = code.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+        .firstOrNull { it.name == name && it.parameterTypes.isEmpty() && it.returnType == type }
+        ?: throw PatchException("the toolbar's button registration has no $name()")
+    val getId = reference("getBeeId", "Ljava/lang/String;")
+    val destroy = reference("onDestroy", "V")
+    if (method.implementation!!.registerCount - 2 < 2) throw PatchException("the toolbar's button registration has no spare registers")
+    val kind = if (classDefByOrNull(getId.definingClass)?.accessFlags?.let { com.android.tools.smali.dexlib2.AccessFlags.INTERFACE.isSet(it) } == true) "interface" else "virtual"
+    val before = method.countReal()
+    val smali = "invoke-$kind/range {p1 .. p1}, ${getId.definingClass}->getBeeId()Ljava/lang/String;\nmove-result-object v1\n" +
+        ids.joinToString("\n") { "const-string v0, \"$it\"\ninvoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v0\nif-nez v0, :sboard_drop" } +
+        "\ngoto :sboard_keep\n:sboard_drop\n" +
+        "invoke-${if (classDefByOrNull(destroy.definingClass)?.accessFlags?.let { com.android.tools.smali.dexlib2.AccessFlags.INTERFACE.isSet(it) } == true) "interface" else "virtual"}/range {p1 .. p1}, ${destroy.definingClass}->onDestroy()V\n" +
+        "return-void\n:sboard_keep\nnop"
     method.addInstructionsWithLabels(0, smali)
     method.checkInserted(before, smali)
 }

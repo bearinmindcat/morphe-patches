@@ -50,23 +50,6 @@ val hideGalaxyAiPatch = bytecodePatch(
     }
 }
 
-/** One UI's switch for the "Cursor control" choice of keyboard swipes; off One UI it reads false and the choice was gone. */
-private const val CURSOR_CONTROL = "SEC_FLOATING_FEATURE_SIP_SUPPORT_CURSOR_CONTROL"
-
-@Suppress("unused")
-val cursorControlSwipePatch = bytecodePatch(
-    name = "Cursor control swipe on every phone",
-    description = "Offers Cursor control in keyboard swipe settings on every phone.",
-) {
-    compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
-    category(SBOARD)
-
-    execute {
-        val reads = answerSwitch(CURSOR_CONTROL, FLOATING_GET_BOOLEAN, "const/16 {r}, 0x1")
-        sboardLog.info("Cursor control swipe: $reads switch reads")
-    }
-}
-
 /** One UI's speed class for the suggestion bar's text animation: "low"/"medium" phones get 150 ms instead of 300 ms. */
 private const val CANDIDATE_DURATION = "SEC_FLOATING_FEATURE_SIP_CONFIG_CANDIDATE_DURATION_TYPE"
 
@@ -123,8 +106,7 @@ val hideTranslatePatch = bytecodePatch(
     }
 }
 
-/** Samsung Pass's toolbar plugin, listed in a resource array the keyboard loads plugins from. */
-private const val PLUGINS = "config_pluginComponentList_onDemand"
+/** Samsung Pass's toolbar button (a plugin; its list must stay: an empty resource array can't be read). */
 private const val SAMSUNG_PASS = "com.samsung.android.authfw.samsungpass"
 
 @Suppress("unused")
@@ -135,23 +117,6 @@ val hideSamsungPassPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
     category(SBOARD)
-
-    dependsOn(
-        app.morphe.patcher.patch.resourcePatch {
-            execute {
-                document("res/values/arrays.xml").use { xml ->
-                    val list = xml.getElementsByTagName("string-array")
-                    // Builds without the on-demand plugin list have only the toolbar button to hide.
-                    val plugins = (0 until list.length).map { list.item(it) as org.w3c.dom.Element }
-                        .singleOrNull { it.getAttribute("name") == PLUGINS } ?: return@use
-                    val items = plugins.getElementsByTagName("item")
-                    (0 until items.length).map { items.item(it) }
-                        .filter { it.textContent.contains("samsungpass") }
-                        .forEach { plugins.removeChild(it) }
-                }
-            }
-        },
-    )
 
     execute {
         hideToolbarButtons(SAMSUNG_PASS)
