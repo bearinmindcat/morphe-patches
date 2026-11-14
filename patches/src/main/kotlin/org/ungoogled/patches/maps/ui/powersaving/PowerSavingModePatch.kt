@@ -5,6 +5,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.string
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patcher.util.smali.ExternalLabel
@@ -27,6 +28,8 @@ import org.ungoogled.patches.maps.ui.navzoom.navigationCameraHookPatch
 import org.ungoogled.patches.maps.ui.refreshrate.frameRateHookPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.w3c.dom.Element
+import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 
 /** org.ungoogled.ui.PowerSaving, the extension half: stands in for Pixel's SystemUI. */
 private const val POWER_SAVING = "Lorg/ungoogled/ui/PowerSaving;"
@@ -71,6 +74,43 @@ private object SpeedLimitDumpFingerprint : Fingerprint(
     filters = listOf(string("speedLimit: "), string("currentAverageSpeed: ")),
 )
 
+/**
+ * Navigation's state, made for every location update while guiding: the routes and each one's progress.
+ * Its constructor checks that the selected route is the guided one -- by reading that route's progress.
+ */
+private object NavigationStateFingerprint : Fingerprint(
+    returnType = "V",
+    filters = listOf(string("routes size == route states size"), string("selected route == guided route")),
+    custom = { method, _ -> method.name == "<init>" },
+)
+
+/** A route's progress, by its dump: the distance to the next turn, the step being driven, on the route or not. */
+private object RouteProgressDumpFingerprint : Fingerprint(
+    returnType = "Ljava/lang/String;",
+    parameters = emptyList(),
+    filters = listOf(string("curStep"), string("metersToNextStep"), string("secondsToNextStep"), string("isOnRoute")),
+    custom = { method, _ -> method.name == "toString" },
+)
+
+/** string/MIN_MODE_LANDSCAPE_DISABLED_SNACKBAR_TEXT: "Can't use landscape mode when power saving". */
+private const val LANDSCAPE_DISABLED_TEXT = 0x7f14136f
+
+/** The power saving screen is declared portrait only; it follows the phone's rotation like navigation does. */
+private val minModeOrientationPatch = resourcePatch(
+    description = "Lets the power saving screen turn to landscape.",
+) {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val activities = manifest.getElementsByTagName("activity")
+            val minMode = (0 until activities.length).map { activities.item(it) as Element }
+                .singleOrNull { it.getAttribute("android:name") == MIN_MODE_ACTIVITY.removePrefix("L").removeSuffix(";").replace('/', '.') }
+                ?: throw PatchException("MinModeActivity is no longer declared")
+            // MapsActivity's own setting: the sensor, unless the user locked the rotation.
+            minMode.setAttribute("android:screenOrientation", "user")
+        }
+    }
+}
+
 @Suppress("unused")
 val powerSavingModePatch = bytecodePatch(
     name = "Power saving mode",
@@ -79,15 +119,18 @@ val powerSavingModePatch = bytecodePatch(
         "screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it " +
         "built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a " +
         "row on the account sheet under Customization, which also has: a navigation button that opens the power saving " +
-        "screen without locking the phone, switching to it by itself when idle, a speedometer on it, a " +
-        "lower frame rate, and its black map in navigation or all over Maps.",
+        "screen without locking the phone, switching to it by itself when idle, the normal screen near turns, " +
+        "a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // The options' switches are refreshed at every Activity attach; the navigation button,
     // idle switch and frame rate run on the shared navigation and frame rate hooks.
     // Power Saving Options is a page of the Customization screen.
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, frameRateHookPatch, customizationScreenPatch)
+    dependsOn(
+        sharedExtensionPatch, activityContextHookPatch, navigationCameraHookPatch, frameRateHookPatch, customizationScreenPatch,
+        minModeOrientationPatch,
+    )
 
     execute {
         markPatched("powerSavingPatched")
@@ -269,6 +312,72 @@ val powerSavingModePatch = bytecodePatch(
                     """,
                 )
             }
+
+        // 6. Landscape: Maps says "Can't use landscape mode when power saving" whenever the phone is held
+        //    sideways; the screen turns with the phone now (manifest, and onMinModeCreate where the manifest
+        //    stays stock). The message comes from an orientation listener of its own, silenced here.
+        val landscapeListeners = mutableListOf<Pair<String, String>>()
+        classDefForEach { c ->
+            if (c.superclass != "Landroid/view/OrientationEventListener;") return@classDefForEach
+            c.methods.filter { m ->
+                m.name == "onOrientationChanged" && m.parameterTypes.map { it.toString() } == listOf("I") &&
+                    m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == LANDSCAPE_DISABLED_TEXT.toLong() } == true
+            }.forEach { landscapeListeners += c.type to it.name }
+        }
+        val (listenerType, listenerMethod) = landscapeListeners.singleOrNull()
+            ?: throw PatchException("power saving screen's landscape message: found ${landscapeListeners.size}")
+        mutableClassDefBy(listenerType).methods
+            .single { it.name == listenerMethod && it.parameterTypes.map { t -> t.toString() } == listOf("I") }
+            .addInstructions(0, "return-void")
+
+        // 7. Normal screen near turns: the guided route's distance to its next turn, for every navigation state
+        //    Maps makes. The progress class gets a method that hands the distance, the step and "on the route"
+        //    to the extension; the state's constructor calls it on the guided route's progress, which it has
+        //    in a register right after checking it is the selected route.
+        val progressType = RouteProgressDumpFingerprint.classDef.type
+        val dump = RouteProgressDumpFingerprint.method.implementation!!.instructions.toList()
+        fun labelAt(label: String) = dump.indexOfFirst { insn ->
+            (insn.opcode == Opcode.CONST_STRING || insn.opcode == Opcode.CONST_STRING_JUMBO) &&
+                ((insn as ReferenceInstruction).reference as StringReference).string == label
+        }.also { if (it < 0) throw PatchException("route progress dump no longer prints $label") }
+        fun fieldRead(label: String, opcode: Opcode, owner: String?): FieldReference =
+            (labelAt(label) - 1 downTo 0).map { dump[it] }.firstNotNullOfOrNull { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? FieldReference)?.takeIf {
+                    insn.opcode == opcode && (owner == null || it.definingClass == owner)
+                }
+            } ?: throw PatchException("route progress dump no longer reads a field for $label")
+        val meters = fieldRead("metersToNextStep", Opcode.IGET, progressType)
+        val onRoute = fieldRead("isOnRoute", Opcode.IGET_BOOLEAN, progressType)
+        // `step == null ? -1 : step.index`: the step itself is the object field read for it.
+        val step = fieldRead("curStep", Opcode.IGET_OBJECT, progressType)
+        if (meters.type != "I" || onRoute.type != "Z") throw PatchException("route progress fields changed type")
+        mutableClassDefBy(progressType).methods.add(
+            ImmutableMethod(
+                progressType, "uaProgress", emptyList(), "V",
+                AccessFlags.PUBLIC.value or AccessFlags.FINAL.value, null, null, MutableMethodImplementation(4),
+            ).toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        iget v0, p0, $progressType->${meters.name}:I
+                        iget-object v1, p0, $progressType->${step.name}:${step.type}
+                        iget-boolean v2, p0, $progressType->${onRoute.name}:Z
+                        invoke-static { v0, v1, v2 }, $POWER_SAVING->toNextStep(ILjava/lang/Object;Z)V
+                        return-void
+                    """,
+                )
+            },
+        )
+        NavigationStateFingerprint.method.apply {
+            val casts = implementation!!.instructions.withIndex().filter { (_, insn) ->
+                insn.opcode == Opcode.CHECK_CAST && ((insn as ReferenceInstruction).reference as TypeReference).type == progressType
+            }
+            val (at, cast) = casts.singleOrNull()
+                ?: throw PatchException("navigation state reads the guided route's progress ${casts.size} times")
+            val register = (cast as OneRegisterInstruction).registerA
+            if (register > 15) throw PatchException("guided route's progress in v$register, out of invoke range")
+            addInstructions(at + 1, "invoke-virtual { v$register }, $progressType->uaProgress()V")
+        }
     }
 
     // A "Power Saving Options" row on the account sheet, right under Customization and so above

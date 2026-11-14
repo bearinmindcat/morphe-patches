@@ -506,6 +506,15 @@ public final class CustomizationActivity extends Activity {
         return seconds > 0 ? "After " + seconds + " seconds" : "Off";
     }
 
+    private static final String[] WAKE_LABELS = {"Off", "Back after 30 seconds", "Back after 1 minute", "Back after 2 minutes", "Back after 5 minutes"};
+
+    private static String wakeSummary(int seconds) {
+        for (int i = 1; i < PowerSaving.WAKE_CHOICES.length; i++) {
+            if (PowerSaving.WAKE_CHOICES[i] == seconds) return PowerSaving.WAKE_METERS + " m before a turn, " + WAKE_LABELS[i].toLowerCase(java.util.Locale.ROOT);
+        }
+        return seconds > 0 ? PowerSaving.WAKE_METERS + " m before a turn, back after " + seconds + " seconds" : "Off";
+    }
+
     private static String lowFpsSummary(int mode) {
         if (mode <= 0 || mode >= LOW_FPS_LABELS.length) return "Off";
         return LOW_FPS_LABELS[mode] + ": 15 fps and 30 Hz, as on the power saving screen";
@@ -542,6 +551,21 @@ public final class CustomizationActivity extends Activity {
             });
         });
         body.addView(idleRow);
+
+        LinearLayout wakeRow = rowBase("Normal screen near turns", wakeSummary(PowerSaving.wakeSeconds(this)));
+        TextView wakeSub = (TextView) ((LinearLayout) wakeRow.getChildAt(0)).getChildAt(1);
+        wakeRow.setOnClickListener(v -> {
+            int current = 0;
+            for (int i = 0; i < PowerSaving.WAKE_CHOICES.length; i++) {
+                if (PowerSaving.WAKE_CHOICES[i] == PowerSaving.wakeSeconds(this)) current = i;
+            }
+            choose("Normal screen near turns", WAKE_LABELS, current, which -> {
+                // read for every navigation update, so no restart
+                PowerSaving.setWakeSeconds(this, PowerSaving.WAKE_CHOICES[which]);
+                wakeSub.setText(wakeSummary(PowerSaving.WAKE_CHOICES[which]));
+            });
+        });
+        body.addView(wakeRow);
 
         Switch speedo = new Switch(this);
         speedo.setChecked(PowerSaving.speedometer(this));

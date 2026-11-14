@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewTreeObserver;
@@ -210,6 +211,11 @@ public final class PowerSaving {
         try {
             // Recorded on every phone: the navigation zoom tiles skip this window on a Pixel too.
             minModeWindow = new WeakReference<>(a.getWindow().getDecorView());
+            // Maps declares the screen portrait only (issue #195); it turns with the phone like navigation does.
+            // The patch says so in the manifest too -- this is for root mount installs, which keep the stock one.
+            if (a.getRequestedOrientation() != android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER) {
+                a.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER);
+            }
             if (!standIn(a)) return;
             a.setShowWhenLocked(true);
             a.setTurnScreenOn(true);
@@ -247,7 +253,16 @@ public final class PowerSaving {
                 watch(a.getWindow().getDecorView());
                 front = new WeakReference<>(a);
                 lastTouch = SystemClock.uptimeMillis();
+            } else {
+                minModeShown = new WeakReference<>(a);
+                minModeResumed = true;
+                wokeAt = 0;
+                // Opened with a turn already close: that turn is not a reason to leave again.
+                if (nearTurn()) wokeFor = stepId;
             }
+        }
+        @Override public void onActivityPaused(Activity a) {
+            if (MIN_MODE.equals(a.getClass().getName())) minModeResumed = false;
         }
         @Override public void onActivityStarted(Activity a) {
             if (MIN_MODE.equals(a.getClass().getName())) Speedometer.start(a);
@@ -256,7 +271,6 @@ public final class PowerSaving {
             if (MIN_MODE.equals(a.getClass().getName())) Speedometer.stop(a);
         }
         @Override public void onActivityCreated(Activity a, Bundle b) {}
-        @Override public void onActivityPaused(Activity a) {}
         @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
         @Override public void onActivityDestroyed(Activity a) {}
     }
@@ -269,6 +283,7 @@ public final class PowerSaving {
     public static final String KEY_IDLE = "power_saving_idle_seconds";
     public static final String KEY_LOW_FPS = "power_saving_low_fps";
     public static final String KEY_THEME = "power_saving_theme_mode";
+    public static final String KEY_WAKE = "power_saving_wake_seconds";
 
     /** Lower frame rate and Power saving theme: off, while navigating, everywhere. */
     public static final int LOW_FPS_OFF = 0, LOW_FPS_NAV = 1, LOW_FPS_ALL = 2;
@@ -278,9 +293,13 @@ public final class PowerSaving {
     static final float SAVER_HZ = 30f;
     /** Auto-switch when idle: the choices, in seconds; 0 is off. */
     public static final int[] IDLE_CHOICES = {0, 15, 30, 60, 120};
+    /** Normal screen near turns: how long it stays before power saving comes back, in seconds; 0 is off. */
+    public static final int[] WAKE_CHOICES = {0, 30, 60, 120, 300};
+    /** How close a turn is when the normal screen comes back for it. */
+    public static final int WAKE_METERS = 500;
 
     static volatile boolean UNLOCKED, SPEEDOMETER;
-    static volatile int IDLE_SECONDS, LOW_FPS, THEME;
+    static volatile int IDLE_SECONDS, LOW_FPS, THEME, WAKE_SECONDS;
     private static volatile boolean loaded;
 
     private static android.content.SharedPreferences prefs(Context c) {
@@ -296,8 +315,9 @@ public final class PowerSaving {
         IDLE_SECONDS = Math.max(0, p.getInt(KEY_IDLE, 0));
         LOW_FPS = p.getInt(KEY_LOW_FPS, LOW_FPS_OFF);
         THEME = p.getInt(KEY_THEME, THEME_OFF);
+        WAKE_SECONDS = Math.max(0, p.getInt(KEY_WAKE, 0));
         loaded = true;
-        if (SPEEDOMETER) trackLifecycle(c);
+        if (SPEEDOMETER || WAKE_SECONDS > 0) trackLifecycle(c);
     }
 
     private static void ensureLoaded() {
@@ -311,12 +331,14 @@ public final class PowerSaving {
     public static int idleSeconds(Context c) { refresh(c); return IDLE_SECONDS; }
     public static int lowFps(Context c) { refresh(c); return LOW_FPS; }
     public static int theme(Context c) { refresh(c); return THEME; }
+    public static int wakeSeconds(Context c) { refresh(c); return WAKE_SECONDS; }
 
     public static void setUnlocked(Context c, boolean on) { prefs(c).edit().putBoolean(KEY_UNLOCKED, on).commit(); refresh(c); }
     public static void setSpeedometer(Context c, boolean on) { prefs(c).edit().putBoolean(KEY_SPEEDOMETER, on).commit(); refresh(c); }
     public static void setIdleSeconds(Context c, int s) { prefs(c).edit().putInt(KEY_IDLE, s).commit(); refresh(c); }
     public static void setLowFps(Context c, int mode) { prefs(c).edit().putInt(KEY_LOW_FPS, mode).commit(); refresh(c); }
     public static void setTheme(Context c, int mode) { prefs(c).edit().putInt(KEY_THEME, mode).commit(); refresh(c); }
+    public static void setWakeSeconds(Context c, int s) { prefs(c).edit().putInt(KEY_WAKE, s).commit(); refresh(c); }
 
     /** Lower frame rate set to everywhere: the main window's 60 Hz becomes 30 (RefreshRate.window). */
     static boolean lowFpsEverywhere() {
@@ -412,25 +434,104 @@ public final class PowerSaving {
             if (!live) RefreshRate.navWindow(null, false);
             else if (navUp && decor != null && a != null && a.getWindow().getDecorView() == decor) RefreshRate.navWindow(a, true);
         }
+        // Normal screen near turns: navigation came back for a turn, and power saving follows once the
+        // chosen time has gone by without a touch and no turn is close.
+        // (Navigation's camera may take a moment to report in again after the power saving screen.)
+        if (wokeAt != 0 && ((!live && SystemClock.uptimeMillis() - wokeAt > 10_000) || WAKE_SECONDS <= 0)) wokeAt = 0;
+        boolean back = wokeAt != 0;
         int idle = IDLE_SECONDS;
-        if (!navUp || decor == null || idle <= 0 || !Shapes.powerSavingPatched()) {
+        if (!navUp || decor == null || (idle <= 0 && !back) || !Shapes.powerSavingPatched()) {
             TouchSpy.remove();
             return;
         }
         TouchSpy.attach(decor);
         long now = SystemClock.uptimeMillis();
-        if (now - lastTouch < idle * 1000L || minModeLast) return;
-        try {
-            // Not while something else has the screen: a dialog or menu has the focus, the
-            // keyboard is up, or Maps shares the screen with another app.
-            if (!decor.hasWindowFocus() || keyboardUp(decor)) return;
-            Activity a = front.get();
-            if (a != null && a.isInMultiWindowMode()) return;
-            PowerManager pm = (PowerManager) decor.getContext().getSystemService(Context.POWER_SERVICE);
-            if (pm == null || !pm.isInteractive()) return;
-        } catch (Throwable t) { return; }
+        if (minModeLast) return;
+        if (back) {
+            if (now - Math.max(wokeAt, lastTouch) < WAKE_SECONDS * 1000L || nearTurn()) return;
+        } else {
+            if (now - lastTouch < idle * 1000L) return;
+            // a turn is coming up and the normal screen is wanted for it: not now
+            if (WAKE_SECONDS > 0 && nearTurn()) return;
+        }
+        if (!free(decor)) return;
+        if (back) Log.i("UA", "power saving: back after the turn");
+        wokeAt = 0;
         lastTouch = now;
         openUnlocked(decor.getContext());
+    }
+
+    /** Nothing else has the screen: no dialog or menu has the focus, no keyboard, Maps not sharing the screen. */
+    private static boolean free(View decor) {
+        try {
+            if (!decor.hasWindowFocus() || keyboardUp(decor)) return false;
+            Activity a = front.get();
+            if (a != null && a.isInMultiWindowMode()) return false;
+            PowerManager pm = (PowerManager) decor.getContext().getSystemService(Context.POWER_SERVICE);
+            return pm != null && pm.isInteractive();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    // ---- normal screen near turns ----
+
+    /** The guided route's distance to its next turn (-1: not known, or off the route), the step, and when. */
+    private static volatile int toTurn = -1;
+    private static volatile int stepId;
+    private static volatile long toTurnAt = -100_000;
+    /** The step the normal screen already came back for, or that was close when the power saving screen opened. */
+    private static volatile int wokeFor;
+    /** When navigation came back for a turn; 0 when it did not, or power saving is back. */
+    private static volatile long wokeAt;
+    private static volatile boolean minModeResumed;
+    private static WeakReference<Activity> minModeShown = new WeakReference<>(null);
+    /** id/gesture_detector_view: the power saving screen's tap catcher (pinned: names do not survive a merged APK). */
+    private static final int TAP_CATCHER = 0x7f0b0476;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    /**
+     * Every navigation state Maps makes while guiding (a location update): the guided route's distance to its
+     * next turn, that step, and whether the car is on the route. Not on the main thread.
+     */
+    public static void toNextStep(int meters, Object step, boolean onRoute) {
+        // No step yet (navigation starting, the route just changed): its distance reads 0 and means nothing.
+        toTurn = onRoute && step != null ? meters : -1;
+        stepId = step == null ? 0 : System.identityHashCode(step);
+        toTurnAt = SystemClock.uptimeMillis();
+        ensureLoaded();
+        if (WAKE_SECONDS > 0 && minModeResumed && nearTurn() && stepId != wokeFor) MAIN.post(PowerSaving::wakeForTurn);
+    }
+
+    /** A turn within WAKE_METERS, as of a navigation state from the last few seconds. */
+    static boolean nearTurn() {
+        int m = toTurn;
+        return m >= 0 && m <= WAKE_METERS && SystemClock.uptimeMillis() - toTurnAt < 5000;
+    }
+
+    /**
+     * A turn is close while the power saving screen shows: back to navigation the way a tap on it goes (Maps'
+     * own handler). Only while the phone is awake and unlocked -- over the lock screen navigation would be
+     * behind it, and nothing could bring the power saving screen back afterwards.
+     */
+    static void wakeForTurn() {
+        Activity a = minModeShown.get();
+        int step = stepId;
+        if (a == null || !minModeResumed || !nearTurn() || step == wokeFor || WAKE_SECONDS <= 0) return;
+        try {
+            PowerManager pm = (PowerManager) a.getSystemService(Context.POWER_SERVICE);
+            android.app.KeyguardManager km = (android.app.KeyguardManager) a.getSystemService(Context.KEYGUARD_SERVICE);
+            if (pm == null || !pm.isInteractive() || (km != null && km.isKeyguardLocked())) return;
+            wokeFor = step;
+            wokeAt = SystemClock.uptimeMillis();
+            Log.i("UA", "power saving: turn in " + toTurn + " m, back to navigation");
+            View tap = a.findViewById(TAP_CATCHER);
+            if (tap != null && tap.performClick()) return;
+            a.startActivity(new Intent().setClassName(a.getPackageName(), "com.google.android.maps.MapsActivity")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION));
+        } catch (Throwable t) {
+            Log.w("UA", "power saving: back to navigation", t);
+        }
     }
 
     private static boolean keyboardUp(View decor) {
