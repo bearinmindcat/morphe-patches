@@ -1,0 +1,8 @@
+package com.samsung.android.sdk;
+
+/** Generated stand-in (.github/scripts/samsung-standins): names and signatures Samsung Photo Editor uses, answering "absent" off One UI (no Samsung code). */
+public class SsdkVendorCheck {
+    public static boolean isSamsungDevice() {
+        return false;
+    }
+}

@@ -74,14 +74,59 @@ private val oneUiMembersPatch = bytecodePatch(
         val implemented = implementOneUiInterfaceMethods("Lorg/ungoogled/samsungphotoeditor/OneUi;")
         java.util.logging.Logger.getLogger("SamsungPhotoEditor")
             .info("One UI members: $calls calls, $fields fields, $implemented inherited methods")
-        // Measured against 3.9.04.6: 186 calls and 45 field accesses.
-        if (calls < 100) throw PatchException("only $calls One UI calls found")
+        // Measured: 3.9.04.6 186 calls and 45 field accesses, 3.4.14.63 93 and 20.
+        if (calls < 60) throw PatchException("only $calls One UI calls found")
+    }
+}
+
+private const val ANDROID_14 = "Lorg/ungoogled/samsungphotoeditor/Android14;"
+
+/**
+ * Android 14 methods Photo Editor 3.4.14.63 (Android 13 and up) calls without checking the version: Ultra HDR
+ * (gainmaps, the display's HDR/SDR ratio). On Android 13 opening a photo died on Display.isHdrSdrRatioAvailable().
+ * Found with api-versions.xml (since > 33) over the app's dex; calls on gainmaps themselves need none (no gainmap
+ * exists below Android 14).
+ */
+private val ANDROID_14_CALLS = listOf(
+    "Landroid/graphics/Bitmap;" to "hasGainmap()Z",
+    "Landroid/graphics/Bitmap;" to "getGainmap()Landroid/graphics/Gainmap;",
+    "Landroid/graphics/Bitmap;" to "setGainmap(Landroid/graphics/Gainmap;)V",
+    "Landroid/view/Display;" to "isHdrSdrRatioAvailable()Z",
+    "Landroid/view/Display;" to "getHdrSdrRatio()F",
+    "Landroid/view/Display;" to "registerHdrSdrRatioChangedListener(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
+    "Landroid/view/Display;" to "unregisterHdrSdrRatioChangedListener(Ljava/util/function/Consumer;)V",
+    "Landroid/view/SurfaceControl\$Transaction;" to
+        "setExtendedRangeBrightness(Landroid/view/SurfaceControl;FF)Landroid/view/SurfaceControl\$Transaction;",
+).associate { (owner, call) ->
+    val params = call.substringAfter('(')
+    "$owner->$call" to "$ANDROID_14->${call.substringBefore('(')}($owner$params"
+}
+
+/** The build for Android 13 and 14 (see SamsungPhotoEditorConstants). */
+private fun isAndroid13Build(version: String?) = version == "3.4.14.63"
+
+/**
+ * Photo Editor 3.4.14.63 runs on Android 13 but calls a few Android 14 methods (Ultra HDR) unchecked: they go through
+ * Android14, which calls them from Android 14 on and answers "no HDR" on Android 13.
+ */
+private val android14CallsPatch = bytecodePatch(
+    description = "Answers Android 14's HDR calls on Android 13.",
+) {
+    extendWith(SAMSUNG_PHOTO_EDITOR_EXTENSION)
+
+    execute {
+        if (!isAndroid13Build(packageMetadata.versionName)) return@execute
+        val moved = redirectCalls(ANDROID_14_CALLS)
+        java.util.logging.Logger.getLogger("SamsungPhotoEditor").info("Android 14 calls: $moved")
+        // Measured against 3.4.14.63: 37 calls.
+        if (moved < 10) throw PatchException("only $moved Android 14 calls found")
     }
 }
 
 /**
  * Native libraries only One UI has: Samsung system libraries the app loads by name, and the app's own libraries that
- * link against one (light balance, beauty, segmentation, tilt, face, matting). Measured against 3.9.04.6.
+ * link against one (light balance, beauty, segmentation, tilt, face, matting). Measured against 3.9.04.6; 3.4.14.63
+ * adds its own matting, photo enhance and LVM libraries (all built on One UI's OpenCV).
  */
 private val ONE_UI_LIBRARIES = setOf(
     "apex_motionphoto_utils_jni.media.samsung", "Beauty_v4.camera.samsung", "BestComposition.polarr", "Feature.polarr",
@@ -92,6 +137,7 @@ private val ONE_UI_LIBRARIES = setOf(
     "veframework.videoeditor.samsung",
     "lightbalance", "PhotoEditorBeauty", "bgpsegmenter.samsung", "FaceOffWrapper.camera.samsung", "GaussianInterface",
     "SRIBLVMUtilityInterface", "tiltEngine",
+    "MattingInterface", "PhotoEnhance", "SRIBLVMInterface",
 )
 
 /**
@@ -130,11 +176,50 @@ private val sdkStubsPatch = bytecodePatch(
     extendWith(SAMSUNG_PHOTO_EDITOR_EXTENSION)
 
     execute {
+        // 3.4 carries its own Quram codec (com.quramsoft.images, with its library) instead of One UI's.
+        val ownCodec = mutableClassDefByOrNull("Lcom/samsung/android/media/SemQrBitmapFactory;") == null &&
+            mutableClassDefByOrNull("Lcom/quramsoft/images/QrBitmapFactory;") != null
         val (implemented, nothing) = replaceSdkStubs(
             mapOf("Lcom/samsung/android/media/SemQrBitmapFactory;" to "Lorg/ungoogled/samsungphotoeditor/QuramCodec;"),
         )
         java.util.logging.Logger.getLogger("SamsungPhotoEditor").info("SDK stubs: $implemented implemented, $nothing answer nothing")
-        if (implemented < 8) throw PatchException("only $implemented Quram codec stubs found")
+        if (implemented < 8 && !ownCodec) throw PatchException("only $implemented Quram codec stubs found")
+        if (ownCodec) {
+            // Its native half is One UI's libimagecodec.quram.so: opening a photo died with UnsatisfiedLinkError.
+            val codec = "Lorg/ungoogled/samsungphotoeditor/QuramCodec;"
+            val qr = "Lcom/quramsoft/images/QrBitmapFactory;"
+            val quram = "Lcom/quramsoft/images/QuramBitmapFactory;"
+            val options = "Lcom/quramsoft/images/QrBitmapFactory\$Options;"
+            val bitmap = "Landroid/graphics/Bitmap;"
+            val string = "Ljava/lang/String;"
+            val calls = mapOf(
+                "$qr->decodeFile($string$options)$bitmap" to "$codec->decodeFile(${string}Ljava/lang/Object;)$bitmap",
+                "$qr->decodeFile($string${options}III)$bitmap" to "$codec->decodeFile(${string}Ljava/lang/Object;III)$bitmap",
+                "$qr->decodeStream(Ljava/io/InputStream;$options)$bitmap" to
+                    "$codec->decodeStream(Ljava/io/InputStream;Ljava/lang/Object;)$bitmap",
+                "$qr->decodeStream(Ljava/io/InputStream;II$options)$bitmap" to
+                    "$codec->decodeStream(Ljava/io/InputStream;IILjava/lang/Object;)$bitmap",
+                "$qr->decodeFileDescriptor(Ljava/io/FileDescriptor;Landroid/graphics/Rect;$options)$bitmap" to
+                    "$codec->decodeFileDescriptor(Ljava/io/FileDescriptor;Landroid/graphics/Rect;Ljava/lang/Object;)$bitmap",
+                "$qr->compressToFile($bitmap$string${string}I$options)I" to
+                    "$codec->compressToFile($bitmap$string${string}ILjava/lang/Object;)I",
+                "$qr->compressToFile($bitmap[B$string${string}I$options)I" to
+                    "$codec->compressToFile($bitmap[B$string${string}ILjava/lang/Object;)I",
+                "$quram->compressToFile($bitmap[B$string${string}I$options)I" to
+                    "$codec->compressToFile($bitmap[B$string${string}ILjava/lang/Object;)I",
+                "$qr->resizeCompressToFile($bitmap$string${string}IIII$options)I" to
+                    "$codec->resizeCompressToFile($bitmap$string${string}IIIILjava/lang/Object;)I",
+                "$qr->resizeCompressToFile($bitmap[B$string${string}IIII$options)I" to
+                    "$codec->resizeCompressToFile($bitmap[B$string${string}IIIILjava/lang/Object;)I",
+                "$quram->getICCProfile($string)[B" to "$codec->getICCProfile($string)[B",
+                "Lcom/quramsoft/images/QuramDngBitmap;->getExifInfoFromFile(${string}Lcom/quramsoft/images/QuramDngJavaExif;)I" to
+                    "$codec->getExifInfoFromFile(${string}Ljava/lang/Object;)I",
+            )
+            val moved = redirectCalls(calls)
+            java.util.logging.Logger.getLogger("SamsungPhotoEditor").info("Bundled Quram codec calls: $moved")
+            // Measured against 3.4.14.63: 21 calls (the app's and the codec's own).
+            if (moved < 10) throw PatchException("only $moved bundled Quram codec calls found")
+        }
     }
 }
 
@@ -187,7 +272,8 @@ val enableNonOneUiPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_PHOTO_EDITOR)
     dependsOn(
-        manifestPatch, oneUiMembersPatch, sprDrawablesPatch, nativeLibrariesPatch, sdkStubsPatch, absentProvidersPatch,
+        manifestPatch, oneUiMembersPatch, android14CallsPatch, sprDrawablesPatch, nativeLibrariesPatch, sdkStubsPatch,
+        absentProvidersPatch,
         galaxyStoreChecksPatch("Samsung Photo Editor"),
     )
     extendWith(SAMSUNG_PHOTO_EDITOR_EXTENSION)

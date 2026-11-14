@@ -12,6 +12,8 @@ public class SemSegmentation {
     }
     public void release() {
     }
+    public void reset() {
+    }
     public static class Mode {
         public static com.samsung.android.media.vision.SemSegmentation.Mode AUTO_WITH_FG_LOOP_MARKER;
         public static com.samsung.android.media.vision.SemSegmentation.Mode MANUAL_WITH_BG_LOOP_MARKER;

@@ -11,10 +11,11 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 
 /**
- * One UI's Quram image codec (SemQrBitmapFactory), which Photo Editor decodes and saves photos with, on Android's own
- * BitmapFactory and Bitmap.compress (no Samsung code). The app only carries the codec's SDK stubs; the patch points
- * them here. Options are the app's SemQrBitmapFactory.Options, read and written by field name. The codec's own
- * extras (thumbnail and region modes, YUV buffers, DNG data, ICC profiles) answer "not available".
+ * One UI's Quram image codec, which Photo Editor decodes and saves photos with, on Android's own BitmapFactory and
+ * Bitmap.compress (no Samsung code). 3.9 calls One UI's SemQrBitmapFactory (the app carries only its SDK stubs); 3.4
+ * calls the bundled com.quramsoft.images.QrBitmapFactory, whose native code is One UI's libimagecodec.quram.so; the
+ * patch points both here. Options are the app's own Options, read and written by field name. The codec's own extras
+ * (thumbnail and region modes, YUV buffers, DNG data, ICC profiles) answer "not available".
  */
 public final class QuramCodec {
     private static final String TAG = "UA";
@@ -107,6 +108,21 @@ public final class QuramCodec {
     public static Bitmap decodeStream(InputStream in, int width, int height, Object options) {
         BitmapFactory.Options decode = android(options);
         return answer(options, decode, BitmapFactory.decodeStream(in, null, decode));
+    }
+
+    public static Bitmap decodeFileDescriptor(java.io.FileDescriptor fd, Rect padding, Object options) {
+        BitmapFactory.Options decode = android(options);
+        return answer(options, decode, BitmapFactory.decodeFileDescriptor(fd, padding, decode));
+    }
+
+    /** The photo's ICC profile: none (Android's decoder applies the embedded profile itself). */
+    public static byte[] getICCProfile(String path) {
+        return null;
+    }
+
+    /** Samsung's DNG EXIF reader: not available (-1). */
+    public static int getExifInfoFromFile(String path, Object exif) {
+        return -1;
     }
 
     public static Bitmap decodeByteArray(byte[] data, int offset, int length, Object options) {

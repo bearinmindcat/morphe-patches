@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungphotoeditor"
 
     defaultConfig {
-        // Photo Editor 3.9 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Photo Editor 3.4.14.63, the oldest version patched, requires Android 13 (API 33).
+        minSdk = 33
     }
 }
 
