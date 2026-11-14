@@ -525,6 +525,26 @@ public final class PlayingMedia {
         return out;
     }
 
+    /**
+     * The apps whose media is in use, most recent first: playing, then paused. Android lists the active sessions most
+     * recently active first. None without notification access.
+     */
+    static List<String> inUse(Context c) {
+        List<String> playing = new java.util.ArrayList<>(), paused = new java.util.ArrayList<>();
+        try {
+            for (MediaController s : c.getSystemService(MediaSessionManager.class)
+                    .getActiveSessions(new ComponentName(c, MediaListener.class))) {
+                String p = s.getPackageName();
+                if (playing(s)) { if (!playing.contains(p)) playing.add(p); }
+                else if (s.getPlaybackState() != null && s.getPlaybackState().getState() == PlaybackState.STATE_PAUSED && !paused.contains(p)) paused.add(p);
+            }
+        } catch (Throwable ignored) {
+        }
+        paused.removeAll(playing);
+        playing.addAll(paused);
+        return playing;
+    }
+
     /** The app's playing session, or with {@code any} the first it has open; null without notification access. */
     private static MediaController sessionOf(Context c, String pkg, boolean any) {
         if (!allowed(c)) return null;

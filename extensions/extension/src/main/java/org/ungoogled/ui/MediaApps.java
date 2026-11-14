@@ -50,6 +50,111 @@ public final class MediaApps {
     static String addMethod() { return ""; }
     /** Rewritten by the patch: the media browser callback's onConnectionFailed. */
     static String failedMethod() { return ""; }
+    /** Rewritten by the patch: the media panel's "which app" getter (its package). */
+    static String panelAppMethod() { return ""; }
+
+    // ---- the media panel's row of other apps (issue #78) ----
+
+    /** The apps chosen for the media panel's row, in order, comma-separated; none chosen: all of them. */
+    static final String KEY_ROW = "media_row_apps";
+
+    /** The apps chosen for the media panel's row; empty: all of them. */
+    public static List<String> chosen(Context c) {
+        List<String> out = new ArrayList<>();
+        try {
+            String v = c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).getString(KEY_ROW, "");
+            for (String p : v.split(",")) if (!p.trim().isEmpty()) out.add(p.trim());
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    public static void setChosen(Context c, List<String> packages) {
+        c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ROW, String.join(",", packages)).commit();
+    }
+
+    /** The apps Maps can offer in navigation now, by name: Android Auto media apps, open sessions, Maps' partners. */
+    public static List<String> candidates(Context c) {
+        PackageManager pm = c.getPackageManager();
+        Set<String> open = PlayingMedia.sessionPackages(c);
+        Set<String> seen = new HashSet<>();
+        List<String> out = new ArrayList<>();
+        for (ResolveInfo r : pm.queryIntentServices(new Intent("android.media.browse.MediaBrowserService"), 0)) {
+            if (r.serviceInfo == null) continue;
+            String pkg = r.serviceInfo.packageName;
+            if (pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
+            if (PARTNERS.contains(pkg) || androidAuto(pm, pkg) || open.contains(pkg)) out.add(pkg);
+        }
+        Collections.sort(out, (a, b) -> label(c, a).compareToIgnoreCase(label(c, b)));
+        return out;
+    }
+
+    public static String label(Context c, String pkg) {
+        try {
+            return String.valueOf(c.getPackageManager().getApplicationLabel(c.getPackageManager().getApplicationInfo(pkg, 0)));
+        } catch (Throwable t) {
+            return pkg;
+        }
+    }
+
+    /**
+     * The media panel collected its apps: the panel's own app first ({@code all} before {@code answers} were added),
+     * then the others in the order their media browsers answered -- a different order each time, and the row under
+     * the controls shows only the first five or so. Now: the panel's own app, the apps playing (or paused) now, then
+     * the apps chosen in Customization in their order, or every app by name when none are chosen.
+     */
+    public static void swapOrder(List<Object> all, List<?> answers) {
+        try {
+            Context c = Shapes.appContext();
+            if (c == null || all == null) return;
+            int lead = Math.max(0, all.size() - (answers == null ? 0 : answers.size()));
+            List<Object> rest = new ArrayList<>(all.subList(lead, all.size()));
+            if (rest.isEmpty()) return;
+            List<String> playing = PlayingMedia.inUse(c);
+            List<String> chosen = chosen(c);
+            Map<Object, String> pkg = new java.util.IdentityHashMap<>();
+            for (Object o : rest) pkg.put(o, packageOf(o));
+            List<Object> keep = new ArrayList<>();
+            for (Object o : rest) {
+                String p = pkg.get(o);
+                if (p == null || chosen.isEmpty() || chosen.contains(p) || playing.contains(p)) keep.add(o);
+            }
+            Collections.sort(keep, (a, b) -> {
+                String pa = pkg.get(a), pb = pkg.get(b);
+                int r = Integer.compare(rank(playing, pa), rank(playing, pb));
+                if (r == 0) r = Integer.compare(rank(chosen, pa), rank(chosen, pb));
+                if (r == 0 && pa != null && pb != null) r = label(c, pa).compareToIgnoreCase(label(c, pb));
+                return r;
+            });
+            List<Object> head = new ArrayList<>(all.subList(0, lead));
+            all.clear();
+            all.addAll(head);
+            all.addAll(keep);
+            StringBuilder order = new StringBuilder();
+            for (Object o : all) order.append(order.length() == 0 ? "" : ", ").append(pkg.containsKey(o) ? pkg.get(o) : packageOf(o));
+            android.util.Log.i("UA", "media: panel apps " + order + (chosen.isEmpty() ? "" : " (chosen " + chosen.size() + ")"));
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media panel apps", t);
+        }
+    }
+
+    private static int rank(List<String> order, String pkg) {
+        int i = pkg == null ? -1 : order.indexOf(pkg);
+        return i < 0 ? Integer.MAX_VALUE : i;
+    }
+
+    private static String packageOf(Object panelApp) {
+        try {
+            for (Class<?> k = panelApp.getClass(); k != null; k = k.getSuperclass()) {
+                try {
+                    Method m = k.getDeclaredMethod(panelAppMethod());
+                    if (m.getReturnType() != String.class) continue;
+                    m.setAccessible(true);
+                    return (String) m.invoke(panelApp);
+                } catch (NoSuchMethodException ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
 
     /** How long an app's media browser may leave Maps' connection unanswered before it counts as refused. */
     private static final long ANSWER_MS = 10000;

@@ -149,7 +149,8 @@ public final class CustomizationActivity extends Activity {
                 Shapes.locationSourcePatched(), "Location source",
                 Shapes.mapRegionPatched(), "Map region",
                 Shapes.proxyPatched(), "Proxy",
-                Shapes.playingMediaPatched(), "Follow playing media"));
+                Shapes.playingMediaPatched(), "Follow playing media",
+                Shapes.anyMediaPatched(), "Media apps in navigation"));
     }
 
     /** A section's row: its title, what it holds, and its page when tapped. Left out when it holds nothing. */
@@ -347,6 +348,42 @@ public final class CustomizationActivity extends Activity {
                     dark ? android.R.style.Theme_DeviceDefault_Dialog_Alert : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert));
             body.addView(mediaRow);
         }
+
+        if (Shapes.anyMediaPatched()) {
+            // The row of other apps in navigation's media panel shows about five (issue #78).
+            LinearLayout appsRow = rowBase("Media apps in navigation", mediaAppsSummary());
+            TextView appsSub = (TextView) ((LinearLayout) appsRow.getChildAt(0)).getChildAt(1);
+            appsRow.setOnClickListener(v -> {
+                java.util.List<String> all = MediaApps.candidates(this);
+                java.util.List<String> chosen = MediaApps.chosen(this);
+                for (String p : chosen) if (!all.contains(p)) all.add(p);     // chosen but not offered right now
+                if (all.size() > 31) all = all.subList(0, 31);
+                final java.util.List<String> apps = all;
+                String[] labels = new String[apps.size()];
+                int mask = 0;
+                for (int i = 0; i < apps.size(); i++) {
+                    labels[i] = MediaApps.label(this, apps.get(i));
+                    if (chosen.contains(apps.get(i))) mask |= 1 << i;
+                }
+                chooseMany("Media apps in navigation", labels, mask, out -> {
+                    java.util.List<String> picked = new java.util.ArrayList<>();
+                    for (int i = 0; i < apps.size(); i++) if ((out & (1 << i)) != 0) picked.add(apps.get(i));
+                    // read when navigation starts, so no restart
+                    MediaApps.setChosen(this, picked);
+                    appsSub.setText(mediaAppsSummary());
+                });
+            });
+            body.addView(appsRow);
+        }
+    }
+
+    private String mediaAppsSummary() {
+        java.util.List<String> chosen = MediaApps.chosen(this);
+        if (chosen.isEmpty()) return "All, the one playing first";
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (String p : chosen) names.add(MediaApps.label(this, p));
+        if (names.size() <= 3) return String.join(", ", names);
+        return String.join(", ", names.subList(0, 2)) + " & " + (names.size() - 2) + " more";
     }
 
     /** Waze & external data source, opened from its own account sheet row: the speeding chime, speed cameras and Waze's alerts. */

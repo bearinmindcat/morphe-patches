@@ -15,6 +15,8 @@ import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
@@ -62,6 +64,8 @@ val anyMediaAppPatch = bytecodePatch(
     dependsOn(sharedExtensionPatch, mediaAppsVisiblePatch)
 
     execute {
+        markPatched("anyMediaPatched")
+
         // The list's builder: the one method naming both YouTube Music and the media browser service.
         val owners = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
         classDefForEach { c ->
@@ -190,6 +194,54 @@ val anyMediaAppPatch = bytecodePatch(
         }
         answer("entryClass", entryType.removePrefix("L").removeSuffix(";").replace('/', '.'))
         answer("addMethod", addRef.name)
+
+        // Issue #78: the media panel offers the other media apps in a row under the controls. The row holds about
+        // five and does not scroll, and its apps came in the order their media browsers answered Maps -- different
+        // each navigation, the rest cut off, the app in use among them at times. The extension puts the playing
+        // apps first, then the ones chosen in Customization (or all, by name), right after the panel collects
+        // the answers: the panel's own app first, then the rest as they answered.
+        run {
+            val callbacks = mutableListOf<Method>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                c.methods.filterTo(callbacks) { m ->
+                    val code = m.implementation?.instructions ?: return@filterTo false
+                    m.returnType == "V" && m.parameterTypes.map(CharSequence::toString) == listOf("Lcom/google/common/collect/ImmutableList;") &&
+                        code.any { ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r -> r.definingClass == "Ljava/util/Collections;" && r.name == "sort" } == true } &&
+                        code.any { ((it as? ReferenceInstruction)?.reference as? FieldReference)?.let { f -> f.definingClass == "Landroid/content/pm/ServiceInfo;" && f.name == "packageName" } == true }
+                }
+            }
+            val found = callbacks.singleOrNull() ?: throw PatchException("media apps' answers: found ${callbacks.size} methods")
+            val method = mutableClassDefBy(found.definingClass).methods.single {
+                it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == "V"
+            }
+            val code = method.implementation!!.instructions.toList()
+            // The panel finds its own app by package: (cast to the panel type).<getter>() equals the default app.
+            val appGetter = code.indices.firstNotNullOfOrNull { i ->
+                val r = (code[i] as? ReferenceInstruction)?.reference as? MethodReference ?: return@firstNotNullOfOrNull null
+                val cast = code.getOrNull(i - 1)
+                val equals = (code.getOrNull(i + 2) as? ReferenceInstruction)?.reference as? MethodReference
+                r.takeIf {
+                    code[i].opcode == Opcode.INVOKE_VIRTUAL && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;" &&
+                        cast?.opcode == Opcode.CHECK_CAST && ((cast as ReferenceInstruction).reference as TypeReference).type == it.definingClass &&
+                        equals?.definingClass == "Ljava/lang/String;" && equals.name == "equals"
+                }?.let { i to it }
+            } ?: throw PatchException("media panel no longer finds its app by package")
+            // all.addAll(answers): the answers are still the parameter there.
+            val answers = method.implementation!!.registerCount - 1
+            val addAll = (appGetter.first downTo 0).firstOrNull { i ->
+                val r = (code[i] as? ReferenceInstruction)?.reference as? MethodReference
+                code[i].opcode == Opcode.INVOKE_INTERFACE && r?.definingClass == "Ljava/util/List;" && r.name == "addAll" &&
+                    (code[i] as Instruction35c).registerD == answers
+            } ?: throw PatchException("media panel no longer adds the answers to its list")
+            val all = (code[addAll] as Instruction35c).registerC
+            if (all > 15 || answers > 15) throw PatchException("media panel list registers out of invoke range")
+            method.addInstructions(
+                addAll + 1,
+                "invoke-static { v$all, v$answers }, $MEDIA_APPS->swapOrder(Ljava/util/List;Ljava/util/List;)V",
+            )
+            answer("panelAppMethod", appGetter.second.name)
+        }
 
         // Issue #78: Maps waits for every listed app's media browser to answer its connection, with no time limit --
         // the Default media app list (also opened by Show media playback controls) loads until all have, the media
