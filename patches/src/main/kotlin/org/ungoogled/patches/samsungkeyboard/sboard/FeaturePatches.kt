@@ -33,12 +33,19 @@ val hideTipsPatch = bytecodePatch(
     category(SBOARD)
 
     execute {
-        // Every tip is shown by one method that inflates the tip bubble into a pop-up window; it now returns at once.
+        // Every tip is shown by one method of the tip pop-up's class (Context, anchor view, text, three ints, a flag,
+        // ...); it now returns at once. The class is the one that inflates the tip's binding.
+        val tipClasses = mutableSetOf<String>()
+        classDefForEach { c ->
+            if (c.methods.any { m ->
+                    m.returnType == SMART_TIP_BINDING || m.parameterTypes.any { it.toString() == SMART_TIP_BINDING } ||
+                        m.instructions().any { ((it as? ReferenceInstruction)?.reference as? TypeReference)?.type == SMART_TIP_BINDING }
+                } && !c.type.startsWith("Lcom/samsung/android/honeyboard/base/databinding/")
+            ) tipClasses += c.type
+        }
+        val shape = listOf("Landroid/content/Context;", "Landroid/view/View;", "Ljava/lang/String;", "I", "I", "I", "Z")
         val shows = methodsWhere { m ->
-            m.returnType == "V" && m.instructions().let { code ->
-                code.any { it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as TypeReference).type == SMART_TIP_BINDING } &&
-                    code.any { it.opcode == Opcode.NEW_INSTANCE && ((it as ReferenceInstruction).reference as TypeReference).type == "Landroid/widget/PopupWindow;" }
-            }
+            m.definingClass in tipClasses && m.returnType == "V" && m.parameterTypes.map(CharSequence::toString).take(7) == shape
         }
         if (shows.isEmpty()) throw PatchException("the keyboard's tip pop-up was not found")
         shows.forEach { mutable(it).prepend("return-void") }
@@ -74,7 +81,6 @@ val hideNewBadgesPatch = resourcePatch(
 
 /** Logged when the sticker bar's store button can't name Galaxy Store; the button's code sits right before. */
 private const val STORE_NAME_LOG = "getStoreName failed"
-private const val MORE_BUTTON = "Lcom/samsung/android/honeyboard/support/category/CategoryLayout;->getMoreBtn()Lcom/samsung/android/honeyboard/support/category/CategoryImageButton;"
 
 @Suppress("unused")
 val hideStoreLinksPatch = bytecodePatch(
@@ -90,16 +96,26 @@ val hideStoreLinksPatch = bytecodePatch(
         var buttons = 0
         for (method in methodsWithString(STORE_NAME_LOG)) mutable(method).apply {
             val instructions = implementation!!.instructions
-            val fetch = instructions.indexOfFirst { it.call() == MORE_BUTTON }
-            if (fetch < 0) return@apply
-            val test = (fetch + 1 until minOf(fetch + 16, instructions.size - 1)).firstOrNull {
-                instructions[it].opcode == Opcode.IGET_BOOLEAN &&
-                    instructions[it + 1].opcode.let { op -> op == Opcode.IF_NEZ || op == Opcode.IF_EQZ } &&
-                    (instructions[it + 1] as OneRegisterInstruction).registerA == (instructions[it] as TwoRegisterInstruction).registerA
+            // The button is shown with setVisibility(0) right after the test that skips to hiding it.
+            // (A boolean flag -- a field, or a ()Z call's result -- not a null check such as the backspace button's.)
+            fun flag(i: Int): Boolean {
+                val register = (instructions[i] as OneRegisterInstruction).registerA
+                val source = instructions.getOrNull(i - 1) ?: return false
+                return when (source.opcode) {
+                    Opcode.IGET_BOOLEAN -> (source as TwoRegisterInstruction).registerA == register
+                    Opcode.MOVE_RESULT -> (source as OneRegisterInstruction).registerA == register &&
+                        instructions.getOrNull(i - 2)?.call()?.endsWith(")Z") == true
+                    else -> false
+                }
+            }
+            val show = instructions.indices.firstOrNull { i ->
+                i >= 3 && instructions[i].call() == "Landroid/view/View;->setVisibility(I)V" &&
+                    (instructions[i - 1] as? NarrowLiteralInstruction)?.narrowLiteral == 0 &&
+                    instructions[i - 2].opcode.let { op -> op == Opcode.IF_NEZ || op == Opcode.IF_EQZ } && flag(i - 2)
             } ?: throw PatchException("the sticker store button's hide test was not found")
-            val register = (instructions[test] as TwoRegisterInstruction).registerA
+            val register = (instructions[show - 2] as OneRegisterInstruction).registerA
             // A hide when the flag is set: if-nez jumps to it, if-eqz jumps past it.
-            replaceInstruction(test, "const/4 v$register, 0x1")
+            addInstructionsAtLabel(show - 2, "const/16 v$register, 0x1")
             buttons++
         }
         if (buttons == 0) throw PatchException("the sticker bar's store button ($STORE_NAME_LOG) was not found")
@@ -124,8 +140,11 @@ val moreRecentEmojiPatch = bytecodePatch(
 
     execute {
         var caps = 0
+        // The class that saves the list caps it as an emoji is added: size() > 40 -> remove(40).
+        val owners = methodsWithString(RECENT_EMOJI).map { it.definingClass }.toSet()
         val writers = methodsWhere { m ->
-            RECENT_EMOJI in m.strings() && m.calls().any { it.endsWith("->putString(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences\$Editor;") }
+            m.definingClass in owners && m.calls().any { it.endsWith("->size()I") } &&
+                m.calls().any { it.endsWith("->remove(I)Ljava/lang/Object;") }
         }
         for (writer in writers) mutable(writer).apply {
             val instructions = implementation!!.instructions
@@ -345,3 +364,4 @@ val moreToolbarButtonsPatch = bytecodePatch(
         sboardLog.info("More toolbar buttons: ${presets.size} presets")
     }
 }
+

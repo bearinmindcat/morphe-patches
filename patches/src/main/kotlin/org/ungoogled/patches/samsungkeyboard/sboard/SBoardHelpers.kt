@@ -95,12 +95,14 @@ private val VISIBILITY_MARKERS = listOf("landscape_view_type", "split_keyboard_l
  * [keys] before it looks at anything else.
  */
 internal fun BytecodePatchContext.hideSettingsRows(vararg keys: String) {
+    // (Context, String, Bundle) in one build family, (String, Context, Bundle) in the other.
+    val shape = setOf("Landroid/content/Context;", "Ljava/lang/String;", "Landroid/os/Bundle;")
     val check = methodsWhere { m ->
-        m.returnType == "Z" &&
-            m.parameterTypes.map(CharSequence::toString) == listOf("Landroid/content/Context;", "Ljava/lang/String;", "Landroid/os/Bundle;") &&
+        m.returnType == "Z" && m.parameterTypes.size == 3 && m.parameterTypes.map(CharSequence::toString).toSet() == shape &&
             m.strings().containsAll(VISIBILITY_MARKERS)
     }.singleOrNull() ?: throw PatchException("the settings' row visibility check was not found")
-    val key = if (check.isStatic) "p1" else "p2"
+    val index = check.parameterTypes.map(CharSequence::toString).indexOf("Ljava/lang/String;")
+    val key = "p${index + if (check.isStatic) 0 else 1}"
     val method = mutable(check)
     val before = method.implementation!!.instructions.size
     val smali =
@@ -121,3 +123,21 @@ internal fun MutableMethod.checkInserted(before: Int, smali: String) {
 
 /** Inserts [smali] at the very start of the method. */
 internal fun MutableMethod.prepend(smali: String) = addInstructions(0, smali)
+
+/** Every toolbar button's visibility (2 = hidden) is asked through its BeeItem, whose name R8 keeps. */
+private const val BEE_ITEM = "Lcom/samsung/android/honeyboard/beehive/data/BeeItem;"
+
+/** Hides toolbar buttons by id: a button's visibility answers 2 (hidden) for [ids] before anything else. */
+internal fun BytecodePatchContext.hideToolbarButtons(vararg ids: String) {
+    val method = mutableClassDefByOrNull(BEE_ITEM)?.methods?.singleOrNull {
+        it.name == "getBeeVisibility" && it.returnType == "I" && it.parameterTypes.isEmpty()
+    } ?: throw PatchException("$BEE_ITEM->getBeeVisibility()I not found")
+    // Two scratch registers below `this`.
+    if (method.implementation!!.registerCount < 3) throw PatchException("$BEE_ITEM->getBeeVisibility()I has no spare registers")
+    val before = method.implementation!!.instructions.size
+    val smali = "invoke-virtual/range {p0 .. p0}, $BEE_ITEM->getBeeId()Ljava/lang/String;\nmove-result-object v1\n" +
+        ids.joinToString("\n") { "const-string v0, \"$it\"\ninvoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\nmove-result v0\nif-nez v0, :sboard_hide" } +
+        "\ngoto :sboard_show\n:sboard_hide\nconst/4 v0, 0x2\nreturn v0\n:sboard_show\nnop"
+    method.addInstructionsWithLabels(0, smali)
+    method.checkInserted(before, smali)
+}

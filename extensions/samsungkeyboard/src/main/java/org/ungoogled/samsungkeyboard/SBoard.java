@@ -15,6 +15,11 @@ public final class SBoard {
         return (list == null ? "" : list) + ",bitmoji,mojitok";
     }
 
+    /** A One UI policy string, or "1" when the phone has none (off One UI). */
+    public static String orPresent(String policy) {
+        return policy == null || policy.isEmpty() ? "1" : policy;
+    }
+
     /** A size table {smallest, default, largest}: heights get 20% lower and 25% higher limits; the default stays. */
     public static float[] sizeRange(int type, float[] range) {
         if (range == null || range.length != 3) return range;

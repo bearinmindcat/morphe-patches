@@ -37,7 +37,7 @@ val hideGalaxyAiPatch = bytecodePatch(
         if (policyReaders.isEmpty()) throw PatchException("the Galaxy AI policy reader ($GALAXY_AI_POLICY_LOG) was not found")
         val readerKeys = policyReaders.map { it.key() }.toSet()
         val checks = methodsWhere { m ->
-            m.isStatic && m.returnType == "Z" && m.parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/String;") &&
+            m.returnType == "Z" && m.parameterTypes.map(CharSequence::toString) == listOf("Ljava/lang/String;") &&
                 m.definingClass in policyReaders.map { it.definingClass } &&
                 (GALAXY_AI_POLICY_LOG in m.strings() || m.calls().any { it in readerKeys })
         }
@@ -45,6 +45,7 @@ val hideGalaxyAiPatch = bytecodePatch(
         checks.forEach { mutable(it).prepend("const/4 v0, 0x1\nreturn v0") }
 
         hideSettingsRows(*GALAXY_AI_ROWS)
+        hideToolbarButtons("ai_writing", "ai_expression")
         sboardLog.info("Hide Galaxy AI: $reads switch reads, ${checks.size} policy checks")
     }
 }
@@ -104,5 +105,77 @@ val hideThirdPartyStickersPatch = bytecodePatch(
             CSC_GET_STRING_2,
         )
         sboardLog.info("Hide Bitmoji and mojitok: $reads switch reads")
+    }
+}
+
+@Suppress("unused")
+val hideTranslatePatch = bytecodePatch(
+    name = "Hide Translate",
+    description = "Removes the Translate button from the toolbar.",
+    default = false,
+) {
+    compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
+    category(SBOARD)
+
+    execute {
+        // Google Translate through Samsung's key: a re-signed copy only gets errors from it.
+        hideToolbarButtons("translation", "sogou_translation")
+    }
+}
+
+/** Samsung Pass's toolbar plugin, listed in a resource array the keyboard loads plugins from. */
+private const val PLUGINS = "config_pluginComponentList_onDemand"
+private const val SAMSUNG_PASS = "com.samsung.android.authfw.samsungpass"
+
+@Suppress("unused")
+val hideSamsungPassPatch = bytecodePatch(
+    name = "Hide Samsung Pass",
+    description = "Removes the Samsung Pass button from the toolbar.",
+    default = false,
+) {
+    compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
+    category(SBOARD)
+
+    dependsOn(
+        app.morphe.patcher.patch.resourcePatch {
+            execute {
+                document("res/values/arrays.xml").use { xml ->
+                    val list = xml.getElementsByTagName("string-array")
+                    // Builds without the on-demand plugin list have only the toolbar button to hide.
+                    val plugins = (0 until list.length).map { list.item(it) as org.w3c.dom.Element }
+                        .singleOrNull { it.getAttribute("name") == PLUGINS } ?: return@use
+                    val items = plugins.getElementsByTagName("item")
+                    (0 until items.length).map { items.item(it) }
+                        .filter { it.textContent.contains("samsungpass") }
+                        .forEach { plugins.removeChild(it) }
+                }
+            }
+        },
+    )
+
+    execute {
+        hideToolbarButtons(SAMSUNG_PASS)
+    }
+}
+
+/** One UI's one-handed mode policy; the keyboard offers its one-handed mode only when the phone has one (off One UI: none). */
+private const val ONE_HAND_POLICY = "SEC_FLOATING_FEATURE_COMMON_CONFIG_ONEHAND_MODE_POLICY"
+
+@Suppress("unused")
+val oneHandedEverywherePatch = bytecodePatch(
+    name = "One-handed keyboard on every phone",
+    description = "Offers the one-handed keyboard mode on every phone.",
+) {
+    compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
+    category(SBOARD)
+    extendWith(SAMSUNG_KEYBOARD_EXTENSION)
+
+    execute {
+        // A Galaxy phone's own policy is kept; an empty one (no One UI) reads as present.
+        val reads = answerSwitch(
+            ONE_HAND_POLICY, FLOATING_GET_STRING,
+            "invoke-static/range {{r} .. {r}}, $SBOARD_EXTENSION_CLASS->orPresent(Ljava/lang/String;)Ljava/lang/String;\nmove-result-object {r}",
+        )
+        sboardLog.info("One-handed keyboard: $reads switch reads")
     }
 }
