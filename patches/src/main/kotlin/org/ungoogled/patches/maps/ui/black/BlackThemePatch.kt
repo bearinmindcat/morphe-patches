@@ -107,14 +107,15 @@ private fun MutableMethod.routeColourReturns(): Int {
 }
 
 /*
- * Maps' colour specs bottom out in three leaves whose b(Context) yields the int
- * the UI paints with. Nine other subclasses of the same base delegate to these
- * or to ColorStateLists (which the shared shims already cover).
+ * Maps' colour specs bottom out in three leaves whose (Context)int method yields the int
+ * the UI paints with. The other subclasses of the same base delegate to these
+ * or to ColorStateLists (which the shared shims already cover). The base is read off the
+ * attribute leaf, the only one with a string.
  */
+private lateinit var colourSpecBase: String
 
 /** A literal ARGB colour: the palette, every day/night pair. */
 private object LiteralColourSpecFingerprint : Fingerprint(
-    name = "b",
     returnType = "I",
     parameters = listOf("Landroid/content/Context;"),
     filters = listOf(
@@ -122,12 +123,11 @@ private object LiteralColourSpecFingerprint : Fingerprint(
         fieldAccess(opcode = Opcode.IGET, definingClass = "this", type = "I", location = MatchAfterImmediately()),
         opcode(Opcode.RETURN, MatchAfterImmediately()),
     ),
-    custom = { _, classDef -> classDef.superclass == "Lbhai;" },
+    custom = { _, classDef -> classDef.superclass == colourSpecBase },
 )
 
 /** An @color resource. */
 private object ResourceColourSpecFingerprint : Fingerprint(
-    name = "b",
     returnType = "I",
     parameters = listOf("Landroid/content/Context;"),
     filters = listOf(
@@ -135,16 +135,14 @@ private object ResourceColourSpecFingerprint : Fingerprint(
         fieldAccess(opcode = Opcode.IGET, type = "I", location = MatchAfterImmediately()),
         methodCall(definingClass = "Landroid/content/Context;", name = "getColor", location = MatchAfterImmediately()),
     ),
-    custom = { _, classDef -> classDef.superclass == "Lbhai;" },
+    custom = { _, classDef -> classDef.superclass == colourSpecBase },
 )
 
 /** A ?attr theme attribute -- the route Material You / system dynamic colours take. */
 private object AttributeColourSpecFingerprint : Fingerprint(
-    name = "b",
     returnType = "I",
     parameters = listOf("Landroid/content/Context;"),
     filters = listOf(string("%s holds an unexpected type: %s (TypedValue.type = %d)")),
-    custom = { _, classDef -> classDef.superclass == "Lbhai;" },
 )
 
 /**
@@ -153,7 +151,6 @@ private object AttributeColourSpecFingerprint : Fingerprint(
  * can override, so it stayed grey while everything on it went black.
  */
 private object AccountSheetDynamicColoursFingerprint : Fingerprint(
-    name = "b",
     returnType = "V",
     parameters = emptyList(),
     filters = listOf(
@@ -176,10 +173,14 @@ val blackThemePatch = bytecodePatch(
     execute {
         markPatched("blackThemePatched")
 
+        colourSpecBase = AttributeColourSpecFingerprint.classDef.superclass
+            ?: throw PatchException("the attribute colour spec has no base class")
         val leaves = listOf(LiteralColourSpecFingerprint, ResourceColourSpecFingerprint, AttributeColourSpecFingerprint)
         if (leaves.map { it.classDef.type }.toSet().size != 3) throw PatchException("colour spec leaves are not three distinct classes")
-        val returns = leaves.sumOf { it.method.routeColourReturns() }
-        if (returns != 5) throw PatchException("expected 5 colour-spec return sites (1 + 1 + 3), found $returns")
+        // Each leaf returns its colour at one site or more (26.36's attribute leaf had three, 26.44's has one).
+        leaves.forEach { leaf ->
+            if (leaf.method.routeColourReturns() == 0) throw PatchException("${leaf.classDef.type} returns no colour")
+        }
 
         // Dynamic colours only while Black theme is actually on: `true` becomes !Shapes.BLACK.
         AccountSheetDynamicColoursFingerprint.let { fp ->
