@@ -1,74 +1,35 @@
 package org.ungoogled.patches.maps.account.trim
 
-import app.morphe.patcher.extensions.InstructionExtensions.removeInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
-import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.resource.ResourceType
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
-import app.morphe.patcher.patch.bytecodePatch
-import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.ungoogled.patches.maps.microg.MicrogSelection
+import org.ungoogled.patches.maps.ui.customization.accountSheet
+import org.ungoogled.patches.maps.ui.mapsId
+import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
-/**
- * Every row before its own call is set up identically: `move-object vN, v6`
- * then `check-cast vN, Lolr;`. Cutting a span whose end anchor is the NEXT
- * kept row's own call must therefore stop two instructions short of that
- * call, so the next row's own (identical-looking, but unique BY POSITION
- * since it is the one right before its own distinctly-named call) setup
- * survives.
+/*
+ * Both account sheet builders (see AccountSheet) add every row the same way:
+ *
+ *     invoke-... row()           // a row method of the holder, or a static factory
+ *     move-result-object vRow
+ *     invoke-virtual { vList, vRow }, list.add(Object)
+ *
+ * A row is recognised by what its method loads -- its title string or Google's visual element
+ * id, both stable across Maps builds -- and only its add is dropped (made a nop), so no code
+ * around it moves and the rows of ours placed after Settings stay as they are.
  */
-private const val ROW_SETUP_LENGTH = 2
 
-/**
- * Removes [start, end) and checks, before touching anything, that the span is
- * made of WHOLE rows: the instruction in front of it finishes a row (its list
- * add) or builds the list, and the span's own last instruction is a row's list
- * add. A cut that ends one row short would otherwise leave that row's
- * move-result behind with no call in front of it -- which the dex verifier
- * rejects, taking the whole builder class (and Maps' startup) with it. An
- * earlier version of this patch shipped exactly that in the legacy builder,
- * where rows have no setup instructions and ROW_SETUP_LENGTH does not apply.
- */
-private fun MutableMethod.removeWholeRows(start: Int, end: Int, what: String) {
-    if (end <= start) throw PatchException("$what span is empty or inverted ($start..$end)")
-    val instructions = implementation!!.instructions
-    fun call(i: Int) = ((instructions[i] as? ReferenceInstruction)?.reference as? MethodReference)
-    fun isRowAdd(i: Int) = call(i)?.let { it.definingClass == "Lbwxy;" && it.name == "i" } == true
-    fun isListCtor(i: Int) = call(i)?.let { it.definingClass == "Lbwxy;" && it.name == "<init>" } == true
-    if (!isRowAdd(start - 1) && !isListCtor(start - 1)) throw PatchException("$what span does not start at a row boundary")
-    if (!isRowAdd(end - 1)) throw PatchException("$what span does not end with a whole row")
-    removeInstructions(start, end - start)
-}
-
-/**
- * Removes, from [start] to [end], every whole row built by a call [builtBy] matches, and
- * only those: Customization screen adds its own row right after Settings, and depending on
- * the order patches run in it may already be there. A row runs from just after the previous
- * row's add to its own add on the same list; [start] must be right after Settings' own add.
- */
-private fun MutableMethod.removeRowsBuilt(start: Int, end: Int, expected: Int, what: String, builtBy: (MethodReference) -> Boolean) {
-    val instructions = implementation!!.instructions
-    fun call(i: Int) = ((instructions[i] as? ReferenceInstruction)?.reference as? MethodReference)
-    val list = (instructions[start - 1] as Instruction35c).registerC
-    val rows = mutableListOf<IntRange>()
-    var rowStart = start
-    for (i in start until end) {
-        val c = call(i) ?: continue
-        if (c.definingClass == "Lbwxy;" && c.name == "i" && (instructions[i] as Instruction35c).registerC == list) {
-            rows += rowStart..i
-            rowStart = i + 1
-        }
-    }
-    if (rowStart != end) throw PatchException("$what: code after the last row before the list is finished")
-    val doomed = rows.filter { row -> row.any { i -> call(i)?.let(builtBy) == true } }
-    if (doomed.size != expected) throw PatchException("$what: expected $expected rows to remove, found ${doomed.size}")
-    doomed.asReversed().forEach { removeWholeRows(it.first, it.last + 1, what) }
-}
-
-private val HELP_AND_FEEDBACK: (MethodReference) -> Boolean = { it.definingClass == "Lbtqs;" && it.name == "cI" }
-private val YOUR_DATA: (MethodReference) -> Boolean =
-    { it.definingClass == "Lolr;" && it.name == "a" && it.parameterTypes.isEmpty() && it.returnType == "Lbrmi;" }
+/** Visual elements Maps logs the two common rows with. */
+private const val YOUR_DATA_VE = 90536
+private const val HELP_AND_FEEDBACK_VE = 90538
 
 @Suppress("unused")
 val trimAccountMenuPatch = bytecodePatch(
@@ -81,45 +42,41 @@ val trimAccountMenuPatch = bytecodePatch(
 
     execute {
         if (MicrogSelection.replaces(this, "Trim account menu")) return@execute
-        // Modern builder: three independent cuts, each a pure removal -- the
-        // rows on both sides of every cut are left completely alone, so
-        // nothing needs to be reconstructed.
-        CustomActionsListFingerprint.let { fp ->
-            val m = fp.instructionMatches
-            val start = m.first().index + 1
-            val end = m.last().index - ROW_SETUP_LENGTH
-            fp.method.removeWholeRows(start, end, "custom-actions")
+        val doomed = mapOf(
+            "Your Timeline" to mapsId(ResourceType.STRING, "YOUR_TIMELINE"),
+            "Location sharing" to mapsId(ResourceType.STRING, "LOCATION_SHARING_FEATURE_TITLE_VARIANT_LOCATION_SHARING"),
+            "Your data in Maps" to YOUR_DATA_VE,
+            "Help & feedback" to HELP_AND_FEEDBACK_VE,
+        )
+        val sheet = accountSheet()
+        fun MethodReference.literals(): Set<Int> {
+            // Rows of ours (ua*) are made like "Your data in Maps" and stay.
+            if (name.startsWith("ua")) return emptySet()
+            val method = classDefByOrNull(definingClass)?.methods?.singleOrNull {
+                it.name == name && it.parameterTypes.map(CharSequence::toString) == parameterTypes.map(CharSequence::toString) &&
+                    it.returnType == returnType
+            } ?: return emptySet()
+            return method.implementation?.instructions?.mapNotNull { (it as? NarrowLiteralInstruction)?.narrowLiteral }?.toSet().orEmpty()
         }
-        CommonActionsListFingerprint.let { fp ->
-            val m = fp.instructionMatches
-            val start = m[1].index + 1 // right after the list's OWN constructor call, m[0]
-            val end = m.last().index - ROW_SETUP_LENGTH
-            fp.method.removeWholeRows(start, end, "common-actions")
-        }
-        SettingsRowAddFingerprint.let { fp ->
-            val m = fp.instructionMatches
-            val start = m[2].index + 1 // right after Settings' own row-add
-            val end = m.last().index   // right at the list finalize
-            fp.method.removeRowsBuilt(start, end, 1, "Help & feedback", HELP_AND_FEEDBACK)
-        }
-
-        // Legacy builder: neither span references the ambiguous constructor
-        // call, so ordering between these two and the modern builder's three
-        // above does not matter -- each computes its own indices fresh, in
-        // its own class's method, right before applying its own mutation.
-        LegacySettingsRowAddFingerprint.let { fp ->
-            val m = fp.instructionMatches
-            val start = m[2].index + 1 // right after Settings' own row-add
-            val end = m.last().index   // right at the list finalize
-            fp.method.removeRowsBuilt(start, end, 2, "legacy Settings") { HELP_AND_FEEDBACK(it) || YOUR_DATA(it) }
-        }
-        LegacyYourProfileFingerprint.let { fp ->
-            val m = fp.instructionMatches
-            val start = m[2].index + 1 // right after Your profile's own row-add
-            // Legacy rows call straight through a typed register -- no setup
-            // instructions -- so the kept row starts AT its own call.
-            val end = m.last().index
-            fp.method.removeWholeRows(start, end, "legacy Your-profile")
+        for (builder in sheet.builders) {
+            val method = builder.method
+            val instructions = method.implementation!!.instructions
+            val found = mutableMapOf<String, Int>()
+            for (i in 2 until instructions.size) {
+                val add = instructions[i]
+                if (add.opcode != Opcode.INVOKE_VIRTUAL || (add as ReferenceInstruction).reference != sheet.listAdd) continue
+                val result = instructions[i - 1]
+                val call = instructions[i - 2]
+                if (result.opcode != Opcode.MOVE_RESULT_OBJECT || (result as OneRegisterInstruction).registerA != (add as Instruction35c).registerD) continue
+                val ref = (call as? ReferenceInstruction)?.reference as? MethodReference ?: continue
+                val literals = ref.literals()
+                val row = doomed.entries.firstOrNull { it.value in literals }?.key ?: continue
+                if (row in found) throw PatchException("$row is added twice in ${method.definingClass}")
+                found[row] = i
+            }
+            val missing = doomed.keys - found.keys
+            if (missing.isNotEmpty()) throw PatchException("account sheet rows not found in ${method.definingClass}: ${missing.joinToString()}")
+            found.values.forEach { method.replaceInstruction(it, "nop") }
         }
     }
 }
