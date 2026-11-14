@@ -15,8 +15,9 @@ import android.util.Log;
  * The wallpaper image the launcher reads to pick dark or light labels, page dots and status bar icons and to blur
  * behind folders and menus. A system home screen may read it; an installed app is refused with a SecurityException
  * (READ_EXTERNAL_STORAGE on Android 11 and 12, a system permission later). Where the image is refused, the launcher gets
- * one of the wallpaper's own colors instead (WallpaperColors, open to every app), light or dark as Android itself
- * judged the wallpaper, so its choices match the wallpaper.
+ * a plain grey as light or dark as Android itself judged the wallpaper (WallpaperColors, open to every app), so its
+ * choices match the wallpaper. Grey, not the wallpaper's own color: the launcher blurs this image behind app menus and
+ * the app drawer, and a tinted one turned them purple on a purple wallpaper.
  */
 public final class Wallpapers {
     private static final String TAG = "UA";
@@ -43,7 +44,7 @@ public final class Wallpapers {
         }
     }
 
-    /** An image of the screen's proportions filled with the wallpaper's main color, as light as Android rates it. */
+    /** An image of the screen's proportions filled with a grey as light as Android rates the wallpaper. */
     static Drawable fromColors(WallpaperManager wm, int which) {
         WallpaperColors colors = null;
         try {
@@ -65,6 +66,8 @@ public final class Wallpapers {
         for (int i = 1; i <= 10 && (darkText ? luminance(color) < 210 : luminance(color) >= 150); i++) {
             color = blend(color, target, 0.15f);
         }
+        int grey = luminance(color);
+        color = Color.rgb(grey, grey, grey);
         DisplayMetrics m = Resources.getSystem().getDisplayMetrics();
         int w = Math.max(1, m.widthPixels / 8), h = Math.max(1, m.heightPixels / 8);
         Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
