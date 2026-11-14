@@ -205,9 +205,10 @@ val enableNonOneUiPatch = bytecodePatch(
             )
         } ?: throw PatchException("no createGifAnimation() in Gallery's $GIF_ANIMATION_FACTORY")
 
-        // A photo opened from a camera app other than Samsung's (GCam's REVIEW, or VIEW through a "Photos" stub) showed
-        // alone. Gallery opens a photo within its album when the intent names the album (bucketId, as Samsung's My Files
-        // does); OpenInAlbum adds it for a camera's photo before Gallery reads the intent, and makes REVIEW a VIEW.
+        // A photo opened from another app (a camera's REVIEW, a "Photos" stub's VIEW, a file manager's document, file or
+        // own URI) showed alone. Gallery opens a photo within its album when the intent names the album (bucketId, as
+        // Samsung's My Files does); OpenInAlbum traces the URI to the photo's MediaStore item and names it and its album
+        // before Gallery reads the intent, and makes REVIEW a VIEW.
         (mutableClassDefByOrNull(LAUNCH_INTENT) ?: throw PatchException("Samsung Gallery has no $LAUNCH_INTENT"))
             .methods.firstOrNull { it.name == "<init>" && it.parameterTypes == listOf("Landroid/content/Intent;") }
             ?.let { constructor ->
