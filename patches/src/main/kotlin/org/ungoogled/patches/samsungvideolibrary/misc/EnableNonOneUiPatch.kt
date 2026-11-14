@@ -13,6 +13,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.implementOneUiInterfaceMethods
 import org.ungoogled.patches.samsung.redirectCalls
+import org.ungoogled.patches.samsung.redirectMembers
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsung.rewriteStringLiterals
@@ -260,6 +261,44 @@ private val systemServicesPatch = bytecodePatch(
     }
 }
 
+/** Calls to One UI's system service managers (by dex key) that a copy not signed by Samsung may be refused. */
+private val ONE_UI_MANAGER_MEMBERS = setOf(
+    // Event delegation (package events): its manager throws NullPointerException without the union service's binder.
+    "Lcom/samsung/android/sepunion/SemEventDelegationManager;->registerPendingIntent(Landroid/content/IntentFilter;Landroid/app/PendingIntent;ILjava/util/List;)V",
+    "Lcom/samsung/android/sepunion/SemEventDelegationManager;->unregisterAll()V",
+    // DeX state and listener.
+    "Lcom/samsung/android/desktopmode/SemDesktopModeManager;->getDesktopModeState()Lcom/samsung/android/desktopmode/SemDesktopModeState;",
+    "Lcom/samsung/android/desktopmode/SemDesktopModeManager;->registerListener(Lcom/samsung/android/desktopmode/SemDesktopModeManager\$DesktopModeListener;)V",
+    "Lcom/samsung/android/desktopmode/SemDesktopModeManager;->unregisterListener(Lcom/samsung/android/desktopmode/SemDesktopModeManager\$DesktopModeListener;)V",
+    "Lcom/samsung/android/desktopmode/SemDesktopModeState;->enabled:I",
+    "Lcom/samsung/android/desktopmode/SemDesktopModeState;->state:I",
+    // Knox: Secure Folder menu and moves, Knox mode (asked on every rotation check).
+    "Lcom/samsung/android/knox/SemPersonaManager;->getKnoxInfoForApp(Landroid/content/Context;)Landroid/os/Bundle;",
+    "Lcom/samsung/android/knox/SemPersonaManager;->getMoveToKnoxMenuList(Landroid/content/Context;)Ljava/util/ArrayList;",
+    "Lcom/samsung/android/knox/SemPersonaManager;->isKnoxActivated()Z",
+    "Lcom/samsung/android/knox/SemRemoteContentManager;->moveFiles(ILjava/util/List;Ljava/util/List;I)J",
+)
+
+/**
+ * On a Samsung phone One UI's own managers are there, but this copy is neither signed by Samsung nor in Video Player's
+ * shared user ID: the list registered for package events through One UI's event delegation at start-up, whose manager
+ * got no binder from Samsung's union service and threw (NullPointerException), and the app crashed on every Galaxy.
+ * Every call it makes to One UI's service managers (event delegation, DeX, Knox) goes through OneUi, which answers
+ * "not there" when One UI refuses it; a DeX state that never came reads as off.
+ */
+private val oneUiManagersPatch = bytecodePatch(
+    description = "Skips One UI system services that refuse this copy on Samsung phones.",
+) {
+    extendWith(SAMSUNG_VIDEO_LIBRARY_EXTENSION)
+
+    execute {
+        val (calls, fields) = redirectMembers("$EXT/OneUi;", "$EXT/Managers;", ONE_UI_MANAGER_MEMBERS) { _, _ -> false }
+        log.info("One UI manager members: $calls calls, $fields fields")
+        // Measured against 1.4.22.81: 11 calls (event delegation 3 + 1, DeX 3, Knox 4) and 3 DeX state field reads.
+        if (calls < 8 || fields < 1) throw PatchException("only $calls One UI manager calls and $fields fields found")
+    }
+}
+
 /**
  * What the raised target SDK changes: a receiver registered at runtime must say whether other apps may send to it
  * (unsaid, Android throws), and a mutable PendingIntent must name its app (the share sheet's "chosen" callback threw
@@ -351,8 +390,8 @@ val enableNonOneUiPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_VIDEO_LIBRARY)
     dependsOn(
-        manifestPatch, sprDrawablesPatch, versionTablePatch, oneUiMembersPatch, systemServicesPatch, mediaQueriesPatch,
-        targetSdkCallsPatch, playerIntentPatch, updateCheckPatch,
+        manifestPatch, sprDrawablesPatch, versionTablePatch, oneUiMembersPatch, oneUiManagersPatch, systemServicesPatch,
+        mediaQueriesPatch, targetSdkCallsPatch, playerIntentPatch, updateCheckPatch,
     )
     extendWith(SAMSUNG_VIDEO_LIBRARY_EXTENSION)
 }
