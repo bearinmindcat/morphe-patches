@@ -18,7 +18,8 @@ private val GATE_FIELDS = listOf("isPreInstalled", "isNothingDevice")
  * Off a Nothing phone, Nothing Gallery refuses to run: it checks that it was pre-installed in the ROM and that the
  * device is a Nothing device, and otherwise shows a dialog that closes the app. Both are local checks; this makes
  * the two getters report yes, so the gallery opens and shows the device's photos, albums and the viewer. Features
- * that need Nothing's own services (e.g. the cloud AI eraser) are out of scope.
+ * that need Nothing's own services (e.g. the cloud AI eraser) are out of scope. ML Kit's usage logs stay on the phone
+ * (mlKitLogsPatch).
  */
 @Suppress("unused")
 val enableNonNothingPatch = bytecodePatch(
@@ -27,6 +28,7 @@ val enableNonNothingPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_NOTHING_GALLERY)
+    dependsOn(mlKitLogsPatch)
 
     execute {
         fun Method.readsBooleanField(name: String): Boolean =
