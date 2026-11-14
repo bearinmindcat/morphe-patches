@@ -86,6 +86,10 @@ APP_RENAMES = {
         '<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail',
         '<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail',
     ),
+    "com.google.android.apps.photos": (
+        '<img src="docs/icons/photos.png" width="20" height="20" align="top"> Google Photos',
+        '<img src="docs/icons/photos.png" width="20" height="20" align="top"> Google Photos',
+    ),
     "com.waze": (
         '<img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze',
         '<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze',
