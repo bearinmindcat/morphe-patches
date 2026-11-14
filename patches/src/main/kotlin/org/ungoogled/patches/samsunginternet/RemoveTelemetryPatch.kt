@@ -1,15 +1,19 @@
 package org.ungoogled.patches.samsunginternet
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.samsung.hideDiagnosticsAgent
 import org.ungoogled.patches.samsung.muteFeatureSurveys
+import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsunginternet.SamsungInternetConstants.COMPATIBILITY_SAMSUNG_INTERNET
 
 private const val SI_LOG = "${SBROWSER}si_log/SILog;"
@@ -19,6 +23,69 @@ private const val GENERAL_CALLBACK = "${SBROWSER}common/model/general/GeneralCal
 private const val COMMAND_LINE = "${SBROWSER}init/SBrowserCommandLine;"
 
 private val log = java.util.logging.Logger.getLogger("SamsungInternet")
+
+private const val TERMS = "${SBROWSER}help_intro/utils/HelpIntroUtil;"
+private const val TERMS_GATE = "Lorg/ungoogled/samsunginternet/TermsGate;"
+
+/**
+ * Seconds after a first launch, with the terms still on screen, the app reached a dozen servers: Samsung's update
+ * check, remote configuration, ad-block lists, Quick access, news and Safer browsing, Kindred (Smart shopping, a third
+ * party), search engines' icons and Firebase for its push. Every connection the app's own code opens
+ * (URL.openConnection / openStream) and every host lookup it makes (InetAddress, which OkHttp uses too) goes through
+ * TermsGate, which fails it as offline until HelpIntroUtil.isAgreementNeeded says the terms are accepted. After
+ * "Continue" everything runs as before. Pages load in the Chromium engine, which this does not touch.
+ */
+private val termsGatePatch = bytecodePatch(
+    description = "Keeps the app offline until its terms are accepted.",
+) {
+    extendWith("extensions/samsunginternet.mpe")
+
+    execute {
+        val needed = method(TERMS, "isAgreementNeeded", "Landroid/content/Context;")
+        if (needed.returnType != "Z" || !AccessFlags.STATIC.isSet(needed.accessFlags)) {
+            throw PatchException("HelpIntroUtil.isAgreementNeeded changed shape")
+        }
+        // Before the app's content providers and Application.onCreate start anything.
+        method("${SBROWSER}SBrowserApplication;", "attachBaseContext", "Landroid/content/Context;").addInstructions(
+            0,
+            "invoke-static {p1}, $TERMS_GATE->install(Landroid/content/Context;)V",
+        )
+        method(
+            "${SBROWSER}help_intro/HelpIntroHelper;", "handleActivityResult",
+            "Landroid/app/Activity;", "I", "${SBROWSER}common/model/sbrowser_tab/SBrowserTabDelegate;",
+        ).addInstructions(0, "invoke-static {p2}, $TERMS_GATE->termsClosed(I)V")
+        // Samsung's push (SMP) registered with Firebase through Play services at start-up: it now starts after the terms.
+        val push = method("${SBROWSER}smp/SmpController;", "initialize", "${SBROWSER}smp/SmpController\$InitializeResultCallback;")
+        if (push.implementation!!.registerCount - 2 < 1) throw PatchException("SmpController.initialize has no free register")
+        push.addInstructionsWithLabels(
+            0,
+            """
+                invoke-static {p0, p1}, $TERMS_GATE->holdPush(Ljava/lang/Object;Ljava/lang/Object;)Z
+                move-result v0
+                if-eqz v0, :start
+                return-void
+            """,
+            ExternalLabel("start", push.implementation!!.instructions.first()),
+        )
+        val moved = redirectCalls(
+            TERMS_GATE,
+            mapOf(
+                "Ljava/net/URL;" to setOf(
+                    "openConnection()Ljava/net/URLConnection;",
+                    "openConnection(Ljava/net/Proxy;)Ljava/net/URLConnection;",
+                    "openStream()Ljava/io/InputStream;",
+                ),
+                "Ljava/net/InetAddress;" to setOf(
+                    "getAllByName(Ljava/lang/String;)[Ljava/net/InetAddress;",
+                    "getByName(Ljava/lang/String;)Ljava/net/InetAddress;",
+                ),
+            ),
+        )
+        // Measured against 31.0.0.79: 26 openConnection, the OkHttp resolver and a few more.
+        if (moved < 10) throw PatchException("only $moved connection calls found")
+        log.info("Terms gate: $moved connection calls")
+    }
+}
 
 /** A Kotlin suspend function that returns Unit: answers the same Unit (read from its own last return) at once. */
 private fun MutableMethod.returnUnit() {
@@ -33,16 +100,17 @@ private fun MutableMethod.returnUnit() {
  * sia.internet.apps.samsung.com), measured sending before the terms are even accepted; the terms-acceptance record
  * (terms.internet.apps.samsung.com/activated with an install ID, model, country and versions); on Galaxy phones also
  * Samsung Analytics, DiagMon crash and ANR reports and One UI's feature-usage surveys; and Chromium's autofill
- * crowdsourcing (form signatures to content-autofill.googleapis.com). Not touched, because they are features: ad
- * blocker lists, Samsung Cloud sync and its push (SMP / Firebase Messaging), Safe Browsing, update checks, the remote
- * configuration, news, and Smart shopping (Kindred, its own setting).
+ * crowdsourcing (form signatures to content-autofill.googleapis.com). The app's features (ad blocker lists, Samsung
+ * Cloud sync and its push, Safe Browsing, update checks, the remote configuration, news, Smart shopping) wait for the
+ * terms (termsGatePatch) and are otherwise untouched.
  */
 @Suppress("unused")
 val removeTelemetryPatch = bytecodePatch(
     name = "Remove telemetry",
-    description = "Stops Samsung's usage logs, analytics, crash reports and autofill crowdsourcing.",
+    description = "Stops Samsung's usage logs, analytics and crash reports, and keeps the app offline until its terms are accepted.",
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_INTERNET)
+    dependsOn(termsGatePatch)
 
     execute {
         // SI log: nothing is recorded (events and status logs), and the client never sends what an older install
