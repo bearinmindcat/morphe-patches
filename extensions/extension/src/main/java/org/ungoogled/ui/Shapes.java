@@ -102,10 +102,21 @@ public final class Shapes {
      * Change package name: in place of the app's package name where Maps looks itself up in its
      * table of Google's own builds (Location sharing's client number, keyed by package). A new
      * package name is not in it, the lookup came back empty, and opening Location sharing crashed
-     * Maps (issue #30). To that table the app is stock Maps.
+     * Maps (issue #30). To that table the app is stock Maps, unless it is one of the builds the
+     * table names: a custom name merely starting like Google's (com.google.android.apps.maps.morphe)
+     * is not in it either (issue #194).
      */
     public static String mapsPackage(String actual) {
-        return actual != null && actual.startsWith("com.google.android.apps.") ? actual : "com.google.android.apps.maps";
+        if (actual == null) return "com.google.android.apps.maps";
+        switch (actual) {
+            case "com.google.android.apps.gmm":            // the table's keys: Google's internal builds
+            case "com.google.android.apps.gmm.dev":
+            case "com.google.android.apps.gmm.fishfood":
+            case "com.google.android.apps.gmm.qp":
+                return actual;
+            default:
+                return "com.google.android.apps.maps";
+        }
     }
     /** Location provider toggle's option: rewritten to return true when it defaults to Play services. */
     public static boolean playLocationByDefault() { return false; }
