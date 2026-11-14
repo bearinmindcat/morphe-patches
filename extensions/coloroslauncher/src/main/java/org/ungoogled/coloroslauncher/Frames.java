@@ -23,6 +23,8 @@ final class Frames implements Choreographer.FrameCallback {
     private final ArrayList<Object> callbacks = new ArrayList<>();
     private final Map<Object, Long> startAt = new HashMap<>();
     private boolean posted;
+    /** The vsync time of the frame being handled (or last handled) on this thread. */
+    private long frameNanos;
 
     private Frames() {
     }
@@ -51,6 +53,30 @@ final class Frames implements Choreographer.FrameCallback {
         int i = f.callbacks.indexOf(callback);
         if (i >= 0) f.callbacks.set(i, null); // removed after this frame, as AnimationHandler does
         f.startAt.remove(callback);
+    }
+
+    /**
+     * Choreographer.getLastFrameTimeNanos() (hidden): the time of this thread's current frame. The home screen's page
+     * spring (quickstep SpringAnimationNs) steps by it; answered 0 the spring never moved and a page swipe stopped
+     * where the finger let go.
+     */
+    static long lastFrameTimeNanos() {
+        Frames f = FRAMES.get();
+        return f != null && f.frameNanos != 0 ? f.frameNanos : System.nanoTime();
+    }
+
+    /** Choreographer.getFrameIntervalNanos() (hidden): one frame at the display's refresh rate. */
+    static long frameIntervalNanos() {
+        try {
+            android.content.Context c = App.context();
+            android.view.Display d = c == null ? null : c.getSystemService(android.hardware.display.DisplayManager.class)
+                    .getDisplay(android.view.Display.DEFAULT_DISPLAY);
+            float hz = d == null ? 0 : d.getRefreshRate();
+            if (hz >= 1) return (long) (1_000_000_000L / hz);
+        } catch (RuntimeException e) {
+            // 60 Hz then
+        }
+        return 16_666_667L;
     }
 
     static int count() {
@@ -88,6 +114,7 @@ final class Frames implements Choreographer.FrameCallback {
     @Override
     public void doFrame(long frameTimeNanos) {
         posted = false;
+        frameNanos = frameTimeNanos;
         long now = SystemClock.uptimeMillis();
         long frameTime = frameTimeNanos / 1_000_000L;
         for (int i = 0; i < callbacks.size(); i++) {

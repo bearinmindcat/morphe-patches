@@ -122,6 +122,10 @@ final class Fallbacks {
                     return null;
                 case "Landroid/animation/AnimationHandler;->getAnimationCount()I":
                     return Frames.count();
+                case "Landroid/view/Choreographer;->getLastFrameTimeNanos()J":
+                    return Frames.lastFrameTimeNanos();
+                case "Landroid/view/Choreographer;->getFrameIntervalNanos()J":
+                    return Frames.frameIntervalNanos();
                 // The dock's own check (OplusHotseat.canReceivePointerEvents) asks Android's first; answered "absent"
                 // (false) its icons got no touches at all and dock apps did not open. Android's test, from public calls.
                 case "Landroid/view/ViewGroup;->canReceivePointerEvents()Z":
