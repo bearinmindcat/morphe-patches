@@ -1,5 +1,6 @@
 package org.ungoogled.patches.maps.ui.powersaving
 
+import org.ungoogled.patches.maps.ui.customization.accountSheet
 import org.ungoogled.patches.maps.ui.mapsId
 import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.Fingerprint
@@ -385,104 +386,15 @@ val powerSavingModePatch = bytecodePatch(
 
     // A "Power Saving Options" row on the account sheet, right under Customization and so above
     // Local saved. In finalize, after every patch has run, so the sheet's other rows of ours are
-    // in place whichever order the patches ran in.
+    // in place whichever order the patches ran in. Built like the Customization row, its icon cut
+    // from Maps' solid battery.
     finalize {
-        val rowHolder = mutableClassDefBy("Lolr;")
-        val template = rowHolder.methods.single { it.name == "a" && it.returnType == "Lbrmi;" && it.parameterTypes.isEmpty() }
-        val templateRefs = template.implementation!!.instructions.mapNotNull { (it as? ReferenceInstruction)?.reference?.toString() }
-        listOf(
-            "Lolr;->a:Lnxb;", "Lmm;->s(Landroid/content/Context;I)Landroid/graphics/drawable/Drawable;",
-            "Lbrmi;->a()Lbrmg;", "Lbrmg;->c(I)V", "Lbrmg;->d(Ljava/lang/String;)V", "Lbrmg;->f(I)V",
-            "Lbrmg;->e(Landroid/view/View\$OnClickListener;)V", "Lbrmf;->d:Lbrmf;", "Lbrmg;->a()Lbrmi;",
-        ).forEach { if (it !in templateRefs) throw PatchException("account sheet row builder no longer uses $it") }
-        // Built like the Customization row; its action id must be unique on the sheet too.
-        rowHolder.methods.add(
-            ImmutableMethod(
-                rowHolder.type, "uaPowerRow", emptyList(), "Lbrmi;",
-                AccessFlags.PUBLIC.value or AccessFlags.FINAL.value, null, null, MutableMethodImplementation(6),
-            ).toMutable().apply {
-                addInstructions(
-                    0,
-                    """
-                        iget-object v0, p0, Lolr;->a:Lnxb;
-                        const v1, $BATTERY_ICON
-                        invoke-static { v0, v1 }, Lmm;->s(Landroid/content/Context;I)Landroid/graphics/drawable/Drawable;
-                        move-result-object v1
-                        invoke-static { v1 }, $POWER_ROW_ICON
-                        move-result-object v1
-                        invoke-static { }, Lbrmi;->a()Lbrmg;
-                        move-result-object v3
-                        invoke-static { }, Landroid/view/View;->generateViewId()I
-                        move-result v4
-                        invoke-virtual { v3, v4 }, Lbrmg;->c(I)V
-                        iput-object v1, v3, Lbrmg;->a:Landroid/graphics/drawable/Drawable;
-                        const-string v4, "Power Saving Options"
-                        invoke-virtual { v3, v4 }, Lbrmg;->d(Ljava/lang/String;)V
-                        const v4, 0x161a8
-                        invoke-virtual { v3, v4 }, Lbrmg;->f(I)V
-                        new-instance v2, $OPEN_POWER
-                        invoke-direct { v2, v0 }, $OPEN_POWER-><init>(Landroid/content/Context;)V
-                        invoke-virtual { v3, v2 }, Lbrmg;->e(Landroid/view/View${'$'}OnClickListener;)V
-                        sget-object v4, Lbrmf;->d:Lbrmf;
-                        iput-object v4, v3, Lbrmg;->d:Lbrmf;
-                        invoke-virtual { v3 }, Lbrmg;->a()Lbrmi;
-                        move-result-object v0
-                        return-object v0
-                    """,
-                )
-            },
-        )
-
-        // Both sheet builders: right after the Customization row's add.
-        fun addUnderCustomization(returnType: String, parameters: List<String>) {
-            fun callsCustomizationRow(insn: com.android.tools.smali.dexlib2.iface.instruction.Instruction) =
-                ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
-                    r.definingClass == "Lolr;" && r.name == "uaCustomizationRow"
-                } == true
-            val found = mutableListOf<Pair<String, String>>()
-            classDefForEach { c ->
-                for (m in c.methods) {
-                    if (m.returnType != returnType || m.parameterTypes.map { it.toString() } != parameters) continue
-                    if (m.implementation?.instructions?.any(::callsCustomizationRow) == true) found += c.type to m.name
-                }
-            }
-            val (owner, name) = found.singleOrNull()
-                ?: throw PatchException("account sheet builder $returnType(${parameters.joinToString()}) with the Customization row: found ${found.size}")
-            val method = mutableClassDefBy(owner).methods.single {
-                it.name == name && it.returnType == returnType && it.parameterTypes.map { t -> t.toString() } == parameters
-            }
-            val ins = method.implementation!!.instructions
-            val call = ins.indexOfFirst(::callsCustomizationRow)
-            val result = ins[call + 1]
-            val add = ins[call + 2]
-            if (result.opcode != Opcode.MOVE_RESULT_OBJECT || add.opcode != Opcode.INVOKE_VIRTUAL ||
-                ((add as ReferenceInstruction).reference as MethodReference).let { it.definingClass != "Lbwxy;" || it.name != "i" }
-            ) throw PatchException("Customization row add changed shape")
-            // The row's result register is dead after its add, so it carries ours.
-            val scratch = (result as OneRegisterInstruction).registerA
-            val list = (add as Instruction35c).registerC
-            val holder = (ins[call] as Instruction35c).registerC
-            // Modern builder: the holder is cast from a wider register just before; do the same.
-            val cast = ins.getOrNull(call - 1)?.takeIf {
-                it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as TypeReference).type == "Lolr;"
-            }
-            val source = cast?.let { (ins[call - 2] as TwoRegisterInstruction).registerB }
-            method.addInstructions(
-                call + 3,
-                if (source != null) """
-                    move-object v$scratch, v$source
-                    check-cast v$scratch, Lolr;
-                    invoke-virtual { v$scratch }, Lolr;->uaPowerRow()Lbrmi;
-                    move-result-object v$scratch
-                    invoke-virtual { v$list, v$scratch }, Lbwxy;->i(Ljava/lang/Object;)V
-                """ else """
-                    invoke-virtual { v$holder }, Lolr;->uaPowerRow()Lbrmi;
-                    move-result-object v$scratch
-                    invoke-virtual { v$list, v$scratch }, Lbwxy;->i(Ljava/lang/Object;)V
-                """,
+        accountSheet().apply {
+            addRowBuilder(
+                "uaPowerRow", "Power Saving Options", BATTERY_ICON, OPEN_POWER, listenerTakesContext = true,
+                iconTransform = POWER_ROW_ICON,
             )
+            placeRow("uaPowerRow", after = listOf("uaCustomizationRow"))
         }
-        addUnderCustomization("Lbrhh;", listOf("Lafmm;"))
-        addUnderCustomization("Lbrfb;", listOf("Z"))
     }
 }

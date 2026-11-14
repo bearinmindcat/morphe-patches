@@ -10,6 +10,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.string
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc
@@ -57,19 +58,28 @@ internal fun BytecodePatchContext.markPatched(marker: String) {
 }
 
 /**
- * AppCompatActivity.attachBaseContext -- the base class every Maps screen
- * descends from (MapsActivity -> ... -> AppCompatActivity). Its body is
- * AppCompat's inlined delegate (the only method in the app that reflects on
- * Theme.rebase), and it ends in exactly one super.attachBaseContext(context).
+ * AppCompatActivity's constructor: the only no-argument constructor that registers AppCompat's
+ * saved-state provider under "androidx:appcompat" -- a key androidx keeps across releases, so
+ * the class is found without its obfuscated name.
+ */
+private object AppCompatActivityConstructorFingerprint : Fingerprint(
+    name = "<init>",
+    parameters = emptyList(),
+    filters = listOf(string("androidx:appcompat")),
+)
+
+/**
+ * AppCompatActivity.attachBaseContext -- the base class every Maps screen descends from
+ * (MapsActivity -> ... -> AppCompatActivity). Its body is AppCompat's inlined delegate, ending
+ * in super.attachBaseContext(context) (once in 26.44; AppCompat versions differ, so every super
+ * call is handled).
  */
 internal object AppCompatAttachBaseContextFingerprint : Fingerprint(
+    classFingerprint = AppCompatActivityConstructorFingerprint,
     name = "attachBaseContext",
     returnType = "V",
     parameters = listOf("Landroid/content/Context;"),
-    filters = listOf(
-        string("rebase"),
-        methodCall(opcode = Opcode.INVOKE_SUPER, name = "attachBaseContext"),
-    ),
+    filters = listOf(methodCall(opcode = Opcode.INVOKE_SUPER, name = "attachBaseContext")),
 )
 
 /**
@@ -78,8 +88,8 @@ internal object AppCompatAttachBaseContextFingerprint : Fingerprint(
  * whose override Configuration selects the -mnc9999 / -mcc9999 resource
  * variants those patches add.
  *
- * The call sits right before the super call, where the context handed on is
- * final. That super call is a branch target (AppCompat reaches it from three
+ * The call sits right before each super call, where the context handed on is
+ * final. A super call is a branch target (AppCompat reaches it from several
  * paths), so the wrap is inserted AT its label rather than in front of it --
  * otherwise the jump paths would skip it and the most common one would never
  * get the override.
@@ -90,12 +100,17 @@ internal val activityContextHookPatch = bytecodePatch(
     dependsOn(sharedExtensionPatch)
 
     execute {
-        AppCompatAttachBaseContextFingerprint.let { fp ->
-            val superCall = fp.instructionMatches.last().index
-            val registers = (fp.method.implementation!!.instructions[superCall] as Instruction35c)
+        val method = AppCompatAttachBaseContextFingerprint.method
+        val superCalls = method.implementation!!.instructions.withIndex().filter { (_, insn) ->
+            (insn.opcode == Opcode.INVOKE_SUPER || insn.opcode == Opcode.INVOKE_SUPER_RANGE) &&
+                ((insn as ReferenceInstruction).reference as MethodReference).name == "attachBaseContext"
+        }
+        // Last to first, so the earlier indices stay valid.
+        for ((superCall, insn) in superCalls.asReversed()) {
+            val registers = insn as? Instruction35c ?: throw PatchException("super.attachBaseContext uses a range call")
             if (registers.registerCount != 2) throw PatchException("super.attachBaseContext takes ${registers.registerCount} registers")
             val context = "v${registers.registerD}"
-            fp.method.addInstructionsAtLabel(
+            method.addInstructionsAtLabel(
                 superCall,
                 """
                     invoke-static { $context }, $SHAPES->wrap(Landroid/content/Context;)Landroid/content/Context;
@@ -273,6 +288,40 @@ private fun avatarPainter(classDef: ClassDef): AvatarPainter? {
     return null
 }
 
+/**
+ * The monogram painter as Maps 26.43+ builds it: a painter that centres the letter (setTextAlign,
+ * drawText) and takes, in its constructor, the shape to fill first -- an interface whose one method
+ * is (Canvas, Paint)V. Its implementations that draw a circle (the other fills the whole square)
+ * make the round letter avatar, so they keep their circles. Fed every class, then asked.
+ */
+private class SplitMonogram {
+    private val canvas = "Landroid/graphics/Canvas;"
+    private val paint = "Landroid/graphics/Paint;"
+    private val shapeInterfaces = mutableSetOf<String>()
+    private val painterShapes = mutableSetOf<String>()
+    private val circleImplementations = mutableMapOf<String, MutableSet<String>>()
+
+    private fun Method.calls(owner: String, name: String) = implementation?.instructions?.any { insn ->
+        ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.let { it.definingClass == owner && it.name == name } == true
+    } == true
+    private fun Method.isShape() = returnType == "V" && parameterTypes.map(CharSequence::toString) == listOf(canvas, paint)
+
+    fun look(classDef: ClassDef) {
+        if (AccessFlags.INTERFACE.isSet(classDef.accessFlags)) {
+            if (classDef.methods.count() == 1 && classDef.methods.single().isShape()) shapeInterfaces += classDef.type
+            return
+        }
+        if (classDef.methods.any { it.calls(paint, "setTextAlign") } && classDef.methods.any { it.calls(canvas, "drawText") }) {
+            classDef.methods.filter { it.name == "<init>" }.forEach { ctor -> ctor.parameterTypes.mapTo(painterShapes) { it.toString() } }
+        }
+        if (classDef.methods.any { it.isShape() && it.calls(canvas, "drawCircle") }) {
+            classDef.interfaces.forEach { circleImplementations.getOrPut(it) { mutableSetOf() } += classDef.type }
+        }
+    }
+
+    fun circles(): Set<String> = (painterShapes intersect shapeInterfaces).flatMap { circleImplementations[it].orEmpty() }.toSet()
+}
+
 internal val shapeShimsPatch = bytecodePatch(
     description = "Routes framework shape and colour calls through the UI extension.",
 ) {
@@ -352,10 +401,14 @@ internal val shapeShimsPatch = bytecodePatch(
         val reparent = mutableListOf<String>()
         val roundAvatars = ROUND_AVATARS.toMutableSet()
         val painters = mutableSetOf<AvatarPainter>()
+        val split = SplitMonogram()
         classDefForEach { classDef ->
             if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
             avatarPainter(classDef)?.let { painters += it; roundAvatars += classDef.type }
+            split.look(classDef)
         }
+        // Since 26.43 the monogram painter draws its letter only; the circle under it comes from a shape it is given.
+        if (AvatarPainter.MONOGRAM !in painters) split.circles().takeIf { it.isNotEmpty() }?.let { painters += AvatarPainter.MONOGRAM; roundAvatars += it }
         if (painters.size != AvatarPainter.entries.size) throw PatchException("avatar circle crop or monogram painter not found: $painters")
         classDefForEach { classDef ->
             if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
@@ -413,7 +466,7 @@ internal val shapeShimsPatch = bytecodePatch(
         if (leftovers.isNotEmpty()) {
             throw PatchException("unhandled framework shape/colour call(s), add a shim for them:\n" + leftovers.take(10).joinToString("\n"))
         }
-        logger.info("Shape/colour shims: $sites call sites in $classes methods")
+        logger.info("Shape/colour shims: $sites call sites in $classes methods; avatars kept round: ${roundAvatars.sorted()}")
     }
 }
 
