@@ -6,9 +6,8 @@ android {
     namespace = "org.ungoogled.extension"
 
     defaultConfig {
-        // The Maps build we patch from requires Android 12L, but people also patch a
-        // 26.36.04 build that runs on Android 10 (issue #8: an Android 11 insets call
-        // crashed every screen of ours there), so lint has to hold us to API 29.
+        // The Maps build we patch runs on Android 10 (minSdk 29; issue #8: an Android 11
+        // insets call crashed every screen of ours there), so lint holds us to API 29.
         minSdk = 29
     }
 }

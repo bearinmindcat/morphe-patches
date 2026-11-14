@@ -13,7 +13,7 @@ object Constants {
      *
      * Every patch here is pinned to one exact version. The classes these patches
      * target are R8-obfuscated, and R8 renames them on every build, so a patch
-     * derived against 26.36.04 cannot be assumed to work on anything else.
+     * derived against one build cannot be assumed to work on anything else.
      * Fingerprints are written to survive that where possible, but the version
      * is still declared explicitly rather than as `null`.
      */
@@ -24,7 +24,7 @@ object Constants {
         // The launcher icon's background plate is white.
         appIconColor = 0xFFFFFF,
         targets = listOf(
-            AppTarget(version = "26.36.04.973607363"),
+            AppTarget(version = "26.44.06.1006895251", minSdk = 29),
         ),
     )
 
