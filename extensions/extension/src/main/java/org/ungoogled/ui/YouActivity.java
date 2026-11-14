@@ -51,10 +51,12 @@ public final class YouActivity extends UiScreen {
     /** How many lists (Labeled included) Your saves shows before "More", as Maps does. */
     private static final int LISTS_SHOWN = 4;
 
-    /** Maps' own icons, by id: the merged APK strips their names. */
-    private static final int BOOKMARK = 0x7f080519, BOOKMARK_FILL = 0x7f080515, HOME = 0x7f080587, WORK = 0x7f08063a,
-            MORE = 0x7f0805c4, ADD = 0x7f0804ec, SHARE = 0x7f0805fe, EDIT = 0x7f080557, ADD_PLACE = 0x7f0804e6,
-            GS_HISTORY = 0x7f080584, GS_DELETE = 0x7f080542;
+    /** Maps' own icons, by id (getIdentifier finds nothing in the merged APK); the patches set Res. */
+    private static final int BOOKMARK = Res.drawable_gs_bookmark_vd_theme_24, BOOKMARK_FILL = Res.drawable_gs_bookmark_fill1_vd_theme_24,
+            HOME = Res.drawable_gs_home_vd_theme_24, WORK = Res.drawable_gs_work_vd_theme_24, MORE = Res.drawable_gs_more_vert_vd_theme_24,
+            ADD = Res.drawable_gs_add_vd_theme_24, SHARE = Res.drawable_gs_share_vd_theme_24, EDIT = Res.drawable_gs_edit_vd_theme_24,
+            ADD_PLACE = Res.drawable_gs_add_location_alt_vd_theme_24, GS_HISTORY = Res.drawable_gs_history_vd_theme_24,
+            GS_DELETE = Res.drawable_gs_delete_vd_theme_24;
     /** Maps' list sort order: Recently edited (newest first), Distance, Editor's order (as added). */
     private static final String[] SORTS = {"Recently edited", "Distance", "Editor's order"};
     private static final String STAR = "M12,17.27L18.18,21l-1.64,-7.03L22,9.24l-7.19,-0.61L12,2 9.19,8.63 2,9.24l5.46,4.73L5.82,21z";

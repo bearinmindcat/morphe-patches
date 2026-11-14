@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.ui.powersaving
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
@@ -38,8 +40,8 @@ private const val POWER_SAVING = "Lorg/ungoogled/ui/PowerSaving;"
 private const val OPEN_POWER = "Lorg/ungoogled/ui/CustomizationActivity\$OpenPower;"
 /** Builds the row's icon from [BATTERY_ICON]. */
 private const val POWER_ROW_ICON = "Lorg/ungoogled/ui/CustomizationActivity;->powerRowIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;"
-/** drawable/gs_battery_full_fill1_vd_theme_24 in this build: Maps' solid battery, the row's icon is cut from it. */
-private const val BATTERY_ICON = 0x7f08050a
+/** drawable/gs_battery_full_fill1_vd_theme_24: Maps' solid battery, the row's icon is cut from it. */
+private val BATTERY_ICON get() = mapsId(ResourceType.DRAWABLE, "gs_battery_full_fill1_vd_theme_24")
 
 /** Maps' own power saving screen. Its name is not obfuscated. */
 private const val MIN_MODE_ACTIVITY = "Lcom/google/android/apps/gmm/features/minmode/MinModeActivity;"
@@ -93,7 +95,7 @@ private object RouteProgressDumpFingerprint : Fingerprint(
 )
 
 /** string/MIN_MODE_LANDSCAPE_DISABLED_SNACKBAR_TEXT: "Can't use landscape mode when power saving". */
-private const val LANDSCAPE_DISABLED_TEXT = 0x7f14136f
+private val LANDSCAPE_DISABLED_TEXT get() = mapsId(ResourceType.STRING, "MIN_MODE_LANDSCAPE_DISABLED_SNACKBAR_TEXT")
 
 /** The power saving screen is declared portrait only; it follows the phone's rotation like navigation does. */
 private val minModeOrientationPatch = resourcePatch(
@@ -317,11 +319,12 @@ val powerSavingModePatch = bytecodePatch(
         //    sideways; the screen turns with the phone now (manifest, and onMinModeCreate where the manifest
         //    stays stock). The message comes from an orientation listener of its own, silenced here.
         val landscapeListeners = mutableListOf<Pair<String, String>>()
+        val landscapeText = LANDSCAPE_DISABLED_TEXT.toLong()
         classDefForEach { c ->
             if (c.superclass != "Landroid/view/OrientationEventListener;") return@classDefForEach
             c.methods.filter { m ->
                 m.name == "onOrientationChanged" && m.parameterTypes.map { it.toString() } == listOf("I") &&
-                    m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == LANDSCAPE_DISABLED_TEXT.toLong() } == true
+                    m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == landscapeText } == true
             }.forEach { landscapeListeners += c.type to it.name }
         }
         val (listenerType, listenerMethod) = landscapeListeners.singleOrNull()

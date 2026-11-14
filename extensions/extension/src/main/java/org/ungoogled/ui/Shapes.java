@@ -1551,16 +1551,12 @@ public final class Shapes {
      *  Using the resources also makes the SHAPE follow Rectangle Shapes for
      *  free: the Rectangle shapes patch emits -mnc9999 variants of these same two ids,
      *  and the Activity's override Configuration selects them. */
-    // The pinned ids of the two masks for this Maps build. Needed because the
-    // MERGED universal APK (APKEditor) keeps the entries and the PNG files but
-    // STRIPS their names from the resource table, and renames the table's
-    // package back to com.google.android.apps.maps -- so getIdentifier() returns
-    // 0 on a phone running the merged APK while the same build resolves the name
-    // fine on the emulator from split APKs. Maps' own code never notices because
-    // it compiles to numeric ids; doing the same is the fix. (aapt shows these
-    // as "INVALID RESOURCE 0x7f0807c2" in the merged APK: entry present, name
-    // gone.) 0x7f0807c2 == 2131232706, the id recorded in CLAUDE.md.
-    static final int ID_FAB_FACE = 0x7f0807c2, ID_FAB_SHADOW = 0x7f0807c3;
+    // The ids of the two masks for this Maps build, by number rather than
+    // getIdentifier(): the MERGED universal APK (APKEditor) keeps the entries and
+    // the PNG files but STRIPS their names from the resource table, so
+    // getIdentifier() returns 0 on a phone running it. The patches look the names
+    // up at patch time instead (Res), as Maps' own code compiles to numbers.
+    static final int ID_FAB_FACE = Res.drawable_ic_qu_fab_circle, ID_FAB_SHADOW = Res.drawable_ic_qu_fab_shadow;
 
     /** The face plus its halo, drawn.
      *

@@ -29,11 +29,15 @@ import org.w3c.dom.Element
 /** org.ungoogled.ui.Shapes, the runtime half of the UI patches (extensions/extension). */
 internal const val SHAPES = "Lorg/ungoogled/ui/Shapes;"
 
-/** Merges org.ungoogled.ui.* into Maps. */
+/** Merges org.ungoogled.ui.* into Maps, with this Maps build's ids for the resources it uses (Res). */
 internal val sharedExtensionPatch = bytecodePatch(
     description = "Adds the Ungoogled Maps UI extension classes.",
 ) {
     extendWith("extensions/extension.mpe")
+
+    execute {
+        setExtensionResourceIds()
+    }
 }
 
 /**

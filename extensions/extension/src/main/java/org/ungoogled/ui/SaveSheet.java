@@ -39,13 +39,13 @@ import java.util.Set;
  * left out for the same reason (the pins are drawn from the account).
  */
 final class SaveSheet {
-    /** Maps' own resources, by id: the merged APK strips their names, so getIdentifier cannot find them. */
-    private static final int SUITCASE = 0x7f080879;          // drawable/ic_suitcase (density split)
-    private static final int CLOSE = 0x7f080538;             // drawable/gs_close_vd_theme_24
-    private static final int BOOKMARK_CHECK = 0x7f080514;    // drawable/gs_bookmark_check_fill1_vd_theme_24
-    private static final int SANS_MEDIUM = 0x7f090000;       // font/GoogleSansMedium
-    private static final int TEXT = 0x7f090003;              // font/GoogleSansTextRegular
-    private static final int TEXT_MEDIUM = 0x7f090002;       // font/GoogleSansTextMedium
+    /** Maps' own resources, by id (getIdentifier finds nothing in the merged APK); the patches set Res. */
+    private static final int SUITCASE = Res.drawable_ic_suitcase;
+    private static final int CLOSE = Res.drawable_gs_close_vd_theme_24;
+    private static final int BOOKMARK_CHECK = Res.drawable_gs_bookmark_check_fill1_vd_theme_24;
+    private static final int SANS_MEDIUM = Res.font_GoogleSansMedium;
+    private static final int TEXT = Res.font_GoogleSansTextRegular;
+    private static final int TEXT_MEDIUM = Res.font_GoogleSansTextMedium;
 
     private final Activity a;
     private final SavedStore.Place place;

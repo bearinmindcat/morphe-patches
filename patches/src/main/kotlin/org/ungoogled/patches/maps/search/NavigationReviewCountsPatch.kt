@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.search
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
@@ -24,7 +26,7 @@ import org.ungoogled.patches.shared.addInstructionsAtLabel
 private const val REVIEW_COUNTS = "Lorg/ungoogled/ui/ReviewCounts;"
 private const val TO_RESULT = "Placemark has no location in conversion to NavigationSearchResult."
 // string/SEARCH_ALONG_ROUTE_RESULT_OPEN: the "Open" a navigation search result's details line ends with.
-private const val RESULT_OPEN = 0x7f141d1b
+private val RESULT_OPEN get() = mapsId(ResourceType.STRING, "SEARCH_ALONG_ROUTE_RESULT_OPEN")
 
 /**
  * Off navigation a search result reads "4.2 (1,600)"; navigation turns each place into a result of its own that keeps
@@ -62,6 +64,7 @@ val navigationReviewCountsPatch = bytecodePatch(
         val counted = mutableListOf<Method>()
         val details = mutableListOf<Method>()
         val formatted = mutableListOf<Method>()
+        val resultOpen = RESULT_OPEN.toLong()
         classDefForEach { c ->
             if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
             c.methods.forEach { m ->
@@ -70,7 +73,7 @@ val navigationReviewCountsPatch = bytecodePatch(
                 if (ins.any { it.string() == TO_RESULT }) conversions += m
                 if (ins.any { it.string() == "reviewCount" } && ins.any { it.string() == "ratingValue" }) counted += m
                 if (m.returnType == "Ljava/lang/CharSequence;" && m.parameterTypes.isEmpty() &&
-                    ins.any { (it as? WideLiteralInstruction)?.wideLiteral == RESULT_OPEN.toLong() }
+                    ins.any { (it as? WideLiteralInstruction)?.wideLiteral == resultOpen }
                 ) details += m
                 if (ins.any { it.string() == "%.1f" } && ins.any { i ->
                         i.opcode == Opcode.INVOKE_STATIC && i.method()?.let { it.params() == listOf("F", "Z") && it.returnType == "Ljava/util/List;" } == true

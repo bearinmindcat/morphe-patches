@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.ui.speed
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
@@ -20,8 +22,8 @@ import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 
 /** The account sheet row's listener: opens Waze & external data source with the sheet left open behind it. */
 private const val OPEN_WAZE = "Lorg/ungoogled/ui/CustomizationActivity\$OpenWaze;"
-/** drawable/gs_directions_car_vd_theme_24 in this build: a car, tinted like the sheet's other icons. */
-private const val CAR_ICON = 0x7f080548
+/** drawable/gs_directions_car_vd_theme_24: a car, tinted like the sheet's other icons. */
+private val CAR_ICON get() = mapsId(ResourceType.DRAWABLE, "gs_directions_car_vd_theme_24")
 
 /**
  * A "Waze & external data source" row on the account sheet -- the speeding chime and speed cameras -- under

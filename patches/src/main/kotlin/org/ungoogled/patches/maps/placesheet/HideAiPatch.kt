@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.placesheet
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -30,14 +32,14 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 private const val HIDE_AI = "Lorg/ungoogled/ui/HideAi;"
 
 /** AI_REVIEW_SUMMARY_DISCLAIMER, "Summarized with Gemini" under the review summary. */
-private const val AI_REVIEW_SUMMARY_DISCLAIMER = 0x7f1401c3
+private val AI_REVIEW_SUMMARY_DISCLAIMER get() = mapsId(ResourceType.STRING, "AI_REVIEW_SUMMARY_DISCLAIMER")
 
 /** ASKMAPS_ENTRYPOINT_LABEL, "Ask Maps": only the Ask Maps chip under the search bar shows it. */
-private const val ASK_MAPS_CHIP_LABEL = 0x7f140320
+private val ASK_MAPS_CHIP_LABEL get() = mapsId(ResourceType.STRING, "ASKMAPS_ENTRYPOINT_LABEL")
 
 /** The Ask Maps chip's label getter; its class is the chip. */
 private object AskMapsChipFingerprint : Fingerprint(
-    filters = listOf(literal(ASK_MAPS_CHIP_LABEL)),
+    filters = listOf(literal({ ASK_MAPS_CHIP_LABEL.toLong() })),
 )
 
 /** Whether Ask Maps (Gemini) runs during navigation: its button on the navigation sheet and its voice session. */
@@ -48,17 +50,17 @@ private object AskMapsInNavigationFingerprint : Fingerprint(
 )
 
 /** SEARCH_LIST_NAVIGATION_HEADER_ASK_MAPS_MODE_BUTTON: loaded right after the "is Ask Maps on" checks. */
-private const val ASK_MAPS_SEARCH_HEADER_BUTTON = 0x7f141d38
+private val ASK_MAPS_SEARCH_HEADER_BUTTON get() = mapsId(ResourceType.STRING, "SEARCH_LIST_NAVIGATION_HEADER_ASK_MAPS_MODE_BUTTON")
 
 /** ASK_MAPS_PLACE_ACTION_TEXT, "Ask": the place sheet's Ask action. */
-private const val ASK_MAPS_PLACE_ACTION = 0x7f140373
+private val ASK_MAPS_PLACE_ACTION get() = mapsId(ResourceType.STRING, "ASK_MAPS_PLACE_ACTION_TEXT")
 
 /** ASK_MAPS_LIST_ACTION_TEXT, "Ask": the saved list's Ask action. */
-private const val ASK_MAPS_LIST_ACTION = 0x7f14035c
+private val ASK_MAPS_LIST_ACTION get() = mapsId(ResourceType.STRING, "ASK_MAPS_LIST_ACTION_TEXT")
 
 /** The review summary's layout, the only code that draws that label. */
 private object ReviewSummaryLayoutFingerprint : Fingerprint(
-    filters = listOf(literal(AI_REVIEW_SUMMARY_DISCLAIMER)),
+    filters = listOf(literal({ AI_REVIEW_SUMMARY_DISCLAIMER.toLong() })),
 )
 
 /**
@@ -329,13 +331,14 @@ internal val hideAiPatch = bytecodePatch(
         // Ask Maps button label.
         run {
             var header: Pair<String, Method>? = null
+            val headerButton = ASK_MAPS_SEARCH_HEADER_BUTTON
             classDefForEach { c ->
                 if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
-                c.methods.firstOrNull { it.literalAt(ASK_MAPS_SEARCH_HEADER_BUTTON) >= 0 }?.let { header = c.type to it }
+                c.methods.firstOrNull { it.literalAt(headerButton) >= 0 }?.let { header = c.type to it }
             }
             val (_, headerMethod) = header ?: throw PatchException("Ask Maps search header button not found")
             val headerInsns = headerMethod.implementation!!.instructions.toList()
-            val at = headerMethod.literalAt(ASK_MAPS_SEARCH_HEADER_BUTTON)
+            val at = headerMethod.literalAt(headerButton)
             fun boolCall(insn: com.android.tools.smali.dexlib2.iface.instruction.Instruction) =
                 ((insn as? ReferenceInstruction)?.reference as? MethodReference)?.takeIf {
                     insn.opcode == Opcode.INVOKE_VIRTUAL && it.returnType == "Z" && it.parameterTypes.isEmpty()
@@ -375,8 +378,9 @@ internal val hideAiPatch = bytecodePatch(
         // offers Ask Maps for it, whatever the switch above says; its "show it?" answers no.
         run {
             var owner: String? = null
+            val placeAction = ASK_MAPS_PLACE_ACTION
             classDefForEach { c ->
-                if (owner == null && c.methods.any { it.literalAt(ASK_MAPS_PLACE_ACTION) >= 0 }) owner = c.type
+                if (owner == null && c.methods.any { it.literalAt(placeAction) >= 0 }) owner = c.type
             }
             val show = mutableClassDefBy(owner ?: throw PatchException("place sheet Ask action not found")).methods.singleOrNull {
                 it.name == "c" && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/Boolean;"
@@ -401,10 +405,11 @@ internal val hideAiPatch = bytecodePatch(
         // A saved list's "Ask" action: added after its own server check; skipped the way that check skips it.
         run {
             var field: FieldReference? = null
+            val listAction = ASK_MAPS_LIST_ACTION
             classDefForEach { c ->
                 if (field != null) return@classDefForEach
                 val init = c.methods.firstOrNull { it.name == "<clinit>" } ?: return@classDefForEach
-                val at = init.literalAt(ASK_MAPS_LIST_ACTION)
+                val at = init.literalAt(listAction)
                 if (at < 0) return@classDefForEach
                 field = init.implementation!!.instructions.drop(at).firstNotNullOfOrNull { insn ->
                     ((insn as? ReferenceInstruction)?.reference as? FieldReference)?.takeIf { insn.opcode == Opcode.SPUT_OBJECT }

@@ -19,8 +19,8 @@ import java.util.Map;
  * shows one: the results' callouts on the map, the card a tapped result opens, the results list.
  */
 public final class ReviewCounts {
-    /** plurals/REVIEW_COUNT_SHORT, Maps' own "(%,d)" (resource names do not survive a merged APK). */
-    private static final int REVIEW_COUNT_SHORT = 0x7f1200eb;
+    /** plurals/REVIEW_COUNT_SHORT, Maps' own "(%,d)" (set by the patches, see Res). */
+    private static final int REVIEW_COUNT_SHORT = Res.plurals_REVIEW_COUNT_SHORT;
     private static final Map<Object, Integer> COUNTS = new LinkedHashMap<Object, Integer>(64, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<Object, Integer> eldest) {
             return size() > 400;

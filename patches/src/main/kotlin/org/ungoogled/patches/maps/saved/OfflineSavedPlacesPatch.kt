@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.saved
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
@@ -42,11 +44,11 @@ import org.ungoogled.patches.maps.microg.MicrogSelection
 private const val SAVED_PLACES = "Lorg/ungoogled/ui/SavedPlaces;"
 private const val OPEN_SCREEN = "Lorg/ungoogled/ui/SavedPlaces\$OpenScreen;"
 private const val ACTIVITY = "org.ungoogled.ui.YouActivity"
-/** drawable/gs_bookmark_vd_theme_24 in this build. */
-private const val BOOKMARK_ICON = 0x7f080519
+/** drawable/gs_bookmark_vd_theme_24. */
+private val BOOKMARK_ICON get() = mapsId(ResourceType.DRAWABLE, "gs_bookmark_vd_theme_24")
 /** The Save button's own icons: drawable/ic_qu_placelist_heart and drawable/ic_suitcase (density split). */
-private const val HEART_ICON = 0x7f080824
-private const val SUITCASE_ICON = 0x7f080879
+private val HEART_ICON get() = mapsId(ResourceType.DRAWABLE, "ic_qu_placelist_heart")
+private val SUITCASE_ICON get() = mapsId(ResourceType.DRAWABLE, "ic_suitcase")
 
 /** Declares the Local saved screen; it is launched by explicit class name from inside the app only. */
 private val savedManifestPatch = resourcePatch(description = "Declares the Local saved screen.") {
@@ -89,7 +91,7 @@ private object QuickSaveOwnerFingerprint : Fingerprint(
 private object SaveButtonIconFingerprint : Fingerprint(
     returnType = "I",
     parameters = emptyList(),
-    filters = listOf(literal(SUITCASE_ICON), literal(HEART_ICON)),
+    filters = listOf(literal({ SUITCASE_ICON.toLong() }), literal({ HEART_ICON.toLong() })),
 )
 
 /** The place sheet's Call chip: its click is the only method with this trace label. */
@@ -103,11 +105,11 @@ private object PlaceSummaryFingerprint : Fingerprint(
 )
 
 /** string/ACCESSIBILITY_SHARE_PLACE ("Share %1${'$'}s"): only the place sheet's Share chip uses it. */
-private const val SHARE_PLACE_A11Y = 0x7f1400cb
+private val SHARE_PLACE_A11Y get() = mapsId(ResourceType.STRING, "ACCESSIBILITY_SHARE_PLACE")
 
 /** The place sheet's Share chip, by its content description. */
 private object ShareLabelFingerprint : Fingerprint(
-    filters = listOf(literal(SHARE_PLACE_A11Y)),
+    filters = listOf(literal({ SHARE_PLACE_A11Y.toLong() })),
 )
 
 /** The place sheet's hero image view model, which reads the place's photos. Its trace label is unique. */
@@ -121,11 +123,11 @@ private object AddPlaceFingerprint : Fingerprint(
 )
 
 /** string/ADD_PLACE_TO_LIST_HINT ("Add a place"), the screen's search hint. */
-private const val ADD_PLACE_HINT = 0x7f140166
+private val ADD_PLACE_HINT get() = mapsId(ResourceType.STRING, "ADD_PLACE_TO_LIST_HINT")
 /** ALIAS_SETTING_SIGN_IN_PROMPT: "Sign in to search for "%1$s" and your other personal places." */
-private const val ALIAS_SIGN_IN_PROMPT = 0x7f1401fe
+private val ALIAS_SIGN_IN_PROMPT get() = mapsId(ResourceType.STRING, "ALIAS_SETTING_SIGN_IN_PROMPT")
 /** ALIASING_NEW_PLACE_SIGN_IN_PROMPT: "To label places and quickly find them on Maps, sign in." */
-private const val LABEL_SIGN_IN_PROMPT = 0x7f1401e1
+private val LABEL_SIGN_IN_PROMPT get() = mapsId(ResourceType.STRING, "ALIASING_NEW_PLACE_SIGN_IN_PROMPT")
 
 /** SavedPlaces.PICKED: a place picked on "Add a place" for one of the user's lists. */
 private const val PICKED = 64
@@ -1120,10 +1122,11 @@ private fun BytecodePatchContext.personalPlaceSearch() {
     fun Instruction.method() = (this as? ReferenceInstruction)?.reference as? MethodReference
     // The sign-in dialog's view model: the class that names the sign-in prompt.
     val promptOwners = mutableListOf<String>()
+    val aliasPrompt = ALIAS_SIGN_IN_PROMPT.toLong()
     classDefForEach { c ->
         if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
         val names = c.methods.any { m ->
-            m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == ALIAS_SIGN_IN_PROMPT.toLong() } == true
+            m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == aliasPrompt } == true
         }
         if (names) promptOwners += c.type
     }
@@ -1381,9 +1384,10 @@ private fun BytecodePatchContext.localLabels(
     fun Instruction.ref() = (this as? ReferenceInstruction)?.reference
     // The prompt's text: the one class naming "To label places ... sign in".
     val texts = mutableListOf<String>()
+    val labelPrompt = LABEL_SIGN_IN_PROMPT.toLong()
     classDefForEach { c ->
         if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
-        if (c.methods.any { m -> m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == LABEL_SIGN_IN_PROMPT.toLong() } == true }) {
+        if (c.methods.any { m -> m.implementation?.instructions?.any { (it as? WideLiteralInstruction)?.wideLiteral == labelPrompt } == true }) {
             texts += c.type
         }
     }

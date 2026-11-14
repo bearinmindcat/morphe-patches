@@ -24,12 +24,12 @@ import android.widget.TextView;
  * 24 dp icon -- in Maps' light, dark or Black theme.
  */
 abstract class UiScreen extends Activity {
-    /** Maps' own resources, by id: the merged APK strips their names, so getIdentifier cannot find them. */
-    static final int CLOSE = 0x7f080538;             // drawable/gs_close_vd_theme_24
-    static final int SANS_MEDIUM = 0x7f090000;       // font/GoogleSansMedium
-    static final int SANS_REGULAR = 0x7f090001;      // font/GoogleSansRegular
-    static final int TEXT_REGULAR = 0x7f090003;      // font/GoogleSansTextRegular
-    static final int TEXT_MEDIUM = 0x7f090002;       // font/GoogleSansTextMedium
+    /** Maps' own resources, by id (getIdentifier finds nothing in the merged APK); the patches set Res. */
+    static final int CLOSE = Res.drawable_gs_close_vd_theme_24;
+    static final int SANS_MEDIUM = Res.font_GoogleSansMedium;
+    static final int SANS_REGULAR = Res.font_GoogleSansRegular;
+    static final int TEXT_REGULAR = Res.font_GoogleSansTextRegular;
+    static final int TEXT_MEDIUM = Res.font_GoogleSansTextMedium;
 
     private static final int BG = 0xFFFFFFFF, TEXT = 0xFF1F1F1F, SUMMARY = 0xFF444746, ACCENT = 0xFF357989;
     private static final int BG_D = 0xFF131314, TEXT_D = 0xFFE3E3E3, SUMMARY_D = 0xFFC4C7C5, ACCENT_D = 0xFF7FD0DC;

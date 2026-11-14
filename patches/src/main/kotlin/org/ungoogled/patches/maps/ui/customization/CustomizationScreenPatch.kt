@@ -1,5 +1,7 @@
 package org.ungoogled.patches.maps.ui.customization
 
+import org.ungoogled.patches.maps.ui.mapsId
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.methodCall
@@ -26,8 +28,8 @@ import org.w3c.dom.Element
 
 private const val ACTIVITY = "org.ungoogled.ui.CustomizationActivity"
 private const val TITLE = "Customization"
-/** drawable/quantum_gm_ic_edit_vd_theme_24 in this build. */
-private const val EDIT_ICON = 0x7f080bb4
+/** drawable/quantum_gm_ic_edit_vd_theme_24. */
+private val EDIT_ICON get() = mapsId(ResourceType.DRAWABLE, "quantum_gm_ic_edit_vd_theme_24")
 /** The row's click listener: opens the Customization screen with the sheet left open behind it. */
 private const val OPEN = "Lorg/ungoogled/ui/CustomizationActivity\$Open;"
 

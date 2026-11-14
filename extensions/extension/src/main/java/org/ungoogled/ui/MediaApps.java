@@ -41,7 +41,7 @@ public final class MediaApps {
     /** What Android Auto looks for in an app's manifest before it shows the app. */
     private static final String ANDROID_AUTO = "com.google.android.gms.car.application";
     /** color/quantum_googblue500 and color/google_blue200: Maps' own blue, for an app with no colour here. */
-    private static final int COLOR = 0x7f060eaf, TOUCH_COLOR = 0x7f0606a6;
+    private static final int COLOR = Res.color_quantum_googblue500, TOUCH_COLOR = Res.color_google_blue200;
 
     private MediaApps() {}
 

@@ -18,10 +18,11 @@ import java.lang.ref.WeakReference;
  * closing) the column follows the sheet up, frame by frame with Maps' own sheet animation, by as much as the sheet rose.
  */
 public final class MediaPanel {
-    /** id/nav_sheet, id/header (the sheet's ETA row) and id/media_app_remote_control (the card): pinned, names do not survive a merged APK. */
-    private static final int NAV_SHEET = 0x7f0b06c5, HEADER = 0x7f0b04a5, MEDIA_CARD = 0x7f0b062a;
+    /** id/nav_sheet, id/header (the sheet's ETA row) and id/media_app_remote_control (the card), set by the patches (Res). */
+    private static final int NAV_SHEET = Res.id_nav_sheet, HEADER = Res.id_header, MEDIA_CARD = Res.id_media_app_remote_control;
     /** string/MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION, string/EXPAND_...: the media button's two labels. */
-    private static final int MINIMIZE = 0x7f14136e, EXPAND = 0x7f140c75;
+    private static final int MINIMIZE = Res.string_MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION,
+            EXPAND = Res.string_EXPAND_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION;
 
     private static WeakReference<View> decor = new WeakReference<>(null);
     private static WeakReference<View> button = new WeakReference<>(null), column = new WeakReference<>(null);
