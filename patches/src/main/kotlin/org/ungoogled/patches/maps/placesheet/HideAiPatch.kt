@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.placesheet
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
@@ -24,6 +25,9 @@ import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+
+/** org.ungoogled.ui.HideAi: Know before you go as an Overview tab card. */
+private const val HIDE_AI = "Lorg/ungoogled/ui/HideAi;"
 
 /** AI_REVIEW_SUMMARY_DISCLAIMER, "Summarized with Gemini" under the review summary. */
 private const val AI_REVIEW_SUMMARY_DISCLAIMER = 0x7f1401c3
@@ -112,6 +116,128 @@ internal val hideAiPatch = bytecodePatch(
             """,
             ExternalLabel("show_ai", kbyg.implementation!!.instructions.first()),
         )
+
+        // Issue #199: "Know before you go" as a card of the Overview tab. That tab is a server-made list of modules,
+        // and some modules only show one of the place's content slots, server-built (Elements) cards; the card came
+        // as one of them, where the header getter above never sees it. Each such module looks its slot up in the
+        // place's slot table and is left out when the slot is missing; the extension makes it missing when it is the
+        // slot the place names as Know before you go (the one the header getter shows) or a Know before you go card.
+        run<Unit> {
+            // The header's Know before you go: its getter returns this field, filled from the place's slot table by
+            // `slots.map.get(Integer.valueOf(place.data().slots.config.kbyg))` -- the names the extension follows.
+            val getterCode = kbyg.implementation!!.instructions.toList()
+            val kbygField = (getterCode[getterCode.size - KBYG_GETTER_TAIL.size] as ReferenceInstruction).reference as FieldReference
+            var path: String? = null
+            var slotTable: FieldReference? = null
+            for (m in header.methods) {
+                val code = m.implementation?.instructions?.toList() ?: continue
+                val store = code.indexOfFirst { insn ->
+                    insn.opcode == Opcode.IPUT_OBJECT && ((insn as ReferenceInstruction).reference as FieldReference).let {
+                        it.definingClass == kbygField.definingClass && it.name == kbygField.name
+                    }
+                }
+                if (store < 0) continue
+                fun ref(i: Int) = (code[i] as? ReferenceInstruction)?.reference
+                val get = (store downTo 0).firstOrNull { i ->
+                    code[i].opcode == Opcode.INVOKE_INTERFACE && (ref(i) as? MethodReference)?.let { it.definingClass == "Ljava/util/Map;" && it.name == "get" } == true
+                } ?: continue
+                val boxed = (get downTo 0).firstOrNull { i ->
+                    (ref(i) as? MethodReference)?.let { it.definingClass == "Ljava/lang/Integer;" && it.name == "valueOf" } == true
+                } ?: continue
+                val id = (boxed downTo 0).firstOrNull { code[it].opcode == Opcode.IGET } ?: continue
+                val kbygSlot = ref(id) as FieldReference
+                val config = (id downTo 0).firstNotNullOfOrNull { i ->
+                    (ref(i) as? FieldReference)?.takeIf { code[i].opcode == Opcode.IGET_OBJECT && it.type == kbygSlot.definingClass }
+                } ?: continue
+                val slots = (id downTo 0).firstNotNullOfOrNull { i ->
+                    (ref(i) as? FieldReference)?.takeIf { code[i].opcode == Opcode.IGET_OBJECT && it.type == config.definingClass }
+                } ?: continue
+                val data = (id downTo 0).firstNotNullOfOrNull { i ->
+                    (ref(i) as? MethodReference)?.takeIf { code[i].opcode == Opcode.INVOKE_VIRTUAL && it.returnType == slots.definingClass && it.parameterTypes.isEmpty() }
+                } ?: continue
+                path = "${data.name};${slots.name};${config.name};${kbygSlot.name}"
+                slotTable = slots
+            }
+            val kbygPath = path ?: throw PatchException("Know before you go slot is no longer read from the place's slot table")
+            val getter = mutableClassDefBy(HIDE_AI).methods.single { it.name == "kbygPath" && it.parameterTypes.isEmpty() }
+            val first = getter.implementation!!.instructions.first()
+            if (first.opcode != Opcode.CONST_STRING) throw PatchException("$HIDE_AI->kbygPath() no longer starts with const-string")
+            getter.replaceInstruction(0, "const-string v${(first as OneRegisterInstruction).registerA}, \"$kbygPath\"")
+
+            // The Overview tab's slot module: `content = (Content) slots.get(Integer.valueOf(this.slot)); if (content
+            // == null) return;` while binding a place.
+            val modules = mutableListOf<Pair<String, Method>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    if (m.returnType != "V" || m.parameterTypes.size != 1) continue
+                    val code = m.implementation?.instructions?.toList() ?: continue
+                    val get = code.indexOfFirst { insn ->
+                        insn.opcode == Opcode.INVOKE_INTERFACE && ((insn as ReferenceInstruction).reference as MethodReference).let {
+                            it.definingClass == "Ljava/util/Map;" && it.name == "get"
+                        }
+                    }
+                    if (get < 3 || get + 4 >= code.size) continue
+                    val ownSlot = (code[get - 3] as? ReferenceInstruction)?.reference as? FieldReference
+                    if (code[get - 3].opcode != Opcode.IGET || ownSlot?.definingClass != c.type) continue
+                    if (code[get + 1].opcode != Opcode.MOVE_RESULT_OBJECT || code[get + 2].opcode != Opcode.CHECK_CAST ||
+                        code[get + 3].opcode != Opcode.IF_NEZ || code[get + 4].opcode != Opcode.RETURN_VOID
+                    ) continue
+                    // looked up in the place's slot table (other modules look up other tables the same way)
+                    val readsSlots = code.take(get).any { insn ->
+                        insn.opcode == Opcode.IGET_OBJECT && ((insn as ReferenceInstruction).reference as FieldReference).let {
+                            it.definingClass == slotTable!!.definingClass && it.name == slotTable!!.name
+                        }
+                    }
+                    if (!readsSlots) continue
+                    modules += c.type to m
+                }
+            }
+            val (moduleType, found) = modules.singleOrNull()
+                ?: throw PatchException("Overview tab slot module: found ${modules.size}")
+            val bind = mutableClassDefBy(moduleType).methods.single {
+                it.name == found.name && it.returnType == "V" && it.parameterTypes == found.parameterTypes
+            }
+            val code = bind.implementation!!.instructions.toList()
+            val get = code.indexOfFirst { insn ->
+                insn.opcode == Opcode.INVOKE_INTERFACE && ((insn as ReferenceInstruction).reference as MethodReference).name == "get"
+            }
+            val slotField = (code[get - 3] as ReferenceInstruction).reference as FieldReference
+            val key = (code[get] as com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c).registerD
+            val content = (code[get + 2] as OneRegisterInstruction).registerA
+            val contentType = ((code[get + 2] as ReferenceInstruction).reference as TypeReference).type
+            val place = bind.implementation!!.registerCount - 1
+            if (bind.implementation!!.instructions[get + 3].location.labels.isNotEmpty()) {
+                throw PatchException("Overview tab slot module's null check is a branch target")
+            }
+            if (key > 15 || content > 15 || place > 15 || key == content) throw PatchException("Overview tab slot module registers out of reach")
+            if (code.take(get + 3).any { it.opcode.setsRegister() && (it as? OneRegisterInstruction)?.registerA == place }) {
+                throw PatchException("Overview tab slot module no longer keeps its place in its parameter")
+            }
+            // Right before `if (content == null) return`: the key's register is free once the lookup is done -- its next
+            // use writes it.
+            val nextUse = code.drop(get + 4).firstOrNull { insn ->
+                when (insn) {
+                    is com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c ->
+                        key in listOf(insn.registerC, insn.registerD, insn.registerE, insn.registerF, insn.registerG).take(insn.registerCount)
+                    is com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction -> insn.registerA == key || insn.registerB == key
+                    is OneRegisterInstruction -> insn.registerA == key
+                    else -> false
+                }
+            }
+            if (nextUse == null || !nextUse.opcode.setsRegister() || (nextUse as? OneRegisterInstruction)?.registerA != key ||
+                (nextUse is com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction && nextUse.registerB == key)
+            ) throw PatchException("Overview tab slot module still needs its lookup key")
+            bind.addInstructions(
+                get + 3,
+                """
+                    iget v$key, p0, $moduleType->${slotField.name}:I
+                    invoke-static { v$content, v$key, v$place }, $HIDE_AI->slot(Ljava/lang/Object;ILjava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$content
+                    check-cast v$content, $contentType
+                """,
+            )
+        }
 
         // The review summary. Both lists that add it (the Reviews tab and the overview's reviews
         // block) ask its view model "is there one" right before creating its layout; that is the
