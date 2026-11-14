@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.7](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.7)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;198 patches total
+> **[v2.9.8](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.8)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -53,12 +53,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Map region](#map-region) | Adds a Customization option to pick the country the map's names and borders are shown for. |  |
 | [Media panel can be closed](#media-panel-can-be-closed) | Navigation's media button stays above the media controls, so they can be closed again. |  |
 | [Offline saved places](#offline-saved-places) | Save places without a Google account, kept only on the phone: Save opens Maps' own "Place saved" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a "Local saved" row on the account sheet rebuilds Maps' You tab -- your recent places, your lists and labels (Home, Work, your own) -- with export and import (backup file, KML, Google Takeout's saved lists and Saved Places.json, several files or the whole Takeout .zip at once). It also has a Timeline: where the phone has been, grouped into days and visits, kept only on the phone, with GPX export. Recording is off until switched on there; it shows a notification while it runs. With Add microG-RE support, Maps' own Save keeps syncing to your account and Local saved instead copies the account's saved lists to the phone (Pull from Google account). |  |
-| [Power saving mode](#power-saving-mode) | Brings the Pixel-only power saving mode to every phone: while driving with navigation, press the power button and Maps shows only key information such as the next turn on a black screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a row on the account sheet under Customization, which also has: a navigation button that opens the power saving screen without locking the phone, switching to it by itself when idle, a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps. |  |
+| [Power saving mode](#power-saving-mode) | Brings the Pixel-only power saving mode to every phone: while driving with navigation, press the power button and Maps shows only key information such as the next turn on a black screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a row on the account sheet under Customization, which also has: a navigation button that opens the power saving screen without locking the phone, switching to it by itself when idle, the normal screen near turns, a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps. |  |
 | [Proxy](#proxy) | Adds a Proxy screen to Customization that sends Maps' own traffic, map data included, through an HTTP proxy -- for example Orbot's (127.0.0.1:8118) to use Tor. Map data never falls back to a direct connection: if the proxy stops, Maps stops loading. Needs a recent Play services network engine (Cronet); Maps warns when it cannot take the proxy. |  |
 | [Rectangle shapes](#rectangle-shapes) | Squares off rounded corners across the UI, including the two round navigation buttons. |  |
 | [Remove permissions](#remove-permissions) | Removes permissions that only serve Google-account features or Google's data collection: background location, physical activity, contacts, microphone (voice search stops working), camera (Lens and Live View stop working), car speed, advertising ID, push messages and Google services settings. Left out with Add microG-RE support, whose account features need them. |  |
 | [Remove sign-in prompts](#remove-sign-in-prompts) | Removes Google's sign-in prompts: the first-launch "Make it your map" page, the search screen's "Tired of typing?" card and the account sheet's "Sign in" pill. Tapping "Your profile" (or the pill, where it still shows) answers with a "Can't sign in" toast instead of nothing. With Add microG-RE support, which signs in, only the first-launch page and the card go. |  |
-| [Remove telemetry](#remove-telemetry) | Points the Firebase Installations and Play services compliance check-ins at an unresolvable host, stops every ad impression and click ping from being sent, and deregisters Google's logging, performance-monitoring, survey and Location History libraries and the on-device federated-learning services. With Add microG-RE support, Firebase Installations and Location History are left alone, so Timeline, account sync and push messages keep working. |  |
+| [Remove telemetry](#remove-telemetry) | Points the Firebase Installations and Play services compliance check-ins at an unresolvable host, turns Firebase Analytics off, stops every ad impression and click ping from being sent, and deregisters Google's logging, performance-monitoring, survey and Location History libraries and the on-device federated-learning services. With Add microG-RE support, Firebase Installations and Location History are left alone, so Timeline, account sync and push messages keep working. |  |
 | [Review counts in navigation search](#review-counts-in-navigation-search) | Places found while navigating show their review count next to the rating. |  |
 | [Speed cameras](#speed-cameras) | Chimes and shows a note when a speed or red light camera is coming up ahead, and puts the cameras on the map, from OpenStreetMap. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the cameras near you from an OpenStreetMap server -- an area you choose there, about 25 to 175 km across. |  |
 | [Speeding chime](#speeding-chime) | Plays a chime when your speed passes the speed limit during navigation, as Waze does. Maps itself only turns its speedometer red. When it chimes is chosen in Waze & external data source, a row on the account sheet. |  |
@@ -88,7 +88,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
+<summary><img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/gmail.png" width="20" height="20" align="top"> Gmail&nbsp;&nbsp;•&nbsp;&nbsp;13 patches</summary>
 <br>
 
 **Supported version(s):** 2026.11.02.1012472355.Release
@@ -99,9 +99,11 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
+| [Extra compact list](#extra-compact-list) | Tightens the Compact conversation list so more mail fits on screen. | • Square sender pictures |
 | [Hide AI](#hide-ai) | Hides Gemini, Help me write, Polish, summaries, the AI inbox and Gemini replies. |  |
 | [Hide ads](#hide-ads) | Removes sponsored mail from the inbox, Promotions and Social. |  |
 | [Hide upsells](#hide-upsells) | Hides storage nags and Google One, Gemini and Workspace upgrade offers. |  |
+| [Mark as read in notifications](#mark-as-read-in-notifications) | Adds Mark as read to new-mail notifications of Exchange, IMAP and POP3 accounts. |  |
 | [Remove telemetry](#remove-telemetry) | Stops logging, surveys, promo fetches and link-click tracking. |  |
 | [Skip Play Protect screen](#skip-play-protect-screen) | Keeps Gmail working where Google shows "This device isn't Play Protect certified". |  |
 | [Strip link trackers](#strip-link-trackers) | Opens links without Google's redirect and without utm and click-tracking parameters. |  |
@@ -289,7 +291,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;31 apps&nbsp;&nbsp;•&nbsp;&nbsp;58 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;32 apps&nbsp;&nbsp;•&nbsp;&nbsp;74 patches</summary>
 <br>
 <blockquote>
 
@@ -467,7 +469,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Hide update badge](#hide-update-badge) | Removes the update red dot from the menu and Settings. |  |
 | [Remove address bar blur](#remove-address-bar-blur) | Solid address and bottom bars instead of the blurred gradient. |  |
 | [Remove tab limit](#remove-tab-limit) | Removes the 99-tab limit. |  |
-| [Remove telemetry](#remove-telemetry) | Stops Samsung's usage logs, analytics, crash reports and autofill crowdsourcing. |  |
+| [Remove telemetry](#remove-telemetry) | Stops Samsung's usage logs, analytics and crash reports, and keeps the app offline until its terms are accepted. |  |
 | [Theme color on bottom bar](#theme-color-on-bottom-bar) | The page's theme color also colors the bottom address bar and bottom bar. |  |
 
 </details>
@@ -490,6 +492,33 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Remove internet permission](#remove-internet-permission) | Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working. |  |
 | [Show GIFs in every region](#show-gifs-in-every-region) | Shows the GIF board where the phone's region turns it off. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores keyboard policies pushed from Samsung's servers. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/sboard.png" width="20" height="20" align="top"> SBoard&nbsp;&nbsp;•&nbsp;&nbsp;16 patches</summary>
+<br>
+
+**Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Bigger size range](#bigger-size-range) | Lets the keyboard be resized smaller and taller. |  |
+| [Build SBoard](#build-sboard) | Builds SBoard, its own keyboard app with its own name and icon. | • Package name<br>• App name |
+| [Faster backspace](#faster-backspace) | Backspace deletes twice as fast at every speed. |  |
+| [Faster suggestion animations](#faster-suggestion-animations) | Halves the suggestion bar's animation time. |  |
+| [Hide Bitmoji and mojitok](#hide-bitmoji-and-mojitok) | Removes the Bitmoji and mojitok sticker services. |  |
+| [Hide Galaxy AI](#hide-galaxy-ai) | Removes Galaxy AI from the toolbar, stickers and settings. |  |
+| [Hide Samsung Pass](#hide-samsung-pass) | Removes the Samsung Pass button from the toolbar. |  |
+| [Hide Translate](#hide-translate) | Removes the Translate button from the toolbar. |  |
+| [Hide new badges](#hide-new-badges) | Removes the "new" dots from the toolbar and emoji tabs. |  |
+| [Hide store links](#hide-store-links) | Removes the Galaxy Store sticker button and Contact us. |  |
+| [Hide tips](#hide-tips) | Stops the keyboard's pop-up tips. |  |
+| [Key vibration length](#key-vibration-length) | Adds a key vibration length slider to Touch feedback (One UI). |  |
+| [More toolbar buttons](#more-toolbar-buttons) | Shows more buttons on the toolbar before the ... button. | • Buttons |
+| [No contacts access](#no-contacts-access) | Removes the contacts permission (names in suggestions). |  |
+| [One-handed keyboard on every phone](#one-handed-keyboard-on-every-phone) | Offers the one-handed keyboard mode on every phone. |  |
+| [Pure black theme](#pure-black-theme) | Makes the Dark and Solid dark themes pure black. |  |
 
 </details>
 
@@ -585,7 +614,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 3.9.04.6 — needs Android 15 or newer
+**Supported version(s):** 3.9.04.6 — needs Android 15 or newer, 3.4.14.63 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|

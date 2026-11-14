@@ -1,3 +1,37 @@
+## [2.9.8](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.7...v2.9.8) (2026-11-14)
+
+### 🐛 Bug Fixes
+
+* add extra compact list for gmail; issue [#192](https://github.com/bearinmindcat/morphe-patches/issues/192) ([221b7f4](https://github.com/bearinmindcat/morphe-patches/commit/221b7f465b55d10db435468d33eb7104f5a281b2))
+* add sboard samsung keyboard patches ([b6943bd](https://github.com/bearinmindcat/morphe-patches/commit/b6943bdf55912d27435c888f70647e6a3d031221))
+* add sboard, samsung keyboard as its own app with its own name and icon ([aae5ce9](https://github.com/bearinmindcat/morphe-patches/commit/aae5ce9a31376bf76472c3ccca302d130bc5204f))
+* gmail notifications can mark mail as read ([3488861](https://github.com/bearinmindcat/morphe-patches/commit/3488861911b6793d0d32dc811a1c90456617ab9d))
+* hyperos launcher never sends a safe-mode report to xiaomi ([59bd88e](https://github.com/bearinmindcat/morphe-patches/commit/59bd88e55317f0676d342b6636baf6ad243b166b))
+* maps hide ai also hides know before you go in the overview tab; issue [#199](https://github.com/bearinmindcat/morphe-patches/issues/199) ([2fb103a](https://github.com/bearinmindcat/morphe-patches/commit/2fb103a9a4a417bd6e8d484e60e112ddf25af2d6))
+* maps light map also keeps terrain in the day style; issue [#164](https://github.com/bearinmindcat/morphe-patches/issues/164) ([3fd25eb](https://github.com/bearinmindcat/morphe-patches/commit/3fd25eb2853e76b8d99f62f473297ef9c0460651))
+* maps location sharing opens under package names starting like google's; issue [#194](https://github.com/bearinmindcat/morphe-patches/issues/194) ([4de5557](https://github.com/bearinmindcat/morphe-patches/commit/4de5557c84cb367325664cdcccbad9b5485498d6))
+* maps media panel shows the playing app first and lets you choose its apps; issue [#78](https://github.com/bearinmindcat/morphe-patches/issues/78) ([431ece3](https://github.com/bearinmindcat/morphe-patches/commit/431ece3fd054e503263609cd9f4b980083674a86))
+* maps power saving screen turns to landscape and shows navigation again near turns; issue [#195](https://github.com/bearinmindcat/morphe-patches/issues/195) ([45dbd3e](https://github.com/bearinmindcat/morphe-patches/commit/45dbd3ee8b479ed26c7948e6bace11216c96083f))
+* maps sends no firebase analytics through play services ([8bac2a7](https://github.com/bearinmindcat/morphe-patches/commit/8bac2a7f5a2e9762a163b82fee3238417c2a1d8e))
+* microg gmail says it needs microg-re instead of crashing at start; issue [#187](https://github.com/bearinmindcat/morphe-patches/issues/187) ([9487bfa](https://github.com/bearinmindcat/morphe-patches/commit/9487bfa9104cae8c488d3b29614387a96b5c1118))
+* nothing gallery no longer sends ml kit usage logs to google ([5fe4a49](https://github.com/bearinmindcat/morphe-patches/commit/5fe4a49ef74c46eebcf5e9ecaeb081c1883d0320))
+* oneplus system launcher blurs app menus and the drawer without a color tint; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([12608cf](https://github.com/bearinmindcat/morphe-patches/commit/12608cf95ffb012e236ed9438f2bc404bc1bc859))
+* oneplus system launcher says where system navigation is on android's system page; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([e45d58b](https://github.com/bearinmindcat/morphe-patches/commit/e45d58b3d718a004a39c7e4a99630dce27dd276c))
+* oneplus system launcher turns home screen pages with one swipe; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([3b29082](https://github.com/bearinmindcat/morphe-patches/commit/3b2908230a40cb24f2dabda7118e1abf07cd2473))
+* samsung apps skip galaxy store update checks ([6f5c3f8](https://github.com/bearinmindcat/morphe-patches/commit/6f5c3f8c4c476597ae82399cb29affdd8484d0cd))
+* samsung gallery hides the albums you choose in hide albums; issue [#196](https://github.com/bearinmindcat/morphe-patches/issues/196) ([32db3b5](https://github.com/bearinmindcat/morphe-patches/commit/32db3b5beb60eaf55359912c0777fb5d1d44008a))
+* samsung internet waits for its terms before going online ([157dd8e](https://github.com/bearinmindcat/morphe-patches/commit/157dd8e03418b68c985a1667b03c20363c230cff))
+* samsung keyboard swipe controls no longer crash off one ui (cursor control offered) ([7576b7f](https://github.com/bearinmindcat/morphe-patches/commit/7576b7f1098b9faad2c78c27e4194dd2da2301a7))
+* samsung photo editor runs on android 13; issue [#197](https://github.com/bearinmindcat/morphe-patches/issues/197) ([8a10f65](https://github.com/bearinmindcat/morphe-patches/commit/8a10f65a80393e7347233e5d8742978d1d224ed5))
+* samsung video library opens on galaxy phones; issue [#180](https://github.com/bearinmindcat/morphe-patches/issues/180) ([e9855b4](https://github.com/bearinmindcat/morphe-patches/commit/e9855b4eab25339bd8d7540af936acbf30444802))
+* sboard hides translate and samsung pass, one-handed keyboard on every phone, both keyboard build families ([ff18482](https://github.com/bearinmindcat/morphe-patches/commit/ff1848273933d065eb628b2875580bcd11fb3bd1))
+* sboard removes toolbar buttons instead of greying them, unverified extras default off ([62c893f](https://github.com/bearinmindcat/morphe-patches/commit/62c893f5fad1dea50a244abc151a530f14a3a2ec))
+* xiaomi gallery editor no longer contacts firebase or google push at start ([9dd9db1](https://github.com/bearinmindcat/morphe-patches/commit/9dd9db1e0f55919d98f779076c0e317acb0a7055))
+* xiaomi gallery no longer downloads xiaomi's cloud config at start ([8100ff8](https://github.com/bearinmindcat/morphe-patches/commit/8100ff83e83d01a65542fabeffce1b9cd34829d0))
+* xiaomi gallery no longer registers with xiaomi's push service ([91b98a5](https://github.com/bearinmindcat/morphe-patches/commit/91b98a5ac2d067f0f51dfa508db01244aff69533))
+* xiaomi notes never starts xiaomi's usage statistics ([e8a2de8](https://github.com/bearinmindcat/morphe-patches/commit/e8a2de875be93a303dac922f2375a2c0f5fd68ee))
+* xiaomi weather asks before using xiaomi's weather server ([fd876c4](https://github.com/bearinmindcat/morphe-patches/commit/fd876c4e24a75c075923f3d4dd4257028d742f81))
+
 ## [2.9.7](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.6...v2.9.7) (2026-11-14)
 
 ### 🐛 Bug Fixes
