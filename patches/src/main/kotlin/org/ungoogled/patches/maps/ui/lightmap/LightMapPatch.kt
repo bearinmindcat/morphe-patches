@@ -129,6 +129,104 @@ val lightMapPatch = bytecodePatch(
             """,
         )
 
+        // 5. The terrain layer (issue #164: Terrain stayed dark). Its dark tiles are picked by the layer kinds' own
+        //    `night && this == TERRAIN ? TERRAIN_DARK : tiles`, called with a night flag the renderers keep for it:
+        //    a boolean field, or an AtomicBoolean. The theme listener updates them (through mapNight() above), but
+        //    only after its "map style already right?" check, which with Light map is always yes -- so they kept the
+        //    value they were made with, the dark theme's. Every value written into them goes through mapNight().
+        run<Unit> {
+            val picks = mutableListOf<MethodReference>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    if (m.parameterTypes.map { it.toString() } != listOf("Z") || !m.returnType.startsWith("L")) continue
+                    val code = m.implementation?.instructions?.toList() ?: continue
+                    if (code.map { it.opcode } != listOf(
+                            Opcode.IF_EQZ, Opcode.SGET_OBJECT, Opcode.IF_NE, Opcode.SGET_OBJECT, Opcode.RETURN_OBJECT,
+                            Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT,
+                        ) || code[1].fieldRef()?.definingClass != c.type || code[3].fieldRef()?.type != m.returnType
+                    ) continue
+                    picks += com.android.tools.smali.dexlib2.immutable.reference.ImmutableMethodReference(c.type, m.name, m.parameterTypes, m.returnType)
+                }
+            }
+            val pick = picks.singleOrNull() ?: throw PatchException("the terrain layer's day/night pick: found ${picks.size}")
+            val flags = mutableSetOf<FieldReference>()
+            val atomics = mutableSetOf<FieldReference>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    val code = m.implementation?.instructions?.toList() ?: continue
+                    code.forEachIndexed { i, insn ->
+                        val r = insn.methodRef() ?: return@forEachIndexed
+                        if (r.definingClass != pick.definingClass || r.name != pick.name || r.parameterTypes.map { it.toString() } != listOf("Z")) return@forEachIndexed
+                        val night = (insn as FiveRegisterInstruction).registerD
+                        // what wrote the flag shortly before: a field of this class, or AtomicBoolean.get()
+                        for (j in i - 1 downTo maxOf(0, i - 20)) {
+                            val w = code[j]
+                            if (w.opcode == Opcode.IGET_BOOLEAN && (w as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA == night &&
+                                w.fieldRef()?.definingClass == c.type
+                            ) flags += w.fieldRef()!!
+                            if (w.opcode == Opcode.MOVE_RESULT && (w as OneRegisterInstruction).registerA == night) {
+                                val get = code.getOrNull(j - 1)?.methodRef()
+                                if (get?.definingClass == "Ljava/util/concurrent/atomic/AtomicBoolean;" && get.name == "get") {
+                                    val holder = (code[j - 1] as FiveRegisterInstruction).registerC
+                                    (j - 2 downTo maxOf(0, j - 6)).firstNotNullOfOrNull { k ->
+                                        code[k].fieldRef()?.takeIf {
+                                            code[k].opcode == Opcode.IGET_OBJECT && (code[k] as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA == holder
+                                        }
+                                    }?.let { atomics += it }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (flags.size != 1 || atomics.size != 1) throw PatchException("terrain night flags: ${flags.size} fields, ${atomics.size} atomics")
+            val flag = flags.single()
+            val atomic = atomics.single()
+            var writes = 0
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                val hits = c.methods.filter { m ->
+                    m.implementation?.instructions?.any { insn ->
+                        (insn.opcode == Opcode.IPUT_BOOLEAN && insn.fieldRef()?.let { it.definingClass == flag.definingClass && it.name == flag.name } == true) ||
+                            (c.type == atomic.definingClass && m.name == "<init>" && insn.methodRef()?.let {
+                                it.definingClass == "Ljava/util/concurrent/atomic/AtomicBoolean;" && it.name == "<init>" && it.parameterTypes.map { p -> p.toString() } == listOf("Z")
+                            } == true)
+                    } == true
+                }
+                if (hits.isEmpty()) return@classDefForEach
+                val mutable = mutableClassDefBy(c.type)
+                for (hit in hits) {
+                    val m = mutable.methods.single { it.name == hit.name && it.parameterTypes == hit.parameterTypes && it.returnType == hit.returnType }
+                    // from the last up, so earlier indices stay put
+                    val sites = m.implementation!!.instructions.withIndex().filter { (k, insn) ->
+                        (insn.opcode == Opcode.IPUT_BOOLEAN && insn.fieldRef()?.let { it.definingClass == flag.definingClass && it.name == flag.name } == true) ||
+                            (m.name == "<init>" && c.type == atomic.definingClass && insn.methodRef()?.let {
+                                it.definingClass == "Ljava/util/concurrent/atomic/AtomicBoolean;" && it.name == "<init>" && it.parameterTypes.map { p -> p.toString() } == listOf("Z")
+                            } == true && m.implementation!!.instructions.drop(k + 1).take(3).any { n ->
+                                n.opcode == Opcode.IPUT_OBJECT && n.fieldRef()?.let { f -> f.definingClass == atomic.definingClass && f.name == atomic.name } == true
+                            })
+                    }.map { it.index }.reversed()
+                    for (k in sites) {
+                        val insn = m.implementation!!.instructions[k]
+                        if (m.implementation!!.instructions[k].location.labels.isNotEmpty()) throw PatchException("terrain night flag write in ${c.type}->${m.name} is a branch target")
+                        val value = if (insn.opcode == Opcode.IPUT_BOOLEAN) (insn as com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction).registerA
+                            else (insn as FiveRegisterInstruction).registerD
+                        m.addInstructions(
+                            k,
+                            """
+                                invoke-static/range { v$value .. v$value }, $SHAPES->mapNight(Z)Z
+                                move-result v$value
+                            """,
+                        )
+                        writes++
+                    }
+                }
+            }
+            if (writes < 2) throw PatchException("terrain night flags: only $writes writes found")
+        }
+
         // 4. Navigation's night-mode controller. useNightMode() is `allowed && useNightModeIgnoringAllowedState()`,
         //    and the latter is `forced == DAY ? false : forced == NIGHT || nightTime || tunnel || car`;
         //    their fields go to the extension, which works the map's state out for the scheme
