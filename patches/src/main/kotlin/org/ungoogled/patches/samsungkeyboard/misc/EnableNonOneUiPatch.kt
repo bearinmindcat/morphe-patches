@@ -229,6 +229,45 @@ private val oneUiMembersPatch = bytecodePatch(
     }
 }
 
+/** One UI's switch for the "Cursor control" choice of keyboard swipes. */
+private const val CURSOR_CONTROL = "SEC_FLOATING_FEATURE_SIP_SUPPORT_CURSOR_CONTROL"
+private const val FLOATING_GET_BOOLEAN = "Lcom/samsung/android/feature/SemFloatingFeature;->getBoolean(Ljava/lang/String;)Z"
+
+/**
+ * Keyboard swipe controls: the "Cursor control" choice is there when One UI says the phone supports it, and the page
+ * then uses it unchecked as it opens, so off One UI (no answer) the page crashed. Off One UI it is always offered (the
+ * stand-in answers false; a Galaxy phone's own answer is kept).
+ */
+private val swipeSettingsPatch = bytecodePatch {
+    execute {
+        var reads = 0
+        classDefForEach { classDef ->
+            for (method in classDef.methods) {
+                val code = method.implementation?.instructions?.toList() ?: continue
+                if (code.none { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == CURSOR_CONTROL }) continue
+                mutableClassDefBy(classDef.type).methods.single {
+                    it.name == method.name && it.parameterTypes == method.parameterTypes && it.returnType == method.returnType
+                }.apply {
+                    val instructions = implementation!!.instructions
+                    for (key in instructions.indices.reversed()) {
+                        if (((instructions[key] as? ReferenceInstruction)?.reference as? StringReference)?.string != CURSOR_CONTROL) continue
+                        val read = (key + 1 until minOf(key + 8, instructions.size)).firstOrNull { i ->
+                            ((instructions[i] as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                                "${it.definingClass}->${it.name}(${it.parameterTypes.joinToString("")})${it.returnType}"
+                            } == FLOATING_GET_BOOLEAN
+                        } ?: continue
+                        val result = instructions.getOrNull(read + 1)?.takeIf { it.opcode == Opcode.MOVE_RESULT } ?: continue
+                        val register = (result as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                        addInstructions(read + 2, "invoke-static/range {v$register .. v$register}, $ONE_UI->cursorControl(Z)Z\nmove-result v$register")
+                        reads++
+                    }
+                }
+            }
+        }
+        if (reads == 0) throw PatchException("the keyboard's $CURSOR_CONTROL switch was not found")
+    }
+}
+
 /**
  * Off One UI the keyboard dies as it starts, on SemSystemProperties (a One UI class). The extension carries stand-ins
  * for the 47 One UI classes it uses, answering "absent"; on a Samsung phone the framework's own classes load first, so
@@ -241,6 +280,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_KEYBOARD)
-    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch, android13Patch, languageDownloadsPatch)
+    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch, android13Patch, languageDownloadsPatch, swipeSettingsPatch)
     extendWith(SAMSUNG_KEYBOARD_EXTENSION)
 }

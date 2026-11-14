@@ -194,6 +194,14 @@ public final class OneUi {
         return resources.getIdentifier("oneui_" + n, t, app);
     }
 
+    /**
+     * One UI's "the phone supports swipe cursor control": a Galaxy phone's own answer, true elsewhere (the swipe settings
+     * page uses the Cursor control choice unchecked).
+     */
+    public static boolean cursorControl(boolean phone) {
+        return phone || !isOneUi();
+    }
+
     private static volatile Boolean oneUi;
 
     /** Whether the phone runs One UI: its Build.VERSION carries SEM_PLATFORM_INT. */
