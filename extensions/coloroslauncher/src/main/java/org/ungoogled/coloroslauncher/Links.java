@@ -19,7 +19,8 @@ public final class Links {
 
     /**
      * Where the navigation mode is chosen, in order: One UI's Navigation bar page; AOSP's System page (System
-     * navigation is under Gestures there: Android has no page of its own for it that an app may open).
+     * navigation is under Gestures there: Android has no page of its own for it that an app may open, so the System
+     * page comes with a hint saying where to go next).
      */
     private static final String[][] NAVIGATION_PAGES = {
             {"com.android.settings", "com.android.settings.Settings$NavigationBarSettingsActivity"},
@@ -63,10 +64,31 @@ public final class Links {
             Intent android = new Intent(Intent.ACTION_MAIN).setClassName(page[0], page[1]);
             if (opens(c, android)) {
                 redirect(intent, android);
+                if (page[1].endsWith("$SystemDashboardActivity")) hint(c);
                 return;
             }
         }
         redirect(intent, new Intent(Settings.ACTION_SETTINGS));
+    }
+
+    /** "Gestures > System navigation", in Settings' own words where it has them. */
+    private static void hint(Context c) {
+        String gestures = settingsString(c, "gesture_preference_title", "Gestures");
+        String navigation = settingsString(c, "system_navigation_title", "System navigation");
+        final String text = gestures + " \u203a " + navigation;
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(
+                () -> android.widget.Toast.makeText(c, text, android.widget.Toast.LENGTH_LONG).show());
+    }
+
+    private static String settingsString(Context c, String name, String fallback) {
+        try {
+            android.content.res.Resources r = c.getPackageManager().getResourcesForApplication("com.android.settings");
+            int id = r.getIdentifier(name, "string", "com.android.settings");
+            if (id != 0) return r.getString(id);
+        } catch (PackageManager.NameNotFoundException | RuntimeException e) {
+            // English then
+        }
+        return fallback;
     }
 
     private static void redirect(Intent intent, Intent to) {
