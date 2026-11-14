@@ -14,3 +14,17 @@ internal object PopUpButtonFingerprint : Fingerprint(
     returnType = "V",
     filters = listOf(string("To prevent malfunction switching to PopupPlayer in edge of playing.")),
 )
+
+/** FileInfoUtil.setPlayingFileInfo: turns a storage document URI into the path the player plays (off One UI). */
+internal object PlayingFileInfoFingerprint : Fingerprint(
+    returnType = "V",
+    parameters = listOf("Landroid/net/Uri;"),
+    filters = listOf(string("setPlayingFileInfo. EXTERNAL_STORAGE case mFilePath converted to sdpPath")),
+)
+
+/** SemMediaPlayerControlImpl's init: the player opens the path it is given, or the URI when it is a content:// one. */
+internal object PlayerInitFingerprint : Fingerprint(
+    returnType = "Z",
+    parameters = listOf("Z", "Ljava/lang/String;", "Landroid/net/Uri;"),
+    filters = listOf(string("SemMediaPlayer init async. mVideoWidth: ")),
+)

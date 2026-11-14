@@ -12,14 +12,20 @@ import org.ungoogled.patches.samsung.redirectSystemServices
 import org.ungoogled.patches.samsung.replaceSprDrawables
 import org.ungoogled.patches.samsung.rewriteStringLiterals
 import org.ungoogled.patches.samsungvideoplayer.SamsungVideoPlayerConstants.COMPATIBILITY_SAMSUNG_VIDEO_PLAYER
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 internal const val SAMSUNG_VIDEO_PLAYER_EXTENSION = "extensions/samsungvideoplayer.mpe"
 private const val SERVICES = "Lorg/ungoogled/samsungvideoplayer/Services;"
+private const val OPENED_FILES = "Lorg/ungoogled/samsungvideoplayer/OpenedFiles;"
+/** The screen that asks for the video permission before the player opens, unobfuscated. */
+private const val PERMISSIONS_ACTIVITY = "Lcom/samsung/android/video/player/activity/RequestPlayerPermissionsActivity;"
 
 /**
  * Video Player's media controls in the background-play notification (and a few other images) are drawn in One UI's
@@ -167,6 +173,71 @@ private val pictureInPicturePatch = bytecodePatch(
 }
 
 /**
+ * A video opened from a file manager through Android's Files app (a storage document URI) never played: Video Player
+ * turns the URI into a path by text ("primary:Movies/x.mp4" -> /storage/primary/Movies/x.mp4, a folder no phone has)
+ * and, off One UI, plays from that path; and when it first asked for the video permission, the screen that reopened
+ * the player held no access to the URI. The path now comes from the document id, the player takes the URI when the
+ * path cannot be read (as One UI always does), and the permission screen carries the access along.
+ */
+private val openedFilesPatch = bytecodePatch(
+    description = "Plays videos opened from file managers.",
+) {
+    extendWith(SAMSUNG_VIDEO_PLAYER_EXTENSION)
+
+    execute {
+        val info = PlayingFileInfoFingerprint.method
+        val infoInstructions = info.implementation!!.instructions.toList()
+        val log = infoInstructions.indexOfFirst {
+            it.opcode == Opcode.CONST_STRING &&
+                ((it as ReferenceInstruction).reference as? StringReference)?.string?.endsWith("converted to sdpPath") == true
+        }
+        val cast = (log + 1 until minOf(infoInstructions.size, log + 20)).firstOrNull {
+            infoInstructions[it].opcode == Opcode.CHECK_CAST &&
+                (infoInstructions[it] as ReferenceInstruction).reference.toString() == "Ljava/lang/String;"
+        } ?: throw PatchException("setPlayingFileInfo no longer converts document URIs to paths")
+        val path = (infoInstructions[cast] as OneRegisterInstruction).registerA
+        info.addInstructions(
+            cast + 1,
+            """
+                invoke-static/range { p1 .. p1 }, $OPENED_FILES->path(Landroid/net/Uri;)Ljava/lang/String;
+                move-result-object v$path
+            """,
+        )
+
+        PlayerInitFingerprint.method.addInstructions(
+            0,
+            """
+                invoke-static/range { p2 .. p3 }, $OPENED_FILES->source(Ljava/lang/String;Landroid/net/Uri;)Ljava/lang/String;
+                move-result-object p2
+            """,
+        )
+
+        val permissions = mutableClassDefByOrNull(PERMISSIONS_ACTIVITY) ?: throw PatchException("Video Player has no $PERMISSIONS_ACTIVITY")
+        // The static (Activity)Z that starts the permission screen with the player's intent as "previous_intent".
+        val start = permissions.methods.firstOrNull { m ->
+            AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes == listOf("Landroid/app/Activity;") && m.returnType == "Z" &&
+                m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "previous_intent"
+                } == true
+        } ?: throw PatchException("$PERMISSIONS_ACTIVITY no longer starts the permission screen with the player's intent")
+        val startInstructions = start.implementation!!.instructions.toList()
+        val previous = startInstructions.indexOfFirst {
+            it.opcode == Opcode.CONST_STRING && ((it as ReferenceInstruction).reference as? StringReference)?.string == "previous_intent"
+        }
+        val put = startInstructions.getOrNull(previous + 1) as? FiveRegisterInstruction
+        val launch = (previous + 1 until startInstructions.size).firstOrNull {
+            startInstructions[it].opcode == Opcode.INVOKE_VIRTUAL &&
+                ((startInstructions[it] as ReferenceInstruction).reference as? MethodReference)?.name == "startActivity"
+        }
+        if (previous < 0 || put == null || launch == null) throw PatchException("$PERMISSIONS_ACTIVITY no longer passes the player's intent on")
+        start.addInstructions(
+            launch,
+            "invoke-static { v${put.registerC}, v${put.registerE} }, $OPENED_FILES->carryGrant(Landroid/content/Intent;Landroid/content/Intent;)V",
+        )
+    }
+}
+
+/**
  * Off One UI Video Player dies at start-up on One UI classes it calls (SemMultiWindowManager first) and plays every
  * video with One UI's SemMediaPlayer. The extension carries stand-ins for the 121 One UI classes it calls, and a
  * SemMediaPlayer built on Android's own MediaPlayer.
@@ -178,6 +249,14 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_VIDEO_PLAYER)
-    dependsOn(oneUiMembersPatch, systemServicesPatch, privilegedCallsPatch, videoPermissionPatch, pictureInPicturePatch, sprDrawablesPatch)
+    dependsOn(
+        oneUiMembersPatch,
+        systemServicesPatch,
+        privilegedCallsPatch,
+        videoPermissionPatch,
+        pictureInPicturePatch,
+        sprDrawablesPatch,
+        openedFilesPatch,
+    )
     extendWith(SAMSUNG_VIDEO_PLAYER_EXTENSION)
 }

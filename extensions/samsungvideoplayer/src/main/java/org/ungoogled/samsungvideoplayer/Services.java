@@ -35,6 +35,11 @@ public final class Services {
         return null;
     }
 
+    /** The app's context, once Video Player asked for any system service (it does at start-up); else null. */
+    static Context context() {
+        return app;
+    }
+
     /** UserManager.getUserCount() needs MANAGE_USERS, which only One UI's own build of Video Player gets. */
     public static int getUserCount(UserManager manager) {
         try {
