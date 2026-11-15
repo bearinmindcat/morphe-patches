@@ -1,14 +1,15 @@
 package org.ungoogled.ui;
 
 import android.content.Context;
+import android.util.AtomicFile;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.OutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,6 +43,7 @@ final class HistoryStore {
         float rating = Float.NaN;
         int reviews;
         double lat, lng;
+        JSONObject importedRecord;
         /** The latest use of any kind. */
         long last;
         /** The latest use of each kind, in KINDS order; 0 = never. */
@@ -62,6 +64,7 @@ final class HistoryStore {
 
         SavedStore.Place asPlace() {
             SavedStore.Place p = new SavedStore.Place();
+            p.id = java.util.UUID.nameUUIDFromBytes(("history:" + key()).getBytes(StandardCharsets.UTF_8)).toString();
             p.ftid = ftid; p.name = name; p.lat = lat; p.lng = lng;
             p.category = category;
             p.photos.addAll(photos);
@@ -80,29 +83,41 @@ final class HistoryStore {
             if (reviews > 0) o.put("reviews", reviews);
             o.put("lat", lat);
             o.put("lng", lng);
+            if (importedRecord != null) o.put("importedRecord", importedRecord);
             for (int i = 0; i < KINDS.length; i++) if (at[i] > 0) o.put(KIND_NAMES[i], at[i]);
             return o;
         }
 
-        static Entry fromJson(JSONObject o) {
+        static Entry fromJson(JSONObject o) throws Exception {
             Entry e = new Entry();
             e.ftid = o.has("ftid") ? o.optString("ftid", null) : null;
             e.name = o.optString("name", "");
             e.category = o.optString("category", "");
             SavedStore.readPhotos(o, e.photos);
             e.rating = (float) o.optDouble("rating", Double.NaN);
+            if (Float.isInfinite(e.rating)) throw new IOException("Invalid recent-place rating");
             e.reviews = o.optInt("reviews", 0);
             e.lat = o.optDouble("lat");
             e.lng = o.optDouble("lng");
+            if (!SavedStore.coordinates(e.lat, e.lng)) throw new IOException("Invalid recent-place coordinates");
+            e.importedRecord = o.optJSONObject("importedRecord");
             for (int i = 0; i < KINDS.length; i++) {
                 e.at[i] = o.optLong(KIND_NAMES[i], 0);
                 e.last = Math.max(e.last, e.at[i]);
             }
             return e;
         }
+
+        static Entry imported(JSONObject o) throws Exception {
+            Entry e = fromJson(o);
+            e.photos.clear();
+            if (e.importedRecord == null) e.importedRecord = new JSONObject(o.toString());
+            return e;
+        }
     }
 
     private static boolean loaded;
+    private static boolean writeDisabled;
     /** Key -> entry, oldest use first. */
     private static final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
 
@@ -123,20 +138,31 @@ final class HistoryStore {
 
     static synchronized void load(Context c) {
         if (loaded) return;
-        loaded = true;
         entries.clear();
         try {
             File f = new File(c.getFilesDir(), FILE);
-            if (f.exists()) readArray(new JSONObject(SavedStore.readAll(new FileInputStream(f))).optJSONArray("places"));
-        } catch (Throwable ignored) {}
+            if (f.exists() || new File(f + ".bak").exists()) {
+                try (InputStream in = new AtomicFile(f).openRead()) {
+                    readArray(new JSONObject(SavedStore.readAll(in)).getJSONArray("places"), false);
+                }
+            }
+            loaded = true;
+            writeDisabled = false;
+        } catch (Exception e) {
+            writeDisabled = true;
+            entries.clear();
+            android.util.Log.e("UA", "Recent places could not be opened; original file retained", e);
+            throw new IllegalStateException("Cannot read recent places. The original file has not been overwritten.", e);
+        }
     }
 
     /** Merges [a] into what is there, keeping each place's latest use of each kind, oldest first. */
-    private static void readArray(JSONArray a) throws Exception {
+    private static void readArray(JSONArray a, boolean imported) throws Exception {
         if (a == null) return;
-        LinkedHashMap<String, Entry> all = new LinkedHashMap<>(entries);
+        LinkedHashMap<String, Entry> all = new LinkedHashMap<>();
+        for (Entry e : entries.values()) all.put(e.key(), Entry.fromJson(e.toJson()));
         for (int i = 0; i < a.length(); i++) {
-            Entry e = Entry.fromJson(a.getJSONObject(i));
+            Entry e = imported ? Entry.imported(a.getJSONObject(i)) : Entry.fromJson(a.getJSONObject(i));
             Entry old = all.get(e.key());
             if (old == null) { all.put(e.key(), e); continue; }
             for (int k = 0; k < KINDS.length; k++) old.at[k] = Math.max(old.at[k], e.at[k]);
@@ -146,6 +172,7 @@ final class HistoryStore {
             if (old.photos.isEmpty()) old.photos.addAll(e.photos);
             if (Float.isNaN(old.rating)) old.rating = e.rating;
             if (old.reviews == 0) old.reviews = e.reviews;
+            if (old.importedRecord == null) old.importedRecord = e.importedRecord;
         }
         List<Entry> sorted = new ArrayList<>(all.values());
         sorted.sort((x, y) -> Long.compare(x.last, y.last));
@@ -156,12 +183,28 @@ final class HistoryStore {
 
     static synchronized void save(Context c) {
         try {
-            File tmp = new File(c.getFilesDir(), FILE + ".tmp");
-            try (OutputStream out = new FileOutputStream(tmp)) {
-                out.write(new JSONObject().put("places", toJson()).toString(1).getBytes(StandardCharsets.UTF_8));
-            }
-            if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
-        } catch (Throwable ignored) {}
+            persist(c);
+        } catch (Exception e) {
+            android.util.Log.e("UA", "Recent places could not be saved", e);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                    android.widget.Toast.makeText(c, "Recent places could not be saved; original file retained.",
+                            android.widget.Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private static void persist(Context c) throws Exception {
+        if (writeDisabled) throw new IOException("Recent places are read-only after a load error");
+        byte[] bytes = new JSONObject().put("places", toJson()).toString().getBytes(StandardCharsets.UTF_8);
+        AtomicFile file = new AtomicFile(new File(c.getFilesDir(), FILE));
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(bytes);
+            file.finishWrite(out);
+        } catch (IOException e) {
+            if (out != null) file.failWrite(out);
+            throw e;
+        }
     }
 
     /** A use of [p] of [kind]: moves it to the top of the recent places, unless it is the same use again. */
@@ -238,7 +281,18 @@ final class HistoryStore {
     /** From an imported backup: merged in, keeping the latest time of each use. */
     static synchronized void merge(Context c, JSONArray a) throws Exception {
         load(c);
-        readArray(a);
-        save(c);
+        LinkedHashMap<String, Entry> before = new LinkedHashMap<>(entries);
+        try {
+            readArray(a, true);
+            persist(c);
+        } catch (Exception e) {
+            entries.clear();
+            entries.putAll(before);
+            throw e;
+        }
+    }
+
+    static void validateImport(JSONArray a) throws Exception {
+        for (int i = 0; i < a.length(); i++) Entry.imported(a.getJSONObject(i));
     }
 }

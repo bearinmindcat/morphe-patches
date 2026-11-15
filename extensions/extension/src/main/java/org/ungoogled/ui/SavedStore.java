@@ -2,6 +2,7 @@ package org.ungoogled.ui;
 
 import android.content.Context;
 import android.net.Uri;
+import android.util.AtomicFile;
 import android.util.Xml;
 
 import org.json.JSONArray;
@@ -12,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -21,6 +23,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Places saved without a Google account, modelled on Maps' own: a place is
@@ -31,89 +36,296 @@ import java.util.Set;
  */
 final class SavedStore {
     static final String FILE = "ungoogled_saved.json";
+    private static final int MAX_FILE_BYTES = 64 * 1024 * 1024;
     static final String WANT_TO_GO = "want_to_go", TRAVEL = "travel_plans", STARRED = "starred", FAVOURITES = "favourites";
     /** The first version's catch-all list; its places are simply saved now. */
     private static final String OLD_SAVED = "saved";
+    private static final String[] PLACE_FIELDS = {
+            "id", "separateEntry", "ftid", "cid", "placeId", "sourceUrl", "name", "note", "category", "hours",
+            "photo", "photos", "thumbnailUrl", "rating", "reviews", "hasCoordinates", "lat", "lng", "sharedLat", "sharedLng",
+            "added", "lists", "membershipIds", "listNotes", "listEntries", "sources", "detailsState", "thumbnailState",
+            "attempts", "thumbnailAttempts", "retryAt", "metadataAt", "detailError", "thumbnailError",
+            "candidateFtid", "candidateName", "importAliases"
+    };
 
     static final class Place {
+        String id = UUID.randomUUID().toString();
+        boolean separateEntry;
         String ftid;            // Maps' feature id, "0x..:0x..", or null for a bare spot
+        String cid, placeId;
+        String sourceUrl = "";
         String name;
         String note = "";
+        final Map<String, String> listNotes = new LinkedHashMap<>();
+        final Map<String, String> membershipIds = new LinkedHashMap<>();
+        /** The original, list-scoped source projection, never the native details cache. */
+        final Map<String, JSONObject> listEntries = new LinkedHashMap<>();
+        final List<JSONObject> sources = new ArrayList<>();
+        private JSONObject extra = new JSONObject();
+        String detailsState = "none", thumbnailState = "none", detailError = "", thumbnailError = "";
+        String candidateFtid = "", candidateName = "";
+        final Set<String> importAliases = new LinkedHashSet<>();
+        int attempts, thumbnailAttempts;
+        long retryAt, metadataAt;
+        /** Coordinates supplied by the source, not coordinates fetched from Maps. */
+        double sharedLat = Double.NaN, sharedLng = Double.NaN;
         /** What Maps showed of the place, when known: its category line ("Real estate agency"), photo URLs, rating and review count. */
         String category = "";
+        String hours = "";
         final List<String> photos = new ArrayList<>();
+        String thumbnailUrl = "";
         float rating = Float.NaN;
         int reviews;
 
-        String photo() { return photos.isEmpty() ? "" : photos.get(0); }
+        String photo() { return !thumbnailUrl.isEmpty() ? thumbnailUrl : photos.isEmpty() ? "" : photos.get(0); }
 
         /** Takes what [o] knows of the place and this does not. */
         void fillFrom(Place o) {
             if (o == null) return;
             if (category.isEmpty() && o.category != null) category = o.category;
+            if (hours.isEmpty() && o.hours != null) hours = o.hours;
             if (photos.isEmpty()) photos.addAll(o.photos);
             if (Float.isNaN(rating)) rating = o.rating;
             if (reviews == 0) reviews = o.reviews;
         }
-        double lat, lng;
+        double lat = Double.NaN, lng = Double.NaN;
         long added;
         final Set<String> lists = new LinkedHashSet<>();
 
         /** Has a position: a place from a Google Takeout list has none until Maps shows it. */
         boolean located() {
-            return lat != 0 || lng != 0;
+            return coordinates(lat, lng);
         }
 
-        /** The feature id when there is one, else the spot itself. */
+        /** Unresolved and duplicate entries have identities independent of their coordinates. */
         String key() {
-            return ftid != null ? ftid : String.format(Locale.US, "%.6f,%.6f", lat, lng);
+            if (separateEntry) return "id:" + id;
+            if (ftid != null) return ftid;
+            if (cid != null && !"0".equals(cid)) return "cid:" + cid;
+            if (placeId != null) return "place:" + placeId;
+            if (located()) return String.format(Locale.US, "%.6f,%.6f", lat, lng);
+            return "id:" + id;
+        }
+
+        String listNote(String list) {
+            return list == null ? note : listNotes.getOrDefault(list, "");
+        }
+
+        String listTitle(String list) {
+            JSONObject entry = listEntries.get(list);
+            return entry == null ? name : entry.optString("title", name);
+        }
+
+        String membershipId(String list) {
+            String value = membershipIds.get(list);
+            if (value == null) membershipIds.put(list, value = UUID.randomUUID().toString());
+            return value;
+        }
+
+        Place displayCopy() {
+            Place p = new Place();
+            p.id = id; p.separateEntry = separateEntry; p.ftid = ftid; p.cid = cid; p.placeId = placeId; p.sourceUrl = sourceUrl;
+            p.name = name; p.note = note; p.category = category; p.hours = hours;
+            p.lat = lat; p.lng = lng; p.sharedLat = sharedLat; p.sharedLng = sharedLng;
+            p.added = added; p.rating = rating; p.reviews = reviews; p.metadataAt = metadataAt;
+            p.detailsState = detailsState; p.thumbnailState = thumbnailState; p.detailError = detailError;
+            p.thumbnailError = thumbnailError; p.thumbnailUrl = thumbnailUrl;
+            p.candidateFtid = candidateFtid; p.candidateName = candidateName;
+            p.photos.addAll(photos); p.lists.addAll(lists); p.listNotes.putAll(listNotes);
+            p.listEntries.putAll(listEntries);
+            return p;
+        }
+
+        private void restoreFrom(Place p) {
+            id = p.id; separateEntry = p.separateEntry; ftid = p.ftid; cid = p.cid; placeId = p.placeId; sourceUrl = p.sourceUrl;
+            name = p.name; note = p.note; category = p.category; hours = p.hours;
+            lat = p.lat; lng = p.lng; sharedLat = p.sharedLat; sharedLng = p.sharedLng;
+            added = p.added; rating = p.rating; reviews = p.reviews; metadataAt = p.metadataAt;
+            detailsState = p.detailsState; thumbnailState = p.thumbnailState; detailError = p.detailError;
+            thumbnailError = p.thumbnailError; thumbnailUrl = p.thumbnailUrl;
+            candidateFtid = p.candidateFtid; candidateName = p.candidateName;
+            attempts = p.attempts; thumbnailAttempts = p.thumbnailAttempts; retryAt = p.retryAt;
+            photos.clear(); photos.addAll(p.photos);
+            lists.clear(); lists.addAll(p.lists);
+            listNotes.clear(); listNotes.putAll(p.listNotes);
+            listEntries.clear(); listEntries.putAll(p.listEntries);
+            membershipIds.clear(); membershipIds.putAll(p.membershipIds);
+            sources.clear(); sources.addAll(p.sources);
+            importAliases.clear(); importAliases.addAll(p.importAliases);
+            extra = p.extra;
         }
 
         JSONObject toJson() throws Exception {
-            JSONObject o = new JSONObject();
+            JSONObject o = new JSONObject(extra.toString());
+            o.put("id", id);
+            if (separateEntry) o.put("separateEntry", true);
             if (ftid != null) o.put("ftid", ftid);
+            if (cid != null) o.put("cid", cid);
+            if (placeId != null) o.put("placeId", placeId);
+            if (!sourceUrl.isEmpty()) o.put("sourceUrl", sourceUrl);
             o.put("name", name);
             if (!note.isEmpty()) o.put("note", note);
             if (!category.isEmpty()) o.put("category", category);
+            if (!hours.isEmpty()) o.put("hours", hours);
             if (!photos.isEmpty()) o.put("photos", new JSONArray(photos));
+            if (!thumbnailUrl.isEmpty()) o.put("thumbnailUrl", thumbnailUrl);
             if (!Float.isNaN(rating)) o.put("rating", (double) rating);
             if (reviews > 0) o.put("reviews", reviews);
-            o.put("lat", lat);
-            o.put("lng", lng);
+            o.put("hasCoordinates", located());
+            if (located()) { o.put("lat", lat); o.put("lng", lng); }
+            if (coordinates(sharedLat, sharedLng)) {
+                o.put("sharedLat", sharedLat); o.put("sharedLng", sharedLng);
+            }
             o.put("added", added);
             o.put("lists", new JSONArray(lists));
+            for (String list : lists) membershipId(list);
+            o.put("membershipIds", new JSONObject(membershipIds));
+            o.put("listNotes", new JSONObject(listNotes));
+            o.put("listEntries", new JSONObject(listEntries));
+            if (!sources.isEmpty()) o.put("sources", new JSONArray(sources));
+            o.put("detailsState", detailsState).put("thumbnailState", thumbnailState);
+            o.put("attempts", attempts).put("thumbnailAttempts", thumbnailAttempts).put("retryAt", retryAt).put("metadataAt", metadataAt);
+            if (!detailError.isEmpty()) o.put("detailError", detailError);
+            if (!thumbnailError.isEmpty()) o.put("thumbnailError", thumbnailError);
+            if (!candidateFtid.isEmpty()) o.put("candidateFtid", candidateFtid).put("candidateName", candidateName);
+            if (!importAliases.isEmpty()) o.put("importAliases", new JSONArray(importAliases));
             return o;
         }
 
-        static Place fromJson(JSONObject o) {
+        static Place fromJson(JSONObject o) throws Exception {
             Place p = new Place();
+            p.extra = unknownFields(o, PLACE_FIELDS);
+            p.id = o.optString("id", p.id);
+            if (p.id.isEmpty()) throw new IOException("Empty place identifier");
+            p.separateEntry = o.optBoolean("separateEntry");
             p.ftid = o.has("ftid") ? o.optString("ftid", null) : null;
+            p.cid = o.has("cid") ? o.optString("cid", null) : null;
+            if (p.ftid != null && p.ftid.startsWith("0x0:")) {
+                p.cid = SavedPlaces.cid(p.ftid);
+                p.ftid = null;
+            }
+            p.placeId = o.has("placeId") ? o.optString("placeId", null) : null;
+            p.sourceUrl = o.optString("sourceUrl", "");
             p.name = o.optString("name", "");
             p.note = o.optString("note", "");
             p.category = o.optString("category", "");
+            p.hours = o.optString("hours", "");
             readPhotos(o, p.photos);
+            p.thumbnailUrl = o.optString("thumbnailUrl", "");
             p.rating = (float) o.optDouble("rating", Double.NaN);
+            if (Float.isInfinite(p.rating)) throw new IOException("Invalid place rating");
             p.reviews = o.optInt("reviews", 0);
-            p.lat = o.optDouble("lat");
-            p.lng = o.optDouble("lng");
+            p.lat = o.optDouble("lat", Double.NaN);
+            p.lng = o.optDouble("lng", Double.NaN);
+            if ((o.has("lat") || o.has("lng")) && !coordinates(p.lat, p.lng))
+                throw new IOException("Invalid or incomplete place coordinates");
+            if (o.has("hasCoordinates") ? !o.getBoolean("hasCoordinates") : p.lat == 0 && p.lng == 0) {
+                p.lat = p.lng = Double.NaN;
+            }
+            p.sharedLat = o.optDouble("sharedLat", Double.NaN);
+            p.sharedLng = o.optDouble("sharedLng", Double.NaN);
+            if ((o.has("sharedLat") || o.has("sharedLng")) && !coordinates(p.sharedLat, p.sharedLng))
+                throw new IOException("Invalid source coordinates");
             p.added = o.optLong("added", System.currentTimeMillis());
-            JSONArray l = o.optJSONArray("lists");
-            if (l != null) for (int i = 0; i < l.length(); i++) p.lists.add(l.optString(i));
+            JSONArray l = array(o, "lists");
+            if (l != null) for (int i = 0; i < l.length(); i++) p.lists.add(l.getString(i));
             p.lists.remove(OLD_SAVED);
+            readStrings(object(o, "membershipIds"), p.membershipIds);
+            readStrings(object(o, "listNotes"), p.listNotes);
+            JSONObject entries = object(o, "listEntries");
+            if (entries != null) for (java.util.Iterator<String> it = entries.keys(); it.hasNext();) {
+                String list = it.next();
+                JSONObject entry = entries.getJSONObject(list);
+                p.listEntries.put(list, entry);
+            }
+            JSONArray sources = array(o, "sources");
+            if (sources != null) for (int i = 0; i < sources.length(); i++) p.sources.add(sources.getJSONObject(i));
+            p.detailsState = o.optString("detailsState", "none");
+            if ("loading".equals(p.detailsState)) p.detailsState = "pending";
+            p.thumbnailState = o.optString("thumbnailState", "none");
+            p.detailError = o.optString("detailError", "");
+            p.thumbnailError = o.optString("thumbnailError", "");
+            p.candidateFtid = o.optString("candidateFtid", "");
+            p.candidateName = o.optString("candidateName", "");
+            JSONArray aliases = array(o, "importAliases");
+            if (aliases != null) for (int i = 0; i < aliases.length(); i++) p.importAliases.add(aliases.getString(i));
+            p.attempts = Math.max(0, o.optInt("attempts"));
+            p.thumbnailAttempts = Math.max(0, o.optInt("thumbnailAttempts"));
+            p.retryAt = o.optLong("retryAt");
+            p.metadataAt = o.optLong("metadataAt");
+            for (String list : p.lists) p.membershipId(list);
             return p;
+        }
+
+        static Place imported(JSONObject o) throws Exception {
+            Place p = fromJson(o);
+            JSONObject original = new JSONObject(o.toString());
+            original.remove("sources"); // Already retained separately; do not recursively wrap previous imports.
+            String source = UUID.nameUUIDFromBytes(("backup\n" + original).getBytes(StandardCharsets.UTF_8)).toString();
+            boolean known = false;
+            for (JSONObject record : p.sources) if (source.equals(record.optString("id"))) { known = true; break; }
+            if (!known) p.sources.add(new JSONObject().put("id", source).put("backup", original));
+            p.photos.clear();
+            p.thumbnailUrl = "";
+            p.detailsState = p.thumbnailState = "none";
+            p.detailError = p.thumbnailError = p.candidateFtid = p.candidateName = "";
+            p.attempts = p.thumbnailAttempts = 0;
+            p.retryAt = p.metadataAt = 0;
+            return p;
+        }
+    }
+
+    static boolean coordinates(double lat, double lng) {
+        return Double.isFinite(lat) && Double.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+    }
+
+    private static JSONObject unknownFields(JSONObject source, String... known) throws Exception {
+        Set<String> fields = new java.util.HashSet<>(java.util.Arrays.asList(known));
+        JSONObject extra = new JSONObject();
+        for (java.util.Iterator<String> it = source.keys(); it.hasNext();) {
+            String key = it.next();
+            if (!fields.contains(key)) extra.put(key, source.get(key));
+        }
+        return extra;
+    }
+
+    private static JSONArray array(JSONObject o, String key) throws Exception {
+        return o.has(key) ? o.getJSONArray(key) : null;
+    }
+
+    private static JSONObject object(JSONObject o, String key) throws Exception {
+        return o.has(key) ? o.getJSONObject(key) : null;
+    }
+
+    private static void readStrings(JSONObject object, Map<String, String> into) throws Exception {
+        if (object == null) return;
+        for (java.util.Iterator<String> it = object.keys(); it.hasNext();) {
+            String key = it.next();
+            into.put(key, object.getString(key));
         }
     }
 
     /** "photos": [...], or a first version's single "photo". */
     static void readPhotos(JSONObject o, List<String> into) {
         JSONArray a = o.optJSONArray("photos");
-        if (a != null) for (int i = 0; i < a.length(); i++) { String u = a.optString(i, ""); if (!u.isEmpty()) into.add(u); }
-        else if (!o.optString("photo", "").isEmpty()) into.add(o.optString("photo"));
+        if (a != null) {
+            for (int i = 0; i < a.length(); i++) { String u = a.optString(i, ""); if (!u.isEmpty()) into.add(u); }
+        } else if (!o.optString("photo", "").isEmpty()) into.add(o.optString("photo"));
     }
 
     private static boolean loaded;
+    private static boolean writeDisabled;
+    private static long generation, persistedGeneration;
+    private static volatile IOException writeError;
+    private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(r -> new Thread(r, "UA-store"));
+    static boolean enrichmentPaused;
+    static String enrichmentPauseReason = "", enrichmentLastFailure = "";
+    private static final Map<String, String> importedLists = new LinkedHashMap<>();
+    private static JSONObject extra = new JSONObject();
     /** List id -> name, in display order. */
     static final Map<String, String> lists = new LinkedHashMap<>();
+    static final Map<String, String> descriptions = new LinkedHashMap<>();
+    private static final Map<String, JSONObject> listExtras = new LinkedHashMap<>();
     /** Key -> place, newest last. */
     static final Map<String, Place> places = new LinkedHashMap<>();
     static Place home, work;
@@ -126,20 +338,90 @@ final class SavedStore {
 
     private SavedStore() {}
 
-    static synchronized void load(Context c) {
-        if (loaded) return;
-        loaded = true;
+    private static void clearState() {
         lists.clear();
+        descriptions.clear();
+        listExtras.clear();
         places.clear();
         labels.clear();
         hiddenOnMap.clear();
         emojis.clear();
+        importedLists.clear();
+        extra = new JSONObject();
         home = work = null;
+    }
+
+    static synchronized void load(Context c) {
+        if (loaded) return;
+        clearState();
+        boolean migrated = false;
+        boolean queueMigrated = false;
         try {
             File f = new File(c.getFilesDir(), FILE);
-            if (f.exists()) read(new JSONObject(readAll(new java.io.FileInputStream(f))), true);
-        } catch (Throwable ignored) {}
+            AtomicFile atomic = new AtomicFile(f);
+            if (f.exists() || new File(f + ".bak").exists()) {
+                JSONObject root;
+                try (InputStream in = atomic.openRead()) { root = new JSONObject(readAll(in)); }
+                int version = version(root);
+                if (version < 3) {
+                    migrated = true;
+                    File backup = new File(c.getFilesDir(), FILE + ".v" + version + ".bak");
+                    if (!backup.exists()) java.nio.file.Files.copy(f.toPath(), backup.toPath());
+                }
+                read(root, true);
+                enrichmentPaused = root.optBoolean("enrichmentPaused", false);
+                enrichmentPauseReason = root.optString("enrichmentPauseReason",
+                        enrichmentPaused ? "Paused in the earlier build. Tap Resume to continue your existing imports." : "");
+                enrichmentLastFailure = root.optString("enrichmentLastFailure", "");
+                if (queueVersion(root) < 1) {
+                    File backup = new File(c.getFilesDir(), FILE + ".queue-v0.bak");
+                    if (!backup.exists()) java.nio.file.Files.copy(f.toPath(), backup.toPath());
+                    recoverLegacyQueue();
+                    queueMigrated = true;
+                }
+            }
+        } catch (Exception e) {
+            writeDisabled = true;
+            clearState();
+            android.util.Log.e("UA", "Library could not be opened; original file retained", e);
+            throw new IllegalStateException("Cannot read the saved library. The original and backups have not been overwritten.", e);
+        }
         ensureDefaultLists();
+        loaded = true;
+        writeDisabled = false;
+        if (migrated || queueMigrated) {
+            prepareEnrichment();
+            save(c);
+        }
+    }
+
+    private static void recoverLegacyQueue() {
+        for (Place p : places.values()) {
+            if ("review".equals(p.detailsState) || "cancelled".equals(p.detailsState) || "unavailable".equals(p.detailsState)) continue;
+            if ("failed".equals(p.detailsState) && !p.candidateFtid.isEmpty()) {
+                p.detailsState = "review";
+                continue;
+            }
+            if ("pending".equals(p.detailsState) || "loading".equals(p.detailsState) ||
+                    "retry".equals(p.detailsState) || "failed".equals(p.detailsState)) {
+                p.detailsState = "pending";
+                p.attempts = 0;
+                p.retryAt = 0;
+            }
+            if ("failed".equals(p.thumbnailState)) {
+                p.thumbnailState = "pending";
+                p.thumbnailAttempts = 0;
+                p.retryAt = 0;
+            }
+        }
+    }
+
+    private static int queueVersion(JSONObject root) throws Exception {
+        if (!root.has("enrichmentQueueVersion")) return 0;
+        Object value = root.get("enrichmentQueueVersion");
+        if (!(value instanceof Number) || (((Number) value).doubleValue() != 0 && ((Number) value).doubleValue() != 1))
+            throw new IOException("Unsupported enrichment queue version; original file retained");
+        return ((Number) value).intValue();
     }
 
     static boolean isDefault(String id) {
@@ -165,54 +447,206 @@ final class SavedStore {
 
     /** Reads our own format; [replace] false merges into what is already there. */
     private static void read(JSONObject root, boolean replace) throws Exception {
-        JSONArray l = root.optJSONArray("lists");
+        version(root);
+        queueVersion(root);
+        JSONObject unknown = unknownFields(root, "app", "version", "lists", "places", "home", "work",
+                "labels", "hiddenOnMap", "history", "enrichmentPaused", "importedLists",
+                "enrichmentQueueVersion", "enrichmentPauseReason", "enrichmentLastFailure");
+        if (replace) extra = unknown;
+        else mergeExtra(extra, unknown);
+        JSONArray l = array(root, "lists");
         if (l != null) for (int i = 0; i < l.length(); i++) {
             JSONObject o = l.getJSONObject(i);
             String id = o.getString("id");
+            if (id.isEmpty()) throw new IOException("Empty list identifier");
             if (replace || !lists.containsKey(id)) lists.put(id, o.getString("name"));
             String emoji = o.optString("emoji", "");
             if (!emoji.isEmpty() && (replace || !emojis.containsKey(id))) emojis.put(id, emoji);
+            String description = o.optString("description", "");
+            if (o.has("description") && (replace || !descriptions.containsKey(id))) descriptions.put(id, description);
+            JSONObject more = unknownFields(o, "id", "name", "emoji", "description");
+            if (replace || !listExtras.containsKey(id)) listExtras.put(id, more);
+            else mergeExtra(listExtras.get(id), more);
         }
-        JSONArray ps = root.optJSONArray("places");
-        if (ps != null) for (int i = 0; i < ps.length(); i++) merge(Place.fromJson(ps.getJSONObject(i)));
-        if (root.has("home") && (replace || home == null)) home = Place.fromJson(root.getJSONObject("home"));
-        if (root.has("work") && (replace || work == null)) work = Place.fromJson(root.getJSONObject("work"));
-        JSONArray lb = root.optJSONArray("labels");
+        JSONArray ps = array(root, "places");
+        if (ps != null) for (int i = 0; i < ps.length(); i++) {
+            JSONObject record = ps.getJSONObject(i);
+            Place p = replace ? Place.fromJson(record) : Place.imported(record);
+            if (!record.has("id")) p.id = UUID.nameUUIDFromBytes(("backup\n" + i + "\n" + record)
+                    .getBytes(StandardCharsets.UTF_8)).toString();
+            if (replace) {
+                if (find(p.id) != null) throw new IOException("Duplicate stored place identifier");
+                if (places.containsKey(p.key())) p.separateEntry = true;
+                places.put(p.key(), p);
+            } else merge(p);
+        }
+        if (root.has("home")) {
+            Place p = replace ? Place.fromJson(root.getJSONObject("home")) : Place.imported(root.getJSONObject("home"));
+            if (replace || home == null) home = p;
+        }
+        if (root.has("work")) {
+            Place p = replace ? Place.fromJson(root.getJSONObject("work")) : Place.imported(root.getJSONObject("work"));
+            if (replace || work == null) work = p;
+        }
+        JSONArray lb = array(root, "labels");
         if (lb != null) for (int i = 0; i < lb.length(); i++) {
             JSONObject o = lb.getJSONObject(i);
-            String label = o.optString("label", "");
-            JSONObject at = o.optJSONObject("place");
-            if (!label.isEmpty() && at != null && (replace || !labels.containsKey(label))) labels.put(label, Place.fromJson(at));
+            String label = o.getString("label");
+            Place p = replace ? Place.fromJson(o.getJSONObject("place")) : Place.imported(o.getJSONObject("place"));
+            if (label.isEmpty()) throw new IOException("Empty label");
+            if (replace || !labels.containsKey(label)) labels.put(label, p);
         }
-        JSONArray hidden = root.optJSONArray("hiddenOnMap");
-        if (hidden != null) for (int i = 0; i < hidden.length(); i++) hiddenOnMap.add(hidden.optString(i));
+        JSONArray hidden = array(root, "hiddenOnMap");
+        if (hidden != null) for (int i = 0; i < hidden.length(); i++) hiddenOnMap.add(hidden.getString(i));
+        Map<String, String> imported = new LinkedHashMap<>();
+        readStrings(object(root, "importedLists"), imported);
+        for (Map.Entry<String, String> e : imported.entrySet()) importedLists.putIfAbsent(e.getKey(), e.getValue());
     }
 
-    private static void merge(Place p) {
-        Place old = places.get(p.key());
-        if (old == null) places.put(p.key(), p);
-        else old.lists.addAll(p.lists);
+    private static int version(JSONObject root) throws Exception {
+        if (!root.has("version")) return 1;
+        Object value = root.get("version");
+        if (!(value instanceof Number)) throw new IOException("Unsupported backup version; original file retained");
+        double version = ((Number) value).doubleValue();
+        if (version != 1 && version != 2 && version != 3)
+            throw new IOException("Unsupported backup version; original file retained");
+        return (int) version;
+    }
+
+    private static void mergeExtra(JSONObject into, JSONObject from) throws Exception {
+        for (java.util.Iterator<String> it = from.keys(); it.hasNext();) {
+            String key = it.next();
+            if (into.has(key) && !String.valueOf(into.get(key)).equals(String.valueOf(from.get(key))))
+                throw new IOException("Conflicting unsupported field: " + key + "; original data retained");
+            into.put(key, from.get(key));
+        }
+    }
+
+    private static void merge(Place p) throws Exception {
+        Place old = matching(p);
+        boolean sameEntry = old != null && (old.id.equals(p.id) || old.importAliases.contains("id:" + p.id));
+        if (old != null && !sameEntry && (!java.util.Collections.disjoint(old.lists, p.lists) ||
+                old.lists.isEmpty() && p.lists.isEmpty())) {
+            p.separateEntry = true;
+            old = null;
+        }
+        if (old == null) {
+            if (places.containsKey(p.key())) p.separateEntry = true;
+            places.put(p.key(), p);
+        } else {
+            String oldKey = old.key();
+            mergeExtra(old.extra, p.extra);
+            old.lists.addAll(p.lists);
+            old.importAliases.add("id:" + p.id);
+            old.importAliases.addAll(p.importAliases);
+            old.fillFrom(p);
+            if (old.note.isEmpty()) old.note = p.note;
+            if (old.name == null || old.name.isEmpty()) old.name = p.name;
+            if (old.sourceUrl.isEmpty()) old.sourceUrl = p.sourceUrl;
+            if (!old.located() && p.located()) { old.lat = p.lat; old.lng = p.lng; }
+            if (!coordinates(old.sharedLat, old.sharedLng) && coordinates(p.sharedLat, p.sharedLng)) {
+                old.sharedLat = p.sharedLat; old.sharedLng = p.sharedLng;
+            }
+            for (Map.Entry<String, String> e : p.listNotes.entrySet()) old.listNotes.putIfAbsent(e.getKey(), e.getValue());
+            for (Map.Entry<String, String> e : p.membershipIds.entrySet()) old.membershipIds.putIfAbsent(e.getKey(), e.getValue());
+            for (Map.Entry<String, JSONObject> e : p.listEntries.entrySet()) old.listEntries.putIfAbsent(e.getKey(), e.getValue());
+            Set<String> seen = new LinkedHashSet<>();
+            for (JSONObject s : old.sources) seen.add(s.optString("id"));
+            for (JSONObject s : p.sources) if (seen.add(s.optString("id"))) old.sources.add(s);
+            if (!oldKey.equals(old.key())) {
+                places.remove(oldKey);
+                if (places.containsKey(old.key())) old.separateEntry = true;
+                places.put(old.key(), old);
+            }
+        }
+    }
+
+    private static Place matching(Place p) {
+        for (Place q : places.values()) {
+            if (q.id.equals(p.id) || q.importAliases.contains("id:" + p.id)) return q;
+        }
+        Place exact = places.get(p.key());
+        if (exact != null) return exact;
+        String cid = p.cid != null ? p.cid : SavedPlaces.cid(p.ftid);
+        for (Place q : places.values()) {
+            if (p.separateEntry || q.separateEntry) continue;
+            if (q.importAliases.contains(p.key())) return q;
+            if (cid != null && !"0".equals(cid) && cid.equals(q.cid != null ? q.cid : SavedPlaces.cid(q.ftid))) return q;
+            if (p.placeId != null && p.placeId.equals(q.placeId)) return q;
+        }
+        return null;
     }
 
     static synchronized void save(Context c) {
-        try {
-            File tmp = new File(c.getFilesDir(), FILE + ".tmp");
-            try (OutputStream out = new FileOutputStream(tmp)) {
-                out.write(toJson().toString(1).getBytes(StandardCharsets.UTF_8));
+        if (writeDisabled) throw new IllegalStateException("Library is read-only after an error; original files retained");
+        generation++;
+        Context app = c.getApplicationContext();
+        WRITER.execute(() -> {
+            try {
+                persist(app);
+            } catch (IOException e) {
+                boolean first = writeError == null;
+                writeError = e;
+                android.util.Log.e("UA", "Library changes could not be saved", e);
+                if (first) new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                        android.widget.Toast.makeText(app, "Library could not be saved. Check free space and retry.", android.widget.Toast.LENGTH_LONG).show());
             }
-            if (!tmp.renameTo(new File(c.getFilesDir(), FILE))) tmp.delete();
-        } catch (Throwable ignored) {}
+        });
         SavedOnMap.refresh();
     }
 
+    private static void persist(Context c) throws IOException {
+        byte[] bytes;
+        long at;
+        synchronized (SavedStore.class) {
+            if (writeDisabled) throw new IOException("Library is read-only; original file retained");
+            if (persistedGeneration == generation) return;
+            at = generation;
+            try { bytes = toJson().toString().getBytes(StandardCharsets.UTF_8); }
+            catch (Exception e) { throw new IOException("Cannot encode saved library", e); }
+            if (bytes.length > MAX_FILE_BYTES) throw new IOException("Library exceeds 64 MiB; original checkpoint retained");
+        }
+        AtomicFile file = new AtomicFile(new File(c.getFilesDir(), FILE));
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
+            out.write(bytes);
+            out.getFD().sync();
+            file.finishWrite(out);
+            out = null;
+            if (!java.util.Arrays.equals(bytes, file.readFully())) throw new IOException("Library checkpoint could not be verified");
+        } catch (IOException e) {
+            if (out != null) file.failWrite(out);
+            throw e;
+        }
+        synchronized (SavedStore.class) { persistedGeneration = at; }
+        writeError = null;
+    }
+
+    static void flush() throws Exception {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            throw new IllegalStateException("Library flush must run off the main thread");
+        }
+        WRITER.submit(() -> {}).get();
+        if (writeError != null) throw writeError;
+    }
+
     static synchronized JSONObject toJson() throws Exception {
-        JSONObject root = new JSONObject();
+        JSONObject root = new JSONObject(extra.toString());
         root.put("app", "Ungoogled Maps");
-        root.put("version", 2);
+        root.put("version", 3);
+        root.put("enrichmentPaused", enrichmentPaused);
+        root.put("enrichmentQueueVersion", 1);
+        root.put("enrichmentPauseReason", enrichmentPauseReason);
+        root.put("enrichmentLastFailure", enrichmentLastFailure);
+        root.put("importedLists", new JSONObject(importedLists));
         JSONArray l = new JSONArray();
         for (Map.Entry<String, String> e : lists.entrySet()) {
-            JSONObject o = new JSONObject().put("id", e.getKey()).put("name", e.getValue());
+            JSONObject more = listExtras.get(e.getKey());
+            JSONObject o = more == null ? new JSONObject() : new JSONObject(more.toString());
+            o.put("id", e.getKey()).put("name", e.getValue());
             if (emojis.containsKey(e.getKey())) o.put("emoji", emojis.get(e.getKey()));
+            if (descriptions.containsKey(e.getKey())) o.put("description", descriptions.get(e.getKey()));
             l.put(o);
         }
         root.put("lists", l);
@@ -235,22 +669,37 @@ final class SavedStore {
         if (shown ? hiddenOnMap.remove(listId) : hiddenOnMap.add(listId)) save(c);
     }
 
+    static synchronized long revision() { return generation; }
+
+    static synchronized Map<String, String> listNames() { return new LinkedHashMap<>(lists); }
+
+    static synchronized Map<String, Place> labeledPlaces() { return new LinkedHashMap<>(labels); }
+
     // ---- queries and edits ------------------------------------------------------
 
     static synchronized Place find(String key) {
-        return key == null ? null : places.get(key);
+        if (key == null) return null;
+        Place found = places.get(key);
+        if (found != null) return found;
+        String cid = key.startsWith("cid:") ? key.substring(4) : SavedPlaces.cid(key);
+        for (Place p : places.values()) {
+            if (key.equals(p.id) || p.importAliases.contains(key) ||
+                    cid != null && !"0".equals(cid) && cid.equals(p.cid) ||
+                    key.startsWith("place:") && key.substring(6).equals(p.placeId)) return p;
+        }
+        return null;
     }
 
     static synchronized List<Place> inList(String listId) {
         List<Place> out = new ArrayList<>();
         for (Place p : places.values()) if (p.lists.contains(listId)) out.add(p);
-        java.util.Collections.reverse(out);   // newest first
+        out.sort((a, b) -> Long.compare(b.added, a.added));
         return out;
     }
 
     /** Save: keeps [p] (in no list yet) unless it is already kept. Returns the stored place. */
     static synchronized Place keep(Context c, Place p) {
-        Place stored = places.get(p.key());
+        Place stored = matching(p);
         if (stored != null) return stored;
         p.added = System.currentTimeMillis();
         places.put(p.key(), p);
@@ -260,22 +709,44 @@ final class SavedStore {
 
     /** Unsave: forgets [p] and its lists and note. */
     static synchronized void unsave(Context c, Place p) {
-        places.remove(p.key());
+        Place stored = matching(p);
+        if (stored == null) return;
+        places.remove(stored.key());
         save(c);
     }
 
     /** Puts a saved place in exactly [listIds] (none is fine: it stays saved). */
     static synchronized void setLists(Context c, Place p, Set<String> listIds) {
         Place stored = keep(c, p);
+        for (String old : new LinkedHashSet<>(stored.lists)) if (!listIds.contains(old)) {
+            stored.membershipIds.remove(old);
+            stored.listEntries.remove(old);
+            stored.listNotes.remove(old);
+        }
         stored.lists.clear();
         stored.lists.addAll(listIds);
+        for (String list : listIds) stored.membershipId(list);
         save(c);
     }
 
+    static synchronized void setMembership(Context c, Place p, String list, boolean included) {
+        Place stored = keep(c, p);
+        Set<String> next = new LinkedHashSet<>(stored.lists);
+        if (included) next.add(list); else next.remove(list);
+        setLists(c, stored, next);
+    }
+
     static synchronized void setNote(Context c, Place p, String note) {
-        Place stored = places.get(p.key());
+        Place stored = matching(p);
         if (stored == null) return;
         stored.note = note == null ? "" : note.trim();
+        save(c);
+    }
+
+    static synchronized void setListNote(Context c, Place p, String list, String note) {
+        Place stored = matching(p);
+        if (stored == null || !stored.lists.contains(list)) throw new IllegalArgumentException("Place is not in this list");
+        stored.listNotes.put(list, note == null ? "" : note.trim());
         save(c);
     }
 
@@ -288,7 +759,7 @@ final class SavedStore {
     /** Every saved place, newest first. */
     static synchronized List<Place> allSaved() {
         List<Place> out = new ArrayList<>(places.values());
-        java.util.Collections.reverse(out);
+        out.sort((a, b) -> Long.compare(b.added, a.added));
         return out;
     }
 
@@ -296,12 +767,12 @@ final class SavedStore {
     static synchronized List<Place> unlisted() {
         List<Place> out = new ArrayList<>();
         for (Place p : places.values()) if (p.lists.isEmpty()) out.add(p);
-        java.util.Collections.reverse(out);
+        out.sort((a, b) -> Long.compare(b.added, a.added));
         return out;
     }
 
     static synchronized String addList(Context c, String name, String emoji) {
-        String id = "l" + System.currentTimeMillis();
+        String id = UUID.randomUUID().toString();
         lists.put(id, name);
         if (emoji != null && !emoji.isEmpty()) emojis.put(id, emoji);
         save(c);
@@ -321,8 +792,15 @@ final class SavedStore {
     static synchronized void deleteList(Context c, String id) {
         if (isDefault(id)) return;
         lists.remove(id);
+        descriptions.remove(id);
+        listExtras.remove(id);
         emojis.remove(id);
-        for (Place p : places.values()) p.lists.remove(id);
+        for (Place p : places.values()) {
+            p.lists.remove(id);
+            p.listNotes.remove(id);
+            p.membershipIds.remove(id);
+            p.listEntries.remove(id);
+        }
         save(c);
     }
 
@@ -337,7 +815,7 @@ final class SavedStore {
         lists.putAll(names);
         int added = 0;
         for (Place p : found) {
-            Place old = places.get(p.key());
+            Place old = matching(p);
             if (old == null) {
                 places.put(p.key(), p);
                 added++;
@@ -345,7 +823,7 @@ final class SavedStore {
             }
             old.lists.addAll(p.lists);
             if (old.note.isEmpty()) old.note = p.note;
-            if (old.lat == 0 && old.lng == 0) { old.lat = p.lat; old.lng = p.lng; }
+            if (!old.located() && p.located()) { old.lat = p.lat; old.lng = p.lng; }
         }
         ensureDefaultLists();
         save(c);
@@ -383,13 +861,18 @@ final class SavedStore {
     /** A copy of [p] to keep as Home or Work: the spot and its name, none of its lists or note. */
     static Place aliasOf(Place p) {
         Place c = new Place();
-        c.ftid = p.ftid; c.name = p.name; c.lat = p.lat; c.lng = p.lng; c.added = System.currentTimeMillis();
+        c.id = p.id; c.ftid = p.ftid; c.cid = p.cid; c.placeId = p.placeId; c.sourceUrl = p.sourceUrl;
+        c.name = p.name; c.lat = p.lat; c.lng = p.lng; c.added = System.currentTimeMillis();
         c.fillFrom(p);
         return c;
     }
 
     static boolean same(Place a, Place b) {
-        return a != null && b != null && a.key().equals(b.key());
+        if (a == null || b == null) return false;
+        if (a.id.equals(b.id) || a.key().equals(b.key())) return true;
+        String cid = a.cid != null ? a.cid : SavedPlaces.cid(a.ftid);
+        return cid != null && !"0".equals(cid) && cid.equals(b.cid != null ? b.cid : SavedPlaces.cid(b.ftid))
+                || a.placeId != null && a.placeId.equals(b.placeId);
     }
 
     // ---- export / import ------------------------------------------------------------
@@ -457,16 +940,19 @@ final class SavedStore {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
-    private static void write(Context c, Uri to, String text) throws Exception {
+    static void write(Context c, Uri to, String text) throws Exception {
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_FILE_BYTES) throw new IOException("Export exceeds the 64 MiB import limit");
         try (OutputStream out = c.getContentResolver().openOutputStream(to, "wt")) {
             if (out == null) throw new java.io.IOException("cannot write " + to);
-            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.write(bytes);
         }
     }
 
     /** What an import added: places, new lists, places still without a position, and files read. */
     static final class Imported {
         int places, lists, unlocated, files;
+        final List<String> problems = new ArrayList<>();
     }
 
     /**
@@ -497,6 +983,9 @@ final class SavedStore {
                     importText(c, readAll(in), displayName(c, uri));
                     r.files++;
                 }
+            } catch (Exception e) {
+                android.util.Log.w("UA", "Import file could not be read", e);
+                r.problems.add(displayName(c, uri) + ": " + e.getMessage());
             }
         }
         // A place looked at in Maps recently has its position (and photos) in the recent places already.
@@ -514,47 +1003,96 @@ final class SavedStore {
             r.places = places.size() - before;
             for (String id : lists.keySet()) if (!listsBefore.contains(id)) r.lists++;
             for (Place p : places.values()) if (!p.located()) r.unlocated++;
+            prepareEnrichment();
         }
         save(c);
+        flush();
         return r;
     }
 
+    private static void prepareEnrichment() {
+        for (Place p : places.values()) {
+            if (!"none".equals(p.detailsState)) continue;
+            if (!p.photos.isEmpty() && "none".equals(p.thumbnailState)) p.thumbnailState = "pending";
+            if (p.ftid != null || p.cid != null && !"0".equals(p.cid) || p.placeId != null || isShortMapsLink(p.sourceUrl)) {
+                p.detailsState = "pending";
+            } else {
+                p.detailsState = "unavailable";
+                p.thumbnailState = p.photos.isEmpty() ? "unavailable" : "pending";
+                p.detailError = p.located() ? "Coordinate-only entry; no verified place listing"
+                        : "No supported Maps identifier. Original import row retained.";
+            }
+        }
+    }
+
     /** One file's text, by what it holds; [name] is its file name, which names a Takeout list. */
-    private static void importText(Context c, String text, String name) throws Exception {
+    static void importText(Context c, String text, String name) throws Exception {
         String t = text.startsWith("\uFEFF") ? text.substring(1) : text;
         t = t.trim();
         synchronized (SavedStore.class) {
-            if (t.startsWith("{")) {
-                JSONObject root = new JSONObject(t);
-                if (root.has("places") || root.has("lists")) read(root, false);
-                else importGeoJson(root);
-                JSONArray history = root.optJSONArray("history");
-                if (history != null) HistoryStore.merge(c, history);
-            } else if (t.startsWith("<")) {
-                importKml(c, t);
-            } else {
-                importCsv(t, name);
+            JSONObject before = toJson();
+            Map<String, Place> originalPlaces = new LinkedHashMap<>(places);
+            try {
+                if (t.startsWith("{")) {
+                    JSONObject root = new JSONObject(t);
+                    if (root.has("format")) ListTransfer.importDocument(root);
+                    else if (root.has("places") || root.has("lists") || root.has("history")) {
+                        JSONArray history = array(root, "history");
+                        if (history != null) HistoryStore.validateImport(history);
+                        read(root, false);
+                        if (history != null) HistoryStore.merge(c, history);
+                    } else importGeoJson(root);
+                } else if (t.startsWith("<")) {
+                    importKml(c, t);
+                } else {
+                    importCsv(t, name);
+                }
+            } catch (Exception e) {
+                clearState();
+                read(before, true);
+                // Requests and open Save sheets may still hold these objects.
+                for (Place original : originalPlaces.values()) original.restoreFrom(find(original.id));
+                places.clear();
+                places.putAll(originalPlaces);
+                JSONArray records = before.getJSONArray("places");
+                for (int i = 0; i < records.length(); i++) {
+                    JSONObject record = records.getJSONObject(i);
+                    find(record.getString("id")).detailsState = record.optString("detailsState", "none");
+                }
+                throw e;
             }
         }
     }
 
     /** A Takeout .zip: every saved list (Takeout/Saved/<list>.csv) and the starred places (Saved Places.json). */
     private static void importZip(Context c, InputStream in, Imported r) throws Exception {
-        java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in);
-        for (java.util.zip.ZipEntry e; (e = zip.getNextEntry()) != null; ) {
-            if (e.isDirectory()) continue;
-            String path = e.getName().replace('\\', '/');
-            String file = path.substring(path.lastIndexOf('/') + 1);
-            String lower = ("/" + path).toLowerCase(Locale.ROOT);
-            boolean list = lower.endsWith(".csv") && lower.contains("/saved/");
-            boolean starred = file.equalsIgnoreCase("Saved Places.json");
-            if (!list && !starred) continue;
-            ByteArrayOutputStream b = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            for (int n; (n = zip.read(buf)) > 0; ) b.write(buf, 0, n);
-            importText(c, b.toString("UTF-8"), file);
-            r.files++;
+        boolean found = false;
+        try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in)) {
+            for (java.util.zip.ZipEntry e; (e = zip.getNextEntry()) != null; ) {
+                if (e.isDirectory()) continue;
+                String path = e.getName().replace('\\', '/');
+                String file = path.substring(path.lastIndexOf('/') + 1);
+                String lower = ("/" + path).toLowerCase(Locale.ROOT);
+                boolean list = lower.endsWith(".csv") && lower.contains("/saved/");
+                boolean starred = file.equalsIgnoreCase("Saved Places.json");
+                if (!list && !starred) continue;
+                found = true;
+                ByteArrayOutputStream b = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                for (int n; (n = zip.read(buf)) > 0; ) {
+                    if (b.size() + n > MAX_FILE_BYTES) throw new IOException("Saved-list file exceeds 64 MiB");
+                    b.write(buf, 0, n);
+                }
+                try {
+                    importText(c, b.toString("UTF-8"), file);
+                    r.files++;
+                } catch (Exception problem) {
+                    android.util.Log.w("UA", "Saved file inside ZIP could not be imported", problem);
+                    r.problems.add(path + ": " + problem.getMessage());
+                }
+            }
         }
+        if (!found) throw new IOException("No Saved-list CSV or Saved Places.json was found in the ZIP");
     }
 
     private static String displayName(Context c, Uri uri) {
@@ -567,28 +1105,31 @@ final class SavedStore {
 
     // ---- Google Takeout's saved lists ------------------------------------------------------
 
-    private static final java.util.regex.Pattern FEATURE_ID = java.util.regex.Pattern.compile("!1s(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)");
-    private static final java.util.regex.Pattern CID = java.util.regex.Pattern.compile("[?&]cid=(\\d+)");
+    private static final java.util.regex.Pattern FEATURE_ID = java.util.regex.Pattern.compile("(?:!1s|[?&]ftid=)(0x[0-9a-fA-F]+):(0x[0-9a-fA-F]+)");
+    private static final java.util.regex.Pattern CID = java.util.regex.Pattern.compile("[?&](?:cid|ludocid)=(\\d+)");
+    private static final java.util.regex.Pattern PLACE_ID = java.util.regex.Pattern.compile("!1s(ChIJ[a-zA-Z0-9_-]+)");
     private static final java.util.regex.Pattern PIN = java.util.regex.Pattern.compile("!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)");
     private static final java.util.regex.Pattern SPOT = java.util.regex.Pattern.compile(
-            "(?:/search/|/place/|[?&](?:q|query|ll|destination)=|@)\\s*(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*\\+?(-?\\d{1,3}(?:\\.\\d+)?)");
+            "(?:/search/|/place/|[?&](?:q|query|destination)=|^geo:)\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*\\+?(-?\\d+(?:\\.\\d+)?)");
 
     /**
      * One saved list from Google Takeout: a CSV (Title, Note, URL, Tags, Comment) whose links
      * name each place by Maps' feature id -- no position, which the place takes from Maps the
      * first time Maps shows it -- or, for a dropped pin, by its coordinates.
      */
-    private static void importCsv(String text, String fileName) {
+    private static void importCsv(String text, String fileName) throws Exception {
         List<List<String>> rows = csv(text);
         if (rows.isEmpty()) return;
         List<String> header = rows.get(0);
-        int title = column(header, 0, "title"), note = column(header, 1, "note"), url = column(header, 2, "url"),
-                comment = column(header, 4, "comment");
+        int title = column(header, -1, "title"), note = column(header, -1, "note"), url = column(header, -1, "url"),
+                comment = column(header, -1, "comment");
+        if (title < 0 || url < 0) throw new IOException("Expected a saved-list CSV with Title and URL columns");
         String list = listForCsv(fileName);
         long now = System.currentTimeMillis();
         // The list's first row on top here too: the store keeps its newest last.
         for (int i = rows.size() - 1; i >= 1; i--) {
             List<String> row = rows.get(i);
+            if (row.size() == 1 && row.get(0).trim().isEmpty()) continue;
             String link = cell(row, url);
             // A link written without quotes splits at its commas (a dropped pin's "lat,lng", a
             // viewport's "@lat,lng,zoom"): the extra cells are its pieces.
@@ -599,24 +1140,20 @@ final class SavedStore {
                 link = joined.toString();
             }
             Place p = fromMapsLink(link, cell(row, title));
-            if (p == null) continue;
-            String n = cell(row, note), m = cell(row, comment);
-            p.note = n.isEmpty() ? m : m.isEmpty() || m.equals(n) ? n : n + "\n" + m;
-            if (list != null) p.lists.add(list);
+            String n = cell(row, note), m = cell(row, comment < 0 ? -1 : comment + Math.max(0, extra));
+            String annotation = n.isEmpty() ? m : m.isEmpty() || m.equals(n) ? n : n + "\n" + m;
+            if (list != null) {
+                p.lists.add(list);
+                p.listNotes.put(list, annotation);
+                p.listEntries.put(list, ListTransfer.entry(p, list));
+            } else p.note = annotation;
+            String sourceId = UUID.nameUUIDFromBytes((fileName + "\n" + i + "\n" + new JSONArray(row))
+                    .getBytes(StandardCharsets.UTF_8)).toString();
+            p.id = sourceId;
+            p.sources.add(new JSONObject().put("id", sourceId).put("file", fileName).put("row", i)
+                    .put("headers", new JSONArray(header)).put("values", new JSONArray(row)));
             p.added = now - i;
-            Place old = places.get(p.key());
-            if (old == null && p.ftid != null && p.ftid.startsWith("0x0:")) {
-                // Known only by its customer id: the place saved under its full feature id, if there is one.
-                String cid = p.ftid.substring(3);
-                for (Place q : places.values()) if (q.ftid != null && q.ftid.endsWith(cid)) { old = q; break; }
-            }
-            if (old == null) {
-                places.put(p.key(), p);
-                continue;
-            }
-            old.lists.addAll(p.lists);
-            if (old.note.isEmpty()) old.note = p.note;
-            if (!old.located() && p.located()) { old.lat = p.lat; old.lng = p.lng; }
+            merge(p);
         }
     }
 
@@ -632,33 +1169,49 @@ final class SavedStore {
     /** A place from a Maps link: its feature id (or customer id), else the spot a dropped pin's link names. */
     static Place fromMapsLink(String url, String title) {
         Place p = new Place();
+        p.sourceUrl = url == null ? "" : url.trim();
         String link = Uri.decode(url == null ? "" : url);
         java.util.regex.Matcher m = FEATURE_ID.matcher(link);
         if (m.find()) {
             try {
                 p.ftid = "0x" + Long.toHexString(Long.parseUnsignedLong(m.group(1).substring(2), 16))
                         + ":0x" + Long.toHexString(Long.parseUnsignedLong(m.group(2).substring(2), 16));
-            } catch (Throwable ignored) {}
+            } catch (NumberFormatException e) { p.detailError = "Invalid feature identifier"; }
+        }
+        if (p.ftid != null && p.ftid.startsWith("0x0:")) {
+            p.cid = SavedPlaces.cid(p.ftid);
+            p.ftid = null;
         }
         if (p.ftid == null && (m = CID.matcher(link)).find()) {
             try {
-                p.ftid = "0x0:0x" + Long.toHexString(Long.parseUnsignedLong(m.group(1)));
-            } catch (Throwable ignored) {}
+                p.cid = Long.toUnsignedString(Long.parseUnsignedLong(m.group(1)));
+            } catch (NumberFormatException e) { p.detailError = "Invalid CID"; }
         }
+        Uri parsed = Uri.parse(url == null ? "" : url);
+        if (parsed.isHierarchical()) {
+            p.placeId = parsed.getQueryParameter("query_place_id");
+            if (p.placeId == null) {
+                String query = parsed.getQueryParameter("q");
+                if (query == null) query = parsed.getQueryParameter("query");
+                if (query != null && query.startsWith("place_id:")) p.placeId = query.substring("place_id:".length());
+            }
+        }
+        if (p.placeId == null && (m = PLACE_ID.matcher(link)).find()) p.placeId = m.group(1);
         // A position only where the link really names the spot: a place's own (!3d!4d), or a dropped pin's.
         m = PIN.matcher(link);
         boolean spot = m.find();
-        if (!spot && p.ftid == null) {
+        if (!spot && p.ftid == null && p.cid == null && p.placeId == null) {
             m = SPOT.matcher(link);
             spot = m.find();
         }
         if (spot) {
             try {
                 double lat = Double.parseDouble(m.group(1)), lng = Double.parseDouble(m.group(2));
-                if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) { p.lat = lat; p.lng = lng; }
-            } catch (Throwable ignored) {}
+                if (coordinates(lat, lng)) { p.lat = lat; p.lng = lng; }
+                else p.detailError = "Coordinates are outside the valid range";
+            } catch (NumberFormatException e) { p.detailError = "Invalid coordinates"; }
         }
-        if (p.ftid == null && !p.located()) return null;
+        if (p.located()) { p.sharedLat = p.lat; p.sharedLng = p.lng; }
         String name = title == null ? "" : title.trim();
         if (name.isEmpty()) {
             int at = link.indexOf("/place/");
@@ -668,8 +1221,14 @@ final class SavedStore {
                 name = (end >= 0 ? rest.substring(0, end) : rest).replace('+', ' ').trim();
             }
         }
-        p.name = name.isEmpty() ? String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng) : name;
+        p.name = name.isEmpty() ? p.located() ? String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng) : "Unresolved place" : name;
         return p;
+    }
+
+    static boolean isShortMapsLink(String url) {
+        Uri uri = Uri.parse(url == null ? "" : url);
+        return "https".equals(uri.getScheme()) && ("maps.app.goo.gl".equalsIgnoreCase(uri.getHost())
+                || "goo.gl".equalsIgnoreCase(uri.getHost()) && uri.getPath() != null && uri.getPath().startsWith("/maps/"));
     }
 
     /** The list a Takeout CSV goes into: Maps' own four by their Takeout names, any other by its name. */
@@ -682,14 +1241,16 @@ final class SavedStore {
             case "starred places": return STARRED;
             case "": return null;
         }
-        for (Map.Entry<String, String> e : lists.entrySet()) if (e.getValue().equalsIgnoreCase(name)) return e.getKey();
-        String id = "l" + System.nanoTime();
+        String old = importedLists.get(fileName);
+        if (old != null && lists.containsKey(old)) return old;
+        String id = UUID.randomUUID().toString();
         lists.put(id, name);
+        importedLists.put(fileName, id);
         return id;
     }
 
     /** RFC 4180: quoted fields may hold commas, line breaks and doubled quotes. */
-    static List<List<String>> csv(String s) {
+    static List<List<String>> csv(String s) throws IOException {
         List<List<String>> rows = new ArrayList<>();
         List<String> row = new ArrayList<>();
         StringBuilder f = new StringBuilder();
@@ -715,6 +1276,7 @@ final class SavedStore {
                 f.append(ch);
             }
         }
+        if (quoted) throw new IOException("Unterminated quoted CSV field; file not imported");
         if (f.length() > 0 || !row.isEmpty()) {
             row.add(f.toString());
             rows.add(row);
@@ -724,7 +1286,7 @@ final class SavedStore {
 
     /** Maps showed [p] in detail: the saved place of the same key takes what it lacks, its position too. */
     static synchronized void refresh(Context c, Place p) {
-        Place stored = places.get(p.key());
+        Place stored = matching(p);
         if (stored == null) return;
         boolean changed = false;
         if (stored.category.isEmpty() && p.category != null && !p.category.isEmpty()) changed = true;
@@ -740,45 +1302,78 @@ final class SavedStore {
         if (changed) save(c);
     }
 
+    static synchronized Place applyDetails(Place target, Place details) {
+        if (find(target.id) == null) throw new IllegalArgumentException("Saved place no longer exists");
+        places.remove(target.key());
+        target.ftid = details.ftid;
+        target.cid = SavedPlaces.cid(details.ftid);
+        if (places.containsKey(target.key())) target.separateEntry = true;
+        places.put(target.key(), target);
+        if ("Unresolved place".equals(target.name) || target.name == null || target.name.isEmpty()) target.name = details.name;
+        target.lat = details.lat;
+        target.lng = details.lng;
+        target.category = details.category;
+        target.hours = details.hours;
+        target.rating = details.rating;
+        target.reviews = details.reviews;
+        target.photos.clear();
+        target.photos.addAll(details.photos);
+        target.thumbnailUrl = "";
+        target.metadataAt = System.currentTimeMillis();
+        target.detailsState = "complete";
+        target.detailError = target.thumbnailError = target.candidateFtid = target.candidateName = "";
+        target.thumbnailState = target.photos.isEmpty() ? "unavailable" : "pending";
+        target.thumbnailAttempts = 0;
+        return target;
+    }
+
+    static synchronized void confirmReplacement(Context c, Place p, String expectedFtid) {
+        Place stored = find(p.id);
+        if (stored == null || stored.candidateFtid.isEmpty() || !stored.candidateFtid.equals(expectedFtid))
+            throw new IllegalStateException("The proposed replacement changed; review it again");
+        String cid = SavedPlaces.cid(stored.candidateFtid);
+        if (cid == null) throw new IllegalStateException("Invalid proposed replacement");
+        stored.importAliases.add(stored.key());
+        places.remove(stored.key());
+        stored.ftid = stored.candidateFtid;
+        stored.cid = cid;
+        if (places.containsKey(stored.key())) stored.separateEntry = true;
+        places.put(stored.key(), stored);
+        stored.lat = stored.lng = Double.NaN;
+        stored.photos.clear(); stored.thumbnailUrl = ""; stored.category = ""; stored.hours = "";
+        stored.rating = Float.NaN; stored.reviews = 0; stored.metadataAt = 0;
+        stored.detailsState = "pending"; stored.thumbnailState = "none"; stored.retryAt = 0;
+        stored.attempts = stored.thumbnailAttempts = 0;
+        stored.detailError = stored.thumbnailError = stored.candidateFtid = stored.candidateName = "";
+        save(c);
+    }
+
     /**
      * Maps showed a place (any place sheet): a saved place without a position -- from a
      * Takeout list -- takes Maps' own, and one known only by its customer id takes its
      * full feature id.
      */
     static synchronized void locate(Context c, String ftid, double lat, double lng) {
-        if (ftid == null || (lat == 0 && lng == 0)) return;
-        Place p = places.get(ftid);
-        if (p == null) {
-            int colon = ftid.indexOf(':');
-            if (colon < 0) return;
-            String byCid = "0x0" + ftid.substring(colon);
-            p = places.get(byCid);
-            if (p == null) return;
-            // Re-keyed under its full feature id, in place.
-            Map<String, Place> copy = new LinkedHashMap<>(places);
-            places.clear();
-            for (Map.Entry<String, Place> e : copy.entrySet()) places.put(e.getKey().equals(byCid) ? ftid : e.getKey(), e.getValue());
-            p.ftid = ftid;
-        } else if (p.located()) {
-            return;
-        }
+        if (ftid == null || !coordinates(lat, lng)) return;
+        Place p = find(ftid);
+        if (p == null || p.located() && ftid.equals(p.ftid)) return;
+        places.remove(p.key());
+        p.ftid = ftid;
         p.lat = lat;
         p.lng = lng;
+        if (places.containsKey(p.key())) p.separateEntry = true;
+        places.put(p.key(), p);
         save(c);
     }
 
     private static void importGeoJson(JSONObject root) throws Exception {
         JSONArray features = root.optJSONArray("features");
-        if (features == null) return;
+        if (features == null) throw new IOException("Unsupported JSON format; original file retained");
         for (int i = 0; i < features.length(); i++) {
             JSONObject f = features.getJSONObject(i);
             JSONObject g = f.optJSONObject("geometry");
             JSONArray xy = g == null ? null : g.optJSONArray("coordinates");
-            if (xy == null || xy.length() < 2) continue;
             Place p = new Place();
-            p.lng = xy.getDouble(0);
-            p.lat = xy.getDouble(1);
-            if (p.lat == 0 && p.lng == 0) continue;
             JSONObject props = f.optJSONObject("properties");
             String name = null;
             if (props != null) {
@@ -786,8 +1381,17 @@ final class SavedStore {
                 if (loc == null) loc = props.optJSONObject("Location");
                 if (loc != null) name = firstOf(loc, "name", "Business Name", "address", "Address");
                 if (name == null) name = firstOf(props, "name", "Title", "title");
+                String link = firstOf(props, "Google Maps URL", "google_maps_url", "URL", "url");
+                if (link != null) p = fromMapsLink(link, name);
             }
-            p.name = name != null ? name : String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng);
+            if (g != null && "Point".equals(g.optString("type")) && xy != null && xy.length() >= 2 &&
+                    coordinates(xy.optDouble(1, Double.NaN), xy.optDouble(0, Double.NaN))) {
+                p.lng = p.sharedLng = xy.getDouble(0);
+                p.lat = p.sharedLat = xy.getDouble(1);
+            }
+            p.name = name != null ? name : p.located() ? String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng) : "Unresolved place";
+            p.id = UUID.nameUUIDFromBytes(("geojson\n" + i + "\n" + f).getBytes(StandardCharsets.UTF_8)).toString();
+            p.sources.add(new JSONObject().put("id", p.id).put("geojson", f));
             p.added = System.currentTimeMillis();
             merge(p);
         }
@@ -803,32 +1407,48 @@ final class SavedStore {
 
     private static void importKml(Context c, String text) throws Exception {
         XmlPullParser x = Xml.newPullParser();
+        x.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         x.setInput(new java.io.StringReader(text));
-        String folder = null, name = null, coords = null, tag = null;
+        String folder = null, name = null, coords = null, description = null, tag = null;
+        int index = 0;
         boolean inPlacemark = false;
         for (int ev = x.getEventType(); ev != XmlPullParser.END_DOCUMENT; ev = x.next()) {
             if (ev == XmlPullParser.START_TAG) {
                 tag = x.getName();
-                if ("Placemark".equals(tag)) { inPlacemark = true; name = coords = null; }
+                if (x.getDepth() == 1 && !"kml".equals(tag)) throw new IOException("Expected a KML document");
+                if ("Placemark".equals(tag)) { inPlacemark = true; name = coords = description = null; }
             } else if (ev == XmlPullParser.TEXT && tag != null) {
                 String v = x.getText().trim();
                 if (v.isEmpty()) continue;
                 if ("name".equals(tag)) { if (inPlacemark) name = v; else folder = v; }
                 else if ("coordinates".equals(tag) && inPlacemark) coords = v;
+                else if ("description".equals(tag) && inPlacemark) description = v;
             } else if (ev == XmlPullParser.END_TAG) {
                 if ("Placemark".equals(x.getName())) {
                     inPlacemark = false;
+                    Place p = new Place();
                     if (coords != null) {
                         String[] xy = coords.split("\\s+")[0].split(",");
-                        Place p = new Place();
-                        p.lng = Double.parseDouble(xy[0]);
-                        p.lat = Double.parseDouble(xy[1]);
-                        p.name = name != null ? name : String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng);
-                        p.added = System.currentTimeMillis();
-                        String list = listForFolder(folder);
-                        if (list != null) p.lists.add(list);
-                        merge(p);
+                        try {
+                            if (xy.length >= 2 && coordinates(Double.parseDouble(xy[1]), Double.parseDouble(xy[0]))) {
+                                p.lng = p.sharedLng = Double.parseDouble(xy[0]);
+                                p.lat = p.sharedLat = Double.parseDouble(xy[1]);
+                            }
+                        } catch (NumberFormatException e) { p.detailError = "Invalid KML coordinates"; }
                     }
+                    p.name = name != null ? name : p.located() ? String.format(Locale.US, "%.5f, %.5f", p.lat, p.lng) : "Unresolved place";
+                    p.added = System.currentTimeMillis();
+                    String list = listForFolder(folder);
+                    if (list != null) {
+                        p.lists.add(list);
+                        if (description != null) p.listNotes.put(list, description);
+                        p.listEntries.put(list, ListTransfer.entry(p, list));
+                    } else if (description != null) p.note = description;
+                    p.id = UUID.nameUUIDFromBytes(("kml\n" + index++ + "\n" + folder + "\n" + name + "\n" + coords + "\n" + description)
+                            .getBytes(StandardCharsets.UTF_8)).toString();
+                    p.sources.add(new JSONObject().put("id", p.id).put("folder", folder).put("name", name)
+                            .put("coordinates", coords).put("description", description));
+                    merge(p);
                 }
                 tag = null;
             }
@@ -841,7 +1461,7 @@ final class SavedStore {
                 || "Saved places".equals(folder) || "Home and Work".equals(folder) || "Labeled".equals(folder)
                 || "Recent places".equals(folder)) return null;
         for (Map.Entry<String, String> e : lists.entrySet()) if (e.getValue().equalsIgnoreCase(folder)) return e.getKey();
-        String id = "l" + System.nanoTime();
+        String id = UUID.randomUUID().toString();
         lists.put(id, folder);
         return id;
     }
@@ -850,7 +1470,10 @@ final class SavedStore {
         try (InputStream s = in) {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
-            for (int n; (n = s.read(buf)) > 0; ) b.write(buf, 0, n);
+            for (int n; (n = s.read(buf)) > 0; ) {
+                if (b.size() + n > MAX_FILE_BYTES) throw new IOException("Library file exceeds 64 MiB");
+                b.write(buf, 0, n);
+            }
             return b.toString("UTF-8");
         }
     }
