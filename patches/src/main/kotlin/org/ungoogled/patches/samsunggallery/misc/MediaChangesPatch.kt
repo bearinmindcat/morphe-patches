@@ -44,21 +44,28 @@ private const val PROGRESS_SERVICE = "Lcom/samsung/android/gallery/app/service/a
 private const val FILE_EDITOR = "Lcom/samsung/android/gallery/module/fileio/redact/FileEditor;"
 private const val LOCAL_DB_OPERATION = "Lcom/samsung/android/gallery/module/fileio/database/mpq/MpQLocalDbOperation;"
 private const val FILE_INFO = "Lcom/samsung/android/gallery/module/fileio/type/FileInfo;"
+private const val LOCAL_CLOUD_FILE_OPERATION = "Lcom/samsung/android/gallery/module/fileio/abstraction/LocalCloudFileOperation;"
+private const val EDIT_DETAILS_UPDATER = "Lcom/samsung/android/gallery/module/details/EditDetailsUpdater;"
+private const val EDIT_DETAILS_UPDATER_2 = "Lcom/samsung/android/gallery/module/details/EditDetailsUpdater2;"
 
 /**
  * MANAGE_MEDIA lets the user allow Gallery to make the changes below without Android's dialog each time ("Media
- * management apps"); the activity shows Android's dialog over Gallery.
+ * management apps"); the activity shows Android's dialog over Gallery. MANAGE_EXTERNAL_STORAGE ("All files access")
+ * is asked for only to put pictures in folders at the top of a storage, which MediaStore refuses otherwise.
  */
 private val mediaChangesManifestPatch = resourcePatch {
     execute {
         document("AndroidManifest.xml").use { manifest ->
             val application = manifest.getElementsByTagName("application").item(0) as Element
-            manifest.documentElement.insertBefore(
-                manifest.createElement("uses-permission").apply {
-                    setAttribute("android:name", "android.permission.MANAGE_MEDIA")
-                },
-                application,
-            )
+            val permissions = manifest.getElementsByTagName("uses-permission")
+            val declared = (0 until permissions.length).map { (permissions.item(it) as Element).getAttribute("android:name") }
+            for (permission in listOf("android.permission.MANAGE_MEDIA", "android.permission.MANAGE_EXTERNAL_STORAGE")) {
+                if (permission in declared) continue
+                manifest.documentElement.insertBefore(
+                    manifest.createElement("uses-permission").apply { setAttribute("android:name", permission) },
+                    application,
+                )
+            }
             application.appendChild(
                 manifest.createElement("activity").apply {
                     setAttribute("android:name", REQUEST_ACTIVITY)
@@ -245,6 +252,27 @@ internal val mediaChangesPatch = bytecodePatch(
                     invoke-static { v1, v0 }, $MEDIA_MOVES->beforeStart(Ljava/lang/String;Ljava/util/Collection;)V
                 """,
             )
+        }
+
+        // Moves, album renames and the details screen's rename set the item's folder and name in MediaStore. On Android
+        // 15 and older MediaStore puts an "external" uri's new path on internal storage, so on a memory card that
+        // failed ("Changing volume ... not allowed"): the extension updates such an item on its own volume there.
+        val resolverUpdate =
+            "Landroid/content/ContentResolver;->update(Landroid/net/Uri;Landroid/content/ContentValues;Ljava/lang/String;[Ljava/lang/String;)I"
+        for (type in listOf(LOCAL_CLOUD_FILE_OPERATION, EDIT_DETAILS_UPDATER, EDIT_DETAILS_UPDATER_2)) {
+            method(type, "renameByUri", listOf("Landroid/content/Context;", "Landroid/net/Uri;", "Ljava/lang/String;")).apply {
+                val updates = implementation!!.instructions.withIndex().filter { (_, insn) ->
+                    insn.opcode == Opcode.INVOKE_VIRTUAL && (insn as ReferenceInstruction).reference.toString() == resolverUpdate
+                }
+                val update = updates.singleOrNull() ?: throw PatchException("${updates.size} MediaStore updates in $type.renameByUri, expected 1")
+                val call = update.value as FiveRegisterInstruction
+                replaceInstruction(
+                    update.index,
+                    "invoke-static { v${call.registerC}, v${call.registerD}, v${call.registerE}, v${call.registerF}, v${call.registerG} }, " +
+                        "$MEDIA_MOVES->update(Landroid/content/ContentResolver;Landroid/net/Uri;Landroid/content/ContentValues;" +
+                        "Ljava/lang/String;[Ljava/lang/String;)I",
+                )
+            }
         }
 
         // A move to another storage (or one replacing an item) copies, then removes the original by a files uri, which

@@ -7,18 +7,21 @@ import android.content.IntentSender;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Log;
 
 /**
  * Shows Android's dialog for one MediaStore request (see MediaRequests) over Gallery, invisibly, and hands the answer
- * back. The first time a request would ask, it first explains media management access, once.
+ * back. The first time a request would ask, it first explains media management access, once. A request without one
+ * asks for All files access.
  */
 public final class MediaRequestActivity extends Activity {
     static final String EXTRA_ID = "org.ungoogled.samsunggallery.MEDIA_REQUEST";
     private static final int ASK = 1;
     private static final int SETTINGS = 2;
+    private static final int ALL_FILES = 3;
 
     private MediaRequests.Request request;
     private int id;
@@ -33,19 +36,42 @@ public final class MediaRequestActivity extends Activity {
             close(false);
             return;
         }
-        if (request.explain && !MediaRequests.explained(this)) {
+        if (request.intent == null) {
+            askAllFiles();
+        } else if (request.explain && !MediaRequests.explained(this)) {
             explain();
         } else {
             ask();
         }
     }
 
+    private AlertDialog.Builder dialog() {
+        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        return new AlertDialog.Builder(this, night ? android.R.style.Theme_DeviceDefault_Dialog_Alert
+                : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert);
+    }
+
+    /** Folders at the top of a storage take pictures and videos from Gallery only with All files access. */
+    private void askAllFiles() {
+        dialog().setTitle("Allow all files access?")
+                .setMessage("Android lets Gallery put pictures and videos in folders at the top of a storage only with all files access.")
+                .setPositiveButton("Settings", (d, w) -> {
+                    try {
+                        startActivityForResult(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                Uri.parse("package:" + getPackageName())), ALL_FILES);
+                    } catch (RuntimeException e) {
+                        Log.w(MediaRequests.TAG, "no all files access settings: " + e);
+                        close(false);
+                    }
+                })
+                .setNegativeButton("Not now", (d, w) -> close(false))
+                .setOnCancelListener(d -> close(false))
+                .show();
+    }
+
     private void explain() {
         MediaRequests.setExplained(this);
-        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        new AlertDialog.Builder(this, night ? android.R.style.Theme_DeviceDefault_Dialog_Alert
-                : android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
-                .setTitle("Allow media management?")
+        dialog().setTitle("Allow media management?")
                 .setMessage("Android asks you to confirm each delete, restore and move. Allow Gallery to manage media to skip that.")
                 .setPositiveButton("Settings", (d, w) -> openSettings())
                 .setNegativeButton("Not now", (d, w) -> ask())
@@ -75,7 +101,9 @@ public final class MediaRequestActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == SETTINGS) {
+        if (requestCode == ALL_FILES) {
+            close(Environment.isExternalStorageManager());
+        } else if (requestCode == SETTINGS) {
             if (Log.isLoggable(MediaRequests.TAG, Log.DEBUG)) {
                 Log.d(MediaRequests.TAG, "media management now " + MediaStore.canManageMedia(this));
             }

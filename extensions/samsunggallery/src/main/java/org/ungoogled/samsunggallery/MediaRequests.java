@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -53,6 +54,7 @@ public final class MediaRequests {
     }
 
     static final class Request {
+        /** Android's MediaStore request; null asks for All files access instead. */
         final PendingIntent intent;
         final boolean explain;
         final CountDownLatch done = new CountDownLatch(1);
@@ -100,6 +102,17 @@ public final class MediaRequests {
         return ok;
     }
 
+    /** As above, for these uris (an item may have more than one). */
+    static boolean apply(Context context, int kind, List<Uri> uris) {
+        if (uris.isEmpty()) return true;
+        context = context.getApplicationContext();
+        boolean ok = true;
+        for (int from = 0; from < uris.size(); from += CHUNK) {
+            ok &= request(context, kind, new ArrayList<>(uris.subList(from, Math.min(uris.size(), from + CHUNK))));
+        }
+        return ok;
+    }
+
     private static boolean request(Context context, int kind, List<Uri> uris) {
         ContentResolver resolver = context.getContentResolver();
         PendingIntent intent;
@@ -117,11 +130,30 @@ public final class MediaRequests {
         }
         // Favourites never ask; the others ask unless the user allowed media management, which is explained once.
         boolean explain = kind != FAVORITE && kind != UNFAVORITE && confirms(context) && !explained(context);
-        Request request = new Request(intent, explain);
+        boolean applied = show(context, new Request(intent, explain));
+        if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "media request " + kind + " x" + uris.size() + ": " + applied);
+        return applied;
+    }
+
+    /**
+     * Whether Gallery has All files access, asking for it (a short explanation, then Android's settings page) when it
+     * has not. Off the main thread only: it waits for the user.
+     */
+    static boolean allFilesAccess(Context context) {
+        if (Environment.isExternalStorageManager()) return true;
+        if (Looper.myLooper() == Looper.getMainLooper()) return false;
+        show(context.getApplicationContext(), new Request(null, false));
+        return Environment.isExternalStorageManager();
+    }
+
+    /**
+     * Shows the request over Gallery and returns the answer. On the main thread it only starts it (Android's dialog
+     * cannot show while that thread waits) and answers true.
+     */
+    private static boolean show(Context app, Request request) {
         int id = IDS.incrementAndGet();
         PENDING.put(id, request);
         boolean main = Looper.myLooper() == Looper.getMainLooper();
-        Context app = context;
         Runnable start = () -> {
             Intent open = new Intent(app, MediaRequestActivity.class).putExtra(MediaRequestActivity.EXTRA_ID, id);
             Activity front = ActivityState.front();
@@ -148,7 +180,6 @@ public final class MediaRequests {
         } finally {
             PENDING.remove(id);
         }
-        if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "media request " + kind + " x" + uris.size() + ": " + request.applied);
         return request.applied;
     }
 
