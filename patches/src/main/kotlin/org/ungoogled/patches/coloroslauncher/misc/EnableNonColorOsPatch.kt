@@ -214,6 +214,47 @@ private val nightBackgroundsPatch = resourcePatch {
     }
 }
 
+/**
+ * Large app icons (resizing an icon on the home screen) are drawn by ColorOS's icon library with the phone's icon style,
+ * which only ColorOS sets (an OPPO configuration value): elsewhere the style is missing, every large icon failed ("Failed
+ * to load the icon resource. Try again later.") and the icon went back to its size. The large-icon code now gets the
+ * library's default style (see Icons). Normal icons do not read it and keep their look.
+ */
+private val morphIconStylePatch = bytecodePatch {
+    execute {
+        // 15.6.24 has no resizable icons.
+        if (packageMetadata.versionName == "15.6.24") return@execute
+        val getConfig = "Lcom/android/launcher/theme/LauncherIconConfig;->getIconConfig()Lcom/oplus/uxicon/helper/IconConfig;"
+        val utils = mutableClassDefBy("Lcom/android/common/util/IconUtils;")
+        var hooked = 0
+        for (method in utils.methods) {
+            val instructions = method.implementation?.instructions ?: continue
+            val sites = instructions.withIndex().filter { (_, insn) ->
+                insn.opcode == Opcode.INVOKE_VIRTUAL && ((insn as ReferenceInstruction).reference as? MethodReference)?.let {
+                    "${it.definingClass}->${it.name}(${it.parameterTypes.joinToString("")})${it.returnType}" == getConfig
+                } == true
+            }.map { it.index }
+            for (index in sites.reversed()) {
+                val move = instructions[index + 1]
+                if (move.opcode != Opcode.MOVE_RESULT_OBJECT) throw PatchException("IconUtils.${method.name}: getIconConfig result not moved")
+                val r = (move as OneRegisterInstruction).registerA
+                method.addInstructions(
+                    index + 2,
+                    """
+                        invoke-static/range { v$r .. v$r }, $EXT/Icons;->style(Ljava/lang/Object;)Ljava/lang/Object;
+                        move-result-object v$r
+                        check-cast v$r, Lcom/oplus/uxicon/helper/IconConfig;
+                    """,
+                )
+                hooked++
+            }
+        }
+        log.info("large icon style reads: $hooked")
+        // Measured against 16.4.30: 3 (morph icon, its fallback, app clusters).
+        if (hooked == 0) throw PatchException("no icon style reads in IconUtils")
+    }
+}
+
 /** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
 private class HiddenLists(
     val members: Set<String>,
@@ -626,7 +667,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
-        nightBackgroundsPatch,
+        nightBackgroundsPatch, morphIconStylePatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
