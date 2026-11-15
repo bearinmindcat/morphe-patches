@@ -41,6 +41,7 @@ public final class VideoEdits {
         Intent edit = new Intent(Intent.ACTION_EDIT)
                 .setDataAndType(uri, type != null && type.startsWith("video/") ? type : "video/*")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        StoreGuides.fellBack();
         try {
             activity.startActivity(edit);
         } catch (ActivityNotFoundException | SecurityException e) {

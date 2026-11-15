@@ -19,13 +19,30 @@ public final class PhotoEdits {
     private static final ComponentName PHOTO_EDITOR = new ComponentName(
             "com.sec.android.mimage.photoretouching", "com.sec.android.mimage.photoretouching.SPEActivity");
 
+    /** The photo Gallery is handing to Photo Editor (see launchFailed). */
+    private static volatile Uri launching;
+
     private PhotoEdits() {
     }
 
     /** Edit on a photo: true when the photo went elsewhere (Photo Editor is not installed); Gallery's launch stops. */
     public static boolean openElsewhere(Activity activity, Uri uri) {
-        return activity != null && uri != null && !resolves(activity, new Intent().setComponent(PHOTO_EDITOR))
-                && edit(activity, uri);
+        if (activity == null || uri == null) return false;
+        if (resolves(activity, new Intent().setComponent(PHOTO_EDITOR))) {
+            launching = uri;
+            return false;
+        }
+        return edit(activity, uri);
+    }
+
+    /**
+     * Gallery's launch of Photo Editor failed after all (ActivityNotFoundException): the photo goes to Android's
+     * "Edit" too, where Gallery offered the Galaxy Store.
+     */
+    public static void launchFailed(Activity activity) {
+        Uri uri = launching;
+        launching = null;
+        if (activity != null && uri != null) edit(activity, uri);
     }
 
     /**
@@ -62,6 +79,7 @@ public final class PhotoEdits {
         Intent edit = new Intent(Intent.ACTION_EDIT)
                 .setDataAndType(uri, type != null && type.startsWith("image/") ? type : "image/*")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        StoreGuides.fellBack();
         try {
             activity.startActivity(edit);
         } catch (RuntimeException e) {
