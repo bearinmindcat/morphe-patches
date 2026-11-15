@@ -1,3 +1,14 @@
+## [2.9.9](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.8...v2.9.9) (2026-11-15)
+
+### 🐛 Bug Fixes
+
+* gmail extra compact list also tightens the list with sender pictures; issue [#192](https://github.com/bearinmindcat/morphe-patches/issues/192) ([1d723cd](https://github.com/bearinmindcat/morphe-patches/commit/1d723cd3d73b7c07778c868c8e676845324e5545))
+* oneplus system launcher resizes app icons; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([6a66a2c](https://github.com/bearinmindcat/morphe-patches/commit/6a66a2cbab41521cbef1dac10a579b3272e42476))
+* oneplus system launcher settings are readable in dark mode on galaxy phones; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([d570f66](https://github.com/bearinmindcat/morphe-patches/commit/d570f66ce746283984a60c9035a4a7a86d93f25d))
+* oneplus system launcher shows the app menu when holding an app on android 13; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([738b554](https://github.com/bearinmindcat/morphe-patches/commit/738b55465e163723c21e6f3729e2f75062f09c31))
+* samsung gallery loads its picture list faster on android 16 and later; issue [#185](https://github.com/bearinmindcat/morphe-patches/issues/185) ([6eca68e](https://github.com/bearinmindcat/morphe-patches/commit/6eca68e1570568be1fe27ef6e1e7fe12acc767f0))
+* samsung gallery moves pictures and videos on sd cards; issue [#133](https://github.com/bearinmindcat/morphe-patches/issues/133) ([1d265bd](https://github.com/bearinmindcat/morphe-patches/commit/1d265bd96fad102ea5677d6e58c76dd38e3d737f))
+
 ## [2.9.8](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.7...v2.9.8) (2026-11-14)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.8](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.8)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
+> **[v2.9.9](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.9)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -99,7 +99,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
-| [Extra compact list](#extra-compact-list) | Tightens the Compact conversation list so more mail fits on screen. | • Square sender pictures |
+| [Extra compact list](#extra-compact-list) | Tightens the conversation list (all densities) so more mail fits on screen. | • Square sender pictures |
 | [Hide AI](#hide-ai) | Hides Gemini, Help me write, Polish, summaries, the AI inbox and Gemini replies. |  |
 | [Hide ads](#hide-ads) | Removes sponsored mail from the inbox, Promotions and Social. |  |
 | [Hide upsells](#hide-upsells) | Hides storage nags and Google One, Gemini and Workspace upgrade offers. |  |
