@@ -117,6 +117,8 @@ public final class Customization {
                 "No crash reports or usage stats"});
         LABELS.put("removeSignInPrompts", new String[]{"Remove sign-in prompts",
                 "No reminder to register your account"});
+        LABELS.put("patchedYouTubeMusic", new String[]{"Patched YouTube Music",
+                "YouTube Music from Morphe or ReVanced"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */
@@ -387,6 +389,7 @@ public final class Customization {
         if (feature.equals("zoneBar")) ZoneBar.switched(on);
         if (feature.equals("flockCameras")) Flock.switched(on);
         if (feature.equals("speedCameras")) SpeedCameras.switched(on);
+        if (feature.equals(MusicApps.FEATURE)) MusicApps.refresh();
         reapply(feature + (on ? " on" : " off"));
         restartNote(feature);
     }
