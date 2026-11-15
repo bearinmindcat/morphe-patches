@@ -27,6 +27,12 @@ import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
+import org.ungoogled.patches.shared.addInstructionsAtLabel
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 
 /** org.ungoogled.ui.HideAi: Know before you go as an Overview tab card. */
 private const val HIDE_AI = "Lorg/ungoogled/ui/HideAi;"
@@ -373,6 +379,74 @@ internal val hideAiPatch = bytecodePatch(
                 """,
                 ExternalLabel("shortcut_off", ret),
             )
+
+            // Issue #203: that switch only drives the chip's highlight. The chip itself is put in the home chip
+            // row's list either way: with Ask Maps on, or -- since 26.43 -- by a server flag of its own while Ask
+            // Maps is off, which is how it came back. Every chip row's list (a method returning a List that casts
+            // to the chips' interface) goes through a filter that leaves the shortcut out while HIDE_AI is on.
+            // The chip's interface and the chip row item interface it extends (not further up: that is every view model).
+            val chipTypes = owner.interfaces.flatMap { listOf(it) + classDefByOrNull(it)?.interfaces.orEmpty() }.toSet()
+            val rows = mutableListOf<Pair<String, Method>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    if (m.returnType != "Ljava/util/List;" || m.parameterTypes.isNotEmpty()) continue
+                    val casts = m.implementation?.instructions?.any { insn ->
+                        insn.opcode == Opcode.CHECK_CAST && ((insn as ReferenceInstruction).reference as TypeReference).type in chipTypes
+                    } == true
+                    if (casts) rows += c.type to m
+                }
+            }
+            if (rows.isEmpty()) throw PatchException("no chip row lists the Ask Maps shortcut chip's kind")
+            owner.methods.add(
+                ImmutableMethod(
+                    owner.type, "uaDropShortcut", listOf(ImmutableMethodParameter("Ljava/util/List;", null, null)), "Ljava/util/List;",
+                    AccessFlags.PUBLIC.value or AccessFlags.STATIC.value, null, null, MutableMethodImplementation(5),
+                ).toMutable().apply {
+                    addInstructions(
+                        0,
+                        """
+                            sget-boolean v0, $SHAPES->HIDE_AI:Z
+                            if-eqz v0, :keep
+                            if-eqz p0, :keep
+                            new-instance v1, Ljava/util/ArrayList;
+                            invoke-direct { v1 }, Ljava/util/ArrayList;-><init>()V
+                            invoke-interface { p0 }, Ljava/util/List;->iterator()Ljava/util/Iterator;
+                            move-result-object v2
+                            :loop
+                            invoke-interface { v2 }, Ljava/util/Iterator;->hasNext()Z
+                            move-result v0
+                            if-eqz v0, :done
+                            invoke-interface { v2 }, Ljava/util/Iterator;->next()Ljava/lang/Object;
+                            move-result-object v3
+                            instance-of v0, v3, ${owner.type}
+                            if-nez v0, :loop
+                            invoke-interface { v1, v3 }, Ljava/util/List;->add(Ljava/lang/Object;)Z
+                            goto :loop
+                            :done
+                            invoke-static { v1 }, Lcom/google/common/collect/ImmutableList;->copyOf(Ljava/util/Collection;)Lcom/google/common/collect/ImmutableList;
+                            move-result-object v1
+                            return-object v1
+                            :keep
+                            return-object p0
+                        """,
+                    )
+                },
+            )
+            for ((type, found) in rows) {
+                val m = mutableClassDefBy(type).methods.single { it.name == found.name && it.parameterTypes.isEmpty() && it.returnType == found.returnType }
+                val returns = m.implementation!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_OBJECT }.map { it.index }
+                for (r in returns.reversed()) {
+                    val reg = (m.implementation!!.instructions[r] as OneRegisterInstruction).registerA
+                    m.addInstructionsAtLabel(
+                        r,
+                        """
+                            invoke-static/range { v$reg .. v$reg }, ${owner.type}->uaDropShortcut(Ljava/util/List;)Ljava/util/List;
+                            move-result-object v$reg
+                        """,
+                    )
+                }
+            }
         }
 
         // Ask Maps as a whole (issue #82). Maps asks one server switch whether Ask Maps exists at all -- the
