@@ -1,3 +1,13 @@
+## [2.9.11](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.10...v2.9.11) (2026-11-15)
+
+### 🐛 Bug Fixes
+
+* maps hide ai also hides place ai summaries and the ask button; issue [#199](https://github.com/bearinmindcat/morphe-patches/issues/199) ([850b2aa](https://github.com/bearinmindcat/morphe-patches/commit/850b2aa84cfaba304dc5c994e54144150661345f))
+* maps hide ai hides the ask maps button again; issue [#203](https://github.com/bearinmindcat/morphe-patches/issues/203) ([c7c2b00](https://github.com/bearinmindcat/morphe-patches/commit/c7c2b001d7ff70a929e285803ad40499aab40431))
+* samsung gallery edit no longer shows the galaxy store dialog with the editor chooser; issue [#197](https://github.com/bearinmindcat/morphe-patches/issues/197) ([ee3bb1f](https://github.com/bearinmindcat/morphe-patches/commit/ee3bb1f4036334d36d354bfd3549fdb800c539b4))
+* waze patches support waze 5.27.5.0 ([e7172f7](https://github.com/bearinmindcat/morphe-patches/commit/e7172f7e2bf251206a0b33c2849e0ff95da538c0))
+* waze shows youtube music (morphe) in its audio player; issue [#201](https://github.com/bearinmindcat/morphe-patches/issues/201) ([f040d2d](https://github.com/bearinmindcat/morphe-patches/commit/f040d2d9a93d0102d38da4763c4f14c513df4ec9))
+
 ## [2.9.10](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.9...v2.9.10) (2026-11-15)
 
 ### 🐛 Bug Fixes

@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.10](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.10)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
+> **[v2.9.11](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.11)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -127,10 +127,10 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;26 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;27 patches</summary>
 <br>
 
-**Supported version(s):** 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
+**Supported version(s):** 5.27.5.0, 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -150,6 +150,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [No AI reporting](#no-ai-reporting) | Turns off Gemini voice reporting. |  |
 | [No Google Assistant](#no-google-assistant) | Removes Google Assistant from Waze. |  |
 | [Open without device location](#open-without-device-location) | Opens Waze with location off and uses it once it is on. Still needs the location permission. |  |
+| [Patched YouTube Music](#patched-youtube-music) | Lets Waze's audio player use YouTube Music patched with Morphe or ReVanced. |  |
 | [Remove permissions](#remove-permissions) | Removes contacts, calendar, phone, camera and advertising ID access. |  |
 | [Remove sign-in prompts](#remove-sign-in-prompts) | Stops Waze's own reminder to register your account. |  |
 | [Remove telemetry](#remove-telemetry) | No crash reports, usage stats or performance data. Traffic reporting stays. |  |
