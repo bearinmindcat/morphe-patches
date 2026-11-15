@@ -9,10 +9,11 @@ import java.util.List;
 
 /**
  * Which Cronet Maps gets on a phone with no Play services at all (issue #69). Maps takes Play services' Cronet;
- * without it, Cronet's own list offers only its plain-Java fallback -- Android's built-in Cronet (HttpEngine,
- * Android 14 and later) joins the list only under a server flag, "score-based provider selection" -- and the
- * map's data channel cannot run on the fallback, so the map stayed empty while search worked. With no real
- * Cronet available that flag reads as on, which puts HttpEngine in the list; with one, nothing changes.
+ * without it, Cronet's own list may offer only its plain-Java fallback, and the map's data channel cannot run on
+ * the fallback, so the map stayed empty while search worked. Android's built-in Cronet (HttpEngine, Android 14
+ * and later) is in the list since Maps 26.43 (older Cronet: only under a server flag, "score-based provider
+ * selection", which then reads as on), but enabled and ranked only with SDK extension 7. With no real Cronet
+ * available, HttpEngine is enabled and preferred; with one, nothing changes.
  *
  * A provider that throws while asked counts as unavailable, as it does in Maps' own engine builder (a throwing
  * Play services provider used to leave the flag off, and the fallback in charge). HttpEngine is part of every

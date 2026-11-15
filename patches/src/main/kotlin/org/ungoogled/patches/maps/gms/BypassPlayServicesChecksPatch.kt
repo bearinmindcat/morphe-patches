@@ -5,6 +5,8 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLa
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.smali.ExternalLabel
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
@@ -51,23 +53,37 @@ val bypassPlayServicesChecksPatch = bytecodePatch(
         DeviceComplianceVerdictFingerprint.method.addInstructions(0, "return-void")
 
         // No Play services at all (issue #69): Cronet's provider list then holds only its plain-Java fallback,
-        // which the map's data channel cannot run on, and the map stayed empty. Android's own Cronet joins the
-        // list under "score-based provider selection"; that flag now reads as on when only the fallback is there.
-        val cronet = mutableClassDefBy("Lorg/chromium/net/CronetProvider;").methods.singleOrNull {
+        // which the map's data channel cannot run on, and the map stayed empty. Since Maps 26.43 Cronet offers
+        // Android's own Cronet (HttpEngine) unconditionally; older Cronet only under "score-based provider
+        // selection", a server flag, which then reads as on when only the fallback is there.
+        val provider = mutableClassDefBy("Lorg/chromium/net/CronetProvider;")
+        val cronet = provider.methods.singleOrNull {
             it.name == "shouldUseScoreBasedProviderSelection" && it.returnType == "Z" &&
                 it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/content/Context;")
-        } ?: throw PatchException("Cronet's provider selection flag not found")
-        cronet.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { p0 }, Lorg/ungoogled/ui/CronetChoice;->onlyFallback(Landroid/content/Context;)Z
-                move-result v0
-                if-eqz v0, :cronet_flag
-                const/4 v0, 0x1
-                return v0
-            """,
-            ExternalLabel("cronet_flag", cronet.implementation!!.instructions.first()),
-        )
+        }
+        if (cronet != null) {
+            cronet.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { p0 }, Lorg/ungoogled/ui/CronetChoice;->onlyFallback(Landroid/content/Context;)Z
+                    move-result v0
+                    if-eqz v0, :cronet_flag
+                    const/4 v0, 0x1
+                    return v0
+                """,
+                ExternalLabel("cronet_flag", cronet.implementation!!.instructions.first()),
+            )
+        } else {
+            val list = provider.methods.singleOrNull { it.name == "getAllProviderInfos" }
+                ?: throw PatchException("Cronet's provider list not found")
+            val code = list.implementation!!.instructions.toList()
+            val engine = code.indexOfFirst {
+                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "org.chromium.net.impl.HttpEngineNativeProvider"
+            }
+            if (engine < 0 || code.take(engine).any { it.opcode.name.startsWith("IF_") }) {
+                throw PatchException("Cronet no longer offers Android's Cronet unconditionally")
+            }
+        }
 
         // Android's Cronet is part of every Android 14+ build; Maps also wants SDK extension 7, read from the
         // phone's module versions, before it enables it or ranks it above the fallback. With no other Cronet, it is
