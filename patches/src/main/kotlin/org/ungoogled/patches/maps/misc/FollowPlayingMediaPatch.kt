@@ -304,7 +304,8 @@ val followPlayingMediaPatch = bytecodePatch(
         } ?: -1
         val click = mutable(
             button.methods.singleOrNull { m ->
-                !AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes.size == 1 && m.returnType != "V" && m.relabelAt() >= 0
+                // (it returned a click result up to 26.36, nothing since 26.43)
+                !AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes.size == 1 && m.relabelAt() >= 0
             } ?: throw PatchException("media button's click not found"),
         )
         val clickIns = click.refs()
@@ -314,7 +315,7 @@ val followPlayingMediaPatch = bytecodePatch(
         if (toggle?.opcode != Opcode.IPUT_BOOLEAN) throw PatchException("media button's click no longer toggles the panel right before relabelling")
         val free = (toggle as TwoRegisterInstruction).registerA
         if (free > 15) throw PatchException("media button's toggle in v$free, out of invoke range")
-        if (clickIns.drop(toggled + 1).any { it.opcode !in setOf(Opcode.SGET_OBJECT, Opcode.RETURN_OBJECT) }) {
+        if (clickIns.drop(toggled + 1).any { it.opcode !in setOf(Opcode.SGET_OBJECT, Opcode.RETURN_OBJECT, Opcode.RETURN_VOID) }) {
             throw PatchException("media button's click does more after relabelling")
         }
         click.addInstructions(
