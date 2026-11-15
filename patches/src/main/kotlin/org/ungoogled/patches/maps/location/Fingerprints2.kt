@@ -2,27 +2,10 @@ package org.ungoogled.patches.maps.location
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
-import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.literal
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
 import com.android.tools.smali.dexlib2.Opcode
-
-/**
- * The fused (Play services) location provider strategy's availability check.
- * `Laije;->e()` picks the first provider strategy that claims availability,
- * so whether this returns true decides whether Maps uses the fused provider
- * or falls through to `Laiql;`, the platform LocationManager strategy.
- */
-internal object FusedLocationAvailabilityFingerprint : Fingerprint(
-    name = "j",
-    returnType = "Z",
-    parameters = emptyList(),
-    filters = listOf(
-        fieldAccess(opcode = Opcode.IGET_BOOLEAN, definingClass = "this", name = "f"),
-        opcode(Opcode.RETURN, MatchAfterImmediately()),
-    ),
-)
 
 /**
  * Where every Play services connection Maps opens gets its descriptor: the

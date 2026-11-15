@@ -400,6 +400,11 @@ public final class Shapes {
         return !SOURCE_ANDROID.equals(sourceInUse());
     }
 
+    /** Called where Maps' location controller picks its fused strategy: none unless the source is a fused one. */
+    public static Object fusedStrategy(Object strategy) {
+        return playLocation() ? strategy : null;
+    }
+
     /**
      * Called from Maps' choice of heading source (issue #41): Play services' fused orientation only while
      * the location source is Google's Play services; Maps' own fusion of the phone's sensors otherwise.

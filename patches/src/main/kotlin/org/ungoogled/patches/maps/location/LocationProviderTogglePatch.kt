@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.location
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.booleanOption
 import app.morphe.patcher.patch.bytecodePatch
@@ -10,7 +11,11 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import org.ungoogled.patches.maps.microg.microgLocationDialogPatch
 import org.ungoogled.patches.maps.ui.SHAPES
@@ -72,18 +77,25 @@ val locationProviderTogglePatch = bytecodePatch(
         markPatched("locationSourcePatched")
         if (useFusedProvider.value == true) markPatched("playLocationByDefault")
 
-        // 1. The fused provider only counts as available while the chosen source
-        //    is a fused one -- an AND with the real availability, in the register
-        //    the method already returns, so this only ever narrows the stock
-        //    condition. v0 is free again after the method's first call.
-        FusedLocationAvailabilityFingerprint.method.addInstructions(
-            FusedLocationAvailabilityFingerprint.instructionMatches.first().index + 1,
-            """
-                invoke-static { }, $SHAPES->playLocation()Z
-                move-result v0
-                and-int/2addr p0, v0
-            """,
-        )
+        // 1. Maps runs the fused (Play services) strategy whenever it has one, and the platform
+        //    (LocationManager) one otherwise; since 26.43 the choice is made on every update of the
+        //    location controller, from whether its fused strategy field is set. That read now gives
+        //    null unless the chosen source is a fused one, so this only ever narrows the stock choice
+        //    -- with Android, Maps uses LocationManager instead of a fused provider that the
+        //    connection below points nowhere (the blue dot went grey and routing from your location
+        //    hung).
+        fusedStrategyChoice().let { (method, read) ->
+            val register = (method.implementation!!.instructions[read] as TwoRegisterInstruction).registerA
+            val strategyType = ((method.implementation!!.instructions[read] as ReferenceInstruction).reference as FieldReference).type
+            method.addInstructions(
+                read + 1,
+                """
+                    invoke-static/range { v$register .. v$register }, $SHAPES->fusedStrategy(Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v$register
+                    check-cast v$register, $strategyType
+                """,
+            )
+        }
 
         // 2. Every location service connection goes to the chosen source: its package,
         //    under the name it answers (MicroG-RE renamed the service). While the source
@@ -173,4 +185,65 @@ val locationProviderTogglePatch = bytecodePatch(
             )
         }
     }
+}
+
+/**
+ * Where the location controller decides between its strategies: the fused one is the class that is both a
+ * Play services LocationListener and holds a FusedLocationProviderClient, and shares an interface with the
+ * platform strategy (the "gps"/"network"/"passive" one). The controller keeps it in a field of that
+ * interface type (the one its setup stores a new fused strategy in) and, in the method that starts it (casts
+ * to the fused class), first reads that field to choose: `iget-object vA, this.fused; if-eqz vA, :platform`.
+ * Returns that method and the read.
+ */
+private fun BytecodePatchContext.fusedStrategyChoice(): Pair<MutableMethod, Int> {
+    val platform = PlatformLocationStrategyFingerprint.classDef
+    val fusedClasses = mutableListOf<String>()
+    classDefForEach { c ->
+        if ("Lcom/google/android/gms/location/LocationListener;" in c.interfaces &&
+            c.fields.any { it.type == "Lcom/google/android/gms/location/FusedLocationProviderClient;" } &&
+            c.interfaces.any { it in platform.interfaces }
+        ) fusedClasses += c.type
+    }
+    val fused = fusedClasses.singleOrNull() ?: throw PatchException("fused location strategy: found ${fusedClasses.size}")
+    val strategy = classDefBy(fused).interfaces.single { it in platform.interfaces }
+
+    val choices = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+    classDefForEach { c ->
+        if (c.fields.none { it.type == strategy }) return@classDefForEach
+        for (m in c.methods) {
+            val ins = m.implementation?.instructions?.toList() ?: continue
+            if (ins.none { it.opcode == Opcode.CHECK_CAST && ((it as ReferenceInstruction).reference as TypeReference).type == fused }) continue
+            choices += c.type to m
+        }
+    }
+    val (owner, found) = choices.singleOrNull() ?: throw PatchException("location controller that starts the fused strategy: found ${choices.size}")
+    val method = mutableClassDefBy(owner).methods.single {
+        it.name == found.name && it.parameterTypes == found.parameterTypes && it.returnType == found.returnType
+    }
+    val ins = method.implementation!!.instructions.toList()
+    // The fused field: the strategy field the controller's setup stores a new fused strategy in.
+    val fusedFields = mutableListOf<FieldReference>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            val code = m.implementation?.instructions?.toList() ?: continue
+            for ((k, insn) in code.withIndex()) {
+                if (insn.opcode != Opcode.NEW_INSTANCE || ((insn as ReferenceInstruction).reference as TypeReference).type != fused) continue
+                val reg = (insn as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA
+                code.drop(k + 1).take(16).firstNotNullOfOrNull { next ->
+                    if (next.opcode == Opcode.IPUT_OBJECT && (next as TwoRegisterInstruction).registerA == reg) {
+                        (next as ReferenceInstruction).reference as FieldReference
+                    } else null
+                }?.takeIf { it.definingClass == owner && it.type == strategy }?.let { fusedFields += it }
+            }
+        }
+    }
+    val fusedField = fusedFields.distinct().singleOrNull() ?: throw PatchException("fused location strategy field: found ${fusedFields.size}")
+    val read = ins.indexOfFirst { it.opcode == Opcode.IGET_OBJECT && (it as ReferenceInstruction).reference == fusedField }
+    val register = (ins.getOrNull(read) as? TwoRegisterInstruction)?.registerA
+    val test = ins.getOrNull(read + 1)
+    if (read < 0 || test?.opcode != Opcode.IF_EQZ || (test as com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction).registerA != register) {
+        throw PatchException("the location controller no longer chooses its strategy by testing the fused field")
+    }
+    if (test.location.labels.isNotEmpty()) throw PatchException("the location controller's strategy test is a branch target")
+    return method to read
 }
