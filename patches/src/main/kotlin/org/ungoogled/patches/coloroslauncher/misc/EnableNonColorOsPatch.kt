@@ -114,6 +114,12 @@ private val GUARDED_CALLS = mapOf(
     "Landroid/content/ContentResolver;->registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V" to
         "$EXT/Calls;->registerContentObserver(Landroid/content/ContentResolver;Landroid/net/Uri;ZLandroid/database/ContentObserver;)V",
     "Landroid/app/ActivityManager;->getCurrentUser()I" to "$EXT/Calls;->getCurrentUser()I",
+    // A blur of radius 0 (the long-pressed icon's resize frame starts at 0): Android 12 and 13 throw "nativePtr is null"
+    // while drawing, and the icon menu and the dragged icon were not drawn at all.
+    "Landroid/graphics/RenderEffect;->createBlurEffect(FFLandroid/graphics/Shader\$TileMode;)Landroid/graphics/RenderEffect;" to
+        "$EXT/Blurs;->createBlurEffect(FFLandroid/graphics/Shader\$TileMode;)Landroid/graphics/RenderEffect;",
+    "Landroid/graphics/RenderEffect;->createBlurEffect(FFLandroid/graphics/RenderEffect;Landroid/graphics/Shader\$TileMode;)Landroid/graphics/RenderEffect;" to
+        "$EXT/Blurs;->createBlurEffect(FFLandroid/graphics/RenderEffect;Landroid/graphics/Shader\$TileMode;)Landroid/graphics/RenderEffect;",
 ) + listOf(
     "getBoolean(Ljava/lang/String;Ljava/lang/String;Z)Z",
     "getFloat(Ljava/lang/String;Ljava/lang/String;F)F",
