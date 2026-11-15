@@ -12,6 +12,7 @@ import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.util.Log;
 
 import java.util.Map;
 import java.util.Set;
@@ -109,26 +110,29 @@ public final class Services {
     }
 
     /**
-     * What the list writes to MediaStore is Samsung's columns (resume position, last played, hidden folders); Google's
-     * MediaStore refuses them, or asks for write access to videos other apps made. Those go to the copy; anything else
-     * still goes to MediaStore.
+     * What the list writes to MediaStore is Samsung's columns (resume position, last played, hidden folders), which
+     * Google's MediaStore does not have: it refuses them, or for videos other apps made silently changes nothing
+     * ("Hide folders" did nothing). Those columns go to the copy (MediaMirror) on every write; the rest, if any, still
+     * goes to MediaStore.
      */
     public static int update(ContentResolver resolver, Uri uri, ContentValues values, String selection, String[] args) {
-        try {
-            return resolver.update(uri, values, selection, args);
-        } catch (IllegalArgumentException | UnsupportedOperationException | SQLiteException | SecurityException e) {
-            if (!MediaMirror.isMediaStore(uri) || values == null) throw e;
-            Set<String> known = MediaMirror.mediaStoreColumns(app());
-            ContentValues own = new ContentValues();
-            ContentValues samsung = new ContentValues();
-            for (Map.Entry<String, Object> v : values.valueSet()) {
-                put(known.contains(v.getKey()) ? own : samsung, v.getKey(), v.getValue());
-            }
-            if (samsung.size() == 0) throw e;
-            int changed = MediaMirror.update(app(), uri, samsung, selection, args, e);
-            if (own.size() > 0) changed = Math.max(changed, resolver.update(uri, own, selection, args));
-            return changed;
+        if (!MediaMirror.isMediaStore(uri) || values == null) return resolver.update(uri, values, selection, args);
+        Set<String> known = MediaMirror.mediaStoreColumns(app());
+        ContentValues own = new ContentValues();
+        ContentValues samsung = new ContentValues();
+        for (Map.Entry<String, Object> v : values.valueSet()) {
+            put(known.isEmpty() || known.contains(v.getKey()) ? own : samsung, v.getKey(), v.getValue());
         }
+        if (samsung.size() == 0) return resolver.update(uri, values, selection, args);
+        int changed = MediaMirror.update(app(), uri, samsung, selection, args, null);
+        if (own.size() > 0) {
+            try {
+                changed = Math.max(changed, resolver.update(uri, own, selection, args));
+            } catch (IllegalArgumentException | UnsupportedOperationException | SQLiteException | SecurityException e) {
+                Log.w("UA", "MediaStore refused " + own.keySet() + " for " + uri + ": " + e.getMessage());
+            }
+        }
+        return changed;
     }
 
     private static void put(ContentValues to, String key, Object value) {

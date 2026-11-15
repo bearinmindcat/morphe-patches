@@ -1,5 +1,6 @@
 package org.ungoogled.patches.samsungvideolibrary.misc
 
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
@@ -123,7 +124,8 @@ private val sprDrawablesPatch = resourcePatch(
  * own media database (content://secmedia), which only One UI has and which may not answer a copy signed by someone
  * other than Samsung, so the table reads "not One UI" on every phone and the list uses Android's MediaStore. Runs before
  * the One UI member redirect, which would otherwise answer the phone's real version. The file operations' "All files
- * access" check, which One UI 3.1 added, stays on, and the URIs older One UI used for single videos become MediaStore's.
+ * access" check and the pinch-zoom list layout, which One UI 3.1 added, stay on, and the URIs older One UI used for
+ * single videos become MediaStore's.
  */
 private val versionTablePatch = bytecodePatch(
     description = "Lists videos from Android's MediaStore on every phone.",
@@ -157,6 +159,33 @@ private val versionTablePatch = bytecodePatch(
         }
         // Measured against 1.4.22.81: SEM_INT twice, SEM_PLATFORM_INT twice.
         if (reads < 2) throw PatchException("only $reads One UI version reads in the version table")
+
+        // The table's "One UI 3.1" answer also picks the list's layout: from One UI 3.1 on the pinch-zoom lists with
+        // their spacing between items and the "View as" button that switches them in place; below it, older layouts
+        // whose folder grid has no spacing and whose "View as" did nothing. The app's own phones were all One UI 5
+        // (Android 13), so that layout flag reads as One UI 3.1 on every phone; the data paths stay as above.
+        val table = instructions.toList()
+        val oneUi31At = table.indexOfFirst { (it as? NarrowLiteralInstruction)?.narrowLiteral == 3101 }
+        val oneUi31 = table.drop(oneUi31At + 1).firstOrNull { it.opcode == Opcode.SPUT_BOOLEAN }
+            ?.let { (it as ReferenceInstruction).reference as FieldReference }
+            ?: throw PatchException("the version table's One UI 3.1 flag not found")
+        val layouts = mutableListOf<Pair<String, FieldReference>>()
+        classDefForEach { c ->
+            val init = c.methods.firstOrNull { it.name == "<clinit>" } ?: return@classDefForEach
+            val code = init.implementation?.instructions?.toList() ?: return@classDefForEach
+            for ((i, insn) in code.withIndex()) {
+                if (insn.opcode != Opcode.SGET_BOOLEAN || ((insn as ReferenceInstruction).reference as FieldReference).key() !=
+                    "${oneUi31.definingClass}->${oneUi31.name}:Z"
+                ) continue
+                // The feature table copies the flag into four fields; the first is the list layout's.
+                val copies = code.drop(i + 1).takeWhile { it.opcode == Opcode.SPUT_BOOLEAN }
+                if (copies.size >= 4) layouts += c.type to ((copies.first() as ReferenceInstruction).reference as FieldReference)
+            }
+        }
+        val (owner, layout) = layouts.singleOrNull() ?: throw PatchException("expected one list layout flag, found ${layouts.size}")
+        val ownerInit = mutableClassDefBy(owner).methods.first { it.name == "<clinit>" }
+        val end = ownerInit.implementation!!.instructions.indexOfLast { it.opcode == Opcode.RETURN_VOID }
+        ownerInit.addInstructions(end, "const/4 v0, 0x1\nsput-boolean v0, ${layout.key()}")
 
         // Below One UI 3.0 the list still names each video, and reads its details, by Samsung's database URIs (the same
         // IDs as MediaStore's there): the inline player found no video ("doesn't exist in Media DB"). They are

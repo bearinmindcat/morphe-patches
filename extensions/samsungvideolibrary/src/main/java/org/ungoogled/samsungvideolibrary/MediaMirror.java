@@ -104,7 +104,7 @@ public final class MediaMirror {
                 a.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS), sort, groupBy, limit, refused);
     }
 
-    /** A write MediaStore refused (Samsung's columns): made in the copy, and Samsung's columns kept. */
+    /** A write of Samsung's columns: made in the copy, and kept by path. */
     static int update(Context context, Uri uri, ContentValues values, String selection, String[] args,
                       RuntimeException refused) {
         MediaMirror mirror = get(context);
@@ -113,7 +113,7 @@ public final class MediaMirror {
             try {
                 changed = mirror.write(uri, values, selection, args);
             } catch (RuntimeException e) {
-                Log.w(TAG, "MediaStore refused an update of " + uri + " (" + refused.getMessage() + "), copy too: " + e.getMessage());
+                Log.w(TAG, "Samsung columns of " + uri + " not kept" + (refused != null ? " (" + refused.getMessage() + ")" : "") + ": " + e.getMessage());
                 return 0;
             }
         }
