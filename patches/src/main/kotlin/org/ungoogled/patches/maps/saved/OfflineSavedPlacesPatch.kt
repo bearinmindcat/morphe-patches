@@ -77,15 +77,6 @@ private object SaveControllerFingerprint : Fingerprint(
 )
 
 /**
- * The quick-save path: with a Maps flag on, Save skips the list picker and calls `b(place)`
- * on this (R8-merged) class, which makes a signed-out user pick an account first. The
- * class is the only one with this log message.
- */
-private object QuickSaveOwnerFingerprint : Fingerprint(
-    filters = listOf(string("Failed to create SplitEngineRenderer, cannot launch Magic Window")),
-)
-
-/**
  * The Save button's state: its icon chooser, the only method returning both the suitcase and the
  * heart (filters match in bytecode order, and the suitcase's case comes first there).
  */
@@ -293,11 +284,39 @@ internal val localSavedPlacesPatch = bytecodePatch(
         }
 
         // ---- 1b. Quick save (Save's other route, behind a Maps flag): the same list picker ----
-        val quickOwner = mutableClassDefBy(QuickSaveOwnerFingerprint.method.definingClass)
-        val quick = quickOwner.methods.singleOrNull { m ->
-            m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf(placeType)
-        } ?: throw PatchException("quick save not found in ${quickOwner.type}")
-        if (quick.implementation!!.registerCount - 2 < 3) throw PatchException("quick save has too few locals")
+        //      Its method, on an R8-merged class: `b(place)` -- if the place or its position is null, a no-arg
+        //      fallback; otherwise a Runnable(this, place, n) that is run once an account is picked.
+        val quickRef = run {
+            val found = mutableListOf<Pair<String, String>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    if (AccessFlags.STATIC.isSet(m.accessFlags) || m.returnType != "V" ||
+                        m.parameterTypes.map { it.toString() } != listOf(placeType)
+                    ) continue
+                    val code = m.implementation?.instructions?.toList() ?: continue
+                    if (code.size < 8 || code[0].opcode != Opcode.IF_EQZ || code[2].opcode != Opcode.MOVE_RESULT_OBJECT ||
+                        code[3].opcode != Opcode.IF_EQZ ||
+                        ((code[1] as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                            it.definingClass == placeType && it.name == positionGetter.name
+                        } != true
+                    ) continue
+                    val runnable = code.indexOfFirst { it.opcode == Opcode.NEW_INSTANCE }
+                    val init = code.getOrNull(runnable + 2) as? Instruction35c ?: continue
+                    val p0 = m.implementation!!.registerCount - 2
+                    if (init.opcode != Opcode.INVOKE_DIRECT || init.registerCount != 4 || init.registerD != p0 || init.registerE != p0 + 1) continue
+                    found += c.type to m.name
+                }
+            }
+            found.singleOrNull() ?: throw PatchException("quick save: expected one (place)V method that runs the place " +
+                "once an account is picked, found ${found.size}")
+        }
+        val quickOwner = mutableClassDefBy(quickRef.first)
+        val quick = quickOwner.methods.single { m ->
+            m.name == quickRef.second && m.returnType == "V" && m.parameterTypes.map { it.toString() } == listOf(placeType)
+        }
+        if (quick.implementation!!.registerCount - 2 < 2) throw PatchException("quick save has too few locals")
+        // p1 (the place) is read last, then reused for its position.
         quick.addInstructionsWithLabels(
             0,
             """
@@ -307,9 +326,9 @@ internal val localSavedPlacesPatch = bytecodePatch(
                 invoke-virtual { p1 }, $placeType->${featureIdGetter.name}()${featureIdGetter.returnType}
                 move-result-object v1
                 invoke-virtual { p1 }, $placeType->${positionGetter.name}()${positionGetter.returnType}
-                move-result-object v2
+                move-result-object p1
                 const/4 p0, 0x0
-                invoke-static { p0, v0, v1, v2 }, $SAVED_PLACES->save(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V
+                invoke-static { p0, v0, v1, p1 }, $SAVED_PLACES->save(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)V
                 return-void
             """,
             ExternalLabel("maps_quick_save", quick.implementation!!.instructions.first()),
@@ -887,6 +906,17 @@ private fun BytecodePatchContext.savedOnMap(featureType: String, positionType: S
     val info = infos.singleOrNull() ?: throw PatchException("expected one saved list description, found ${infos.map { it.type }}")
     if (!enumNames(info.kind).containsAll(listOf("FAVORITES", "WANT_TO_GO", "TRAVEL_PLANS", "JUST_SAVE", "CUSTOM"))) {
         throw PatchException("${info.kind} is not the saved list kind")
+    }
+
+    // The extension's stubs (org.ungoogled.ui) use these classes directly; 26.43 made the generator
+    // package-private (IllegalAccessError in SavedOnMap.redraw), so every one of them is made public.
+    listOf(generatorType, itemType, builderType, info.type, info.kind, aliasType, featureType, positionType).distinct().forEach {
+        val c = mutableClassDefBy(it)
+        if (!AccessFlags.PUBLIC.isSet(c.accessFlags)) c.accessFlags = c.accessFlags or AccessFlags.PUBLIC.value
+    }
+    mutableClassDefBy(builderType).fields.single { it.name == aliasField.name && it.type == aliasField.type }.apply {
+        val hidden = AccessFlags.PRIVATE.value or AccessFlags.PROTECTED.value
+        if (!AccessFlags.PUBLIC.isSet(accessFlags)) accessFlags = (accessFlags and hidden.inv()) or AccessFlags.PUBLIC.value
     }
 
     // The generator: its setter adds the phone's places, its switch draws them, uaRefresh redraws.
