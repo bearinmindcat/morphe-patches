@@ -256,6 +256,79 @@ private val morphIconStylePatch = bytecodePatch {
 }
 
 /**
+ * "Double-tap to lock": the launcher turns the screen off with PowerManager.goToSleep, which needs a system permission,
+ * so off ColorOS the double tap did nothing. It locks through an accessibility service the patch adds (extension
+ * LockService, Android's GLOBAL_ACTION_LOCK_SCREEN); turning the option on asks for it (see Lock).
+ */
+private val lockServiceResourcesPatch = resourcePatch {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val application = manifest.getElementsByTagName("application").item(0) as org.w3c.dom.Element
+            application.appendChild(manifest.createElement("service").apply {
+                setAttribute("android:name", "org.ungoogled.coloroslauncher.LockService")
+                setAttribute("android:exported", "true")
+                setAttribute("android:label", "@string/ungoogled_lock_service_label")
+                setAttribute("android:permission", "android.permission.BIND_ACCESSIBILITY_SERVICE")
+                appendChild(manifest.createElement("intent-filter").apply {
+                    appendChild(manifest.createElement("action").apply {
+                        setAttribute("android:name", "android.accessibilityservice.AccessibilityService")
+                    })
+                })
+                appendChild(manifest.createElement("meta-data").apply {
+                    setAttribute("android:name", "android.accessibilityservice")
+                    setAttribute("android:resource", "@xml/ungoogled_lock_service")
+                })
+            })
+        }
+        document("res/values/strings.xml").use { strings ->
+            strings.documentElement.appendChild(strings.createElement("string").apply {
+                setAttribute("name", "ungoogled_lock_service_label")
+                textContent = "System Launcher: double-tap to lock"
+            })
+            strings.documentElement.appendChild(strings.createElement("string").apply {
+                setAttribute("name", "ungoogled_lock_service_description")
+                textContent = "Locks the screen when you double-tap an empty space on the home screen. It reads no screen content."
+            })
+        }
+        get("res/xml/ungoogled_lock_service.xml").apply {
+            parentFile.mkdirs()
+            writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:description="@string/ungoogled_lock_service_description"
+                    android:accessibilityFeedbackType="feedbackGeneric"
+                    android:accessibilityFlags="flagDefault"
+                    android:canRetrieveWindowContent="false"
+                    android:notificationTimeout="0" />
+                """.trimIndent(),
+            )
+        }
+    }
+}
+
+private val lockScreenPatch = bytecodePatch {
+    dependsOn(lockServiceResourcesPatch)
+    execute {
+        val sleeps = redirectCalls(
+            mapOf(
+                "Landroid/os/PowerManager;->goToSleep(J)V" to "$EXT/Lock;->goToSleep(Landroid/os/PowerManager;J)V",
+            ),
+        )
+        log.info("screen lock calls: $sleeps")
+        // Measured against 16.4.30 and 15.6.24: 2 (empty home screen, widget area).
+        if (sleeps == 0) throw PatchException("no PowerManager.goToSleep calls found")
+        val change = mutableClassDefBy("Lcom/android/launcher/settings/LauncherSettingsFragment;").methods.firstOrNull {
+            it.name == "onPreferenceChange" && it.returnType == "Z" && it.parameterTypes.size == 2
+        } ?: throw PatchException("LauncherSettingsFragment.onPreferenceChange not found")
+        change.addInstructions(
+            0,
+            "invoke-static/range { p1 .. p2 }, $EXT/Lock;->preferenceChanged(Ljava/lang/Object;Ljava/lang/Object;)V",
+        )
+    }
+}
+
+/**
  * Selecting apps in edit mode: every app after the first kept its grey check until the page redrew (the selection itself
  * worked). The check's animation marks the icon for redrawing, but that did not reach the page; the icon's parents are
  * now asked to redraw too (see Views.invalidateUp).
@@ -690,7 +763,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
-        nightBackgroundsPatch, morphIconStylePatch, selectCheckPatch,
+        nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
