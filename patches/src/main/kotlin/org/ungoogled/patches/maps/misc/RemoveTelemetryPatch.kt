@@ -113,8 +113,13 @@ val removeTelemetryPatch = bytecodePatch(
         // unavailable right after it is made, every later call a no-op, nothing started or registered.
         MeasurementClientFingerprint.method.apply {
             val code = implementation!!.instructions.toList()
+            // Its "FirebaseAnalytics not bundled" exit: a boolean of its own set, then return (26.36) or a jump
+            // straight to the return (26.44).
+            fun returns(next: com.android.tools.smali.dexlib2.iface.instruction.Instruction?): Boolean =
+                next?.opcode == Opcode.RETURN_VOID || (next?.opcode in listOf(Opcode.GOTO, Opcode.GOTO_16, Opcode.GOTO_32) &&
+                    (next as com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction).target.location.instruction?.opcode == Opcode.RETURN_VOID)
             val unavailable = code.indices.firstOrNull { i ->
-                code[i].opcode == Opcode.IPUT_BOOLEAN && code.getOrNull(i + 1)?.opcode == Opcode.RETURN_VOID &&
+                code[i].opcode == Opcode.IPUT_BOOLEAN && returns(code.getOrNull(i + 1)) &&
                     ((code[i] as ReferenceInstruction).reference as FieldReference).definingClass == definingClass
             }?.let { (code[it] as ReferenceInstruction).reference as FieldReference }
                 ?: throw PatchException("measurement client no longer marks itself unavailable")
