@@ -17,46 +17,74 @@ import org.ungoogled.patches.gmail.GmailConstants.COMPATIBILITY_GMAIL
 import org.ungoogled.patches.gmail.GmailConstants.GMAIL_EXTENSION
 import org.w3c.dom.Element
 
-/** The conversation list's row at Settings > General settings > Conversation list density > Compact. */
+/** The conversation list's rows: with sender pictures (Default and Comfortable density) and with checkboxes (Compact). */
+private const val PICTURE_ROW = "res/layout/conversation_item_view.xml"
 private const val COMPACT_ROW = "res/layout/conversation_item_view_compact.xml"
+private const val DIMENS = "res/values/dimens.xml"
+/** The gap above the subject and the snippet (3dp); Gmail also sets the snippet's from it in code, so the value changes. */
+private const val LINE_GAP = "conv_list_item_details_padding_top"
 
 /**
- * Compact's spacing, tightened (Compact: 8dp above the sender, 3dp between the lines, 8dp below, at least 56dp per
- * row with a 48dp checkbox, and the star hanging below the subject line). Text sizes stay. Measured on the emulator
- * (420 dpi): rows from 60dp to 50dp apart, 14 instead of 12 on a phone screen.
+ * The spacing, tightened; text sizes stay. Picture rows (Default/Comfortable: 16dp above the sender, 16dp below the
+ * snippet, a 40dp picture in a 72dp box, at least 88dp per row): 6dp above and below, a 36dp picture. Compact (8dp above
+ * the sender, 8dp below, at least 56dp with a 48dp checkbox, and the star hanging below the subject line): 4dp above, 3dp
+ * below. Lines 1dp apart instead of 3dp. Measured on the emulator (420 dpi): picture rows 96dp to 75dp apart, Compact
+ * rows 60dp to 50dp.
  */
 private val SPACING = mapOf(
-    // view id (null = the row itself) to its new attributes
-    null to mapOf("android:paddingBottom" to "3.0dip", "android:minHeight" to "44.0dip"),
-    "compact_checkbox" to mapOf("android:layout_height" to "40.0dip", "android:paddingTop" to "4.0dip"),
-    "senders" to mapOf("android:layout_marginTop" to "4.0dip"),
-    "subject" to mapOf("android:layout_marginTop" to "2.0dip"),
-    "star" to mapOf("android:layout_height" to "20.0dip"),
+    PICTURE_ROW to mapOf(
+        // view id (null = the row itself) to its new attributes
+        null to mapOf("android:paddingBottom" to "6.0dip", "android:minHeight" to "48.0dip"),
+        // 16 + 36 + 12 wide, 6 + 36 + 6 tall: the picture's top is level with the sender's name.
+        "contact_image" to mapOf(
+            "android:layout_width" to "64.0dip", "android:layout_height" to "48.0dip",
+            "android:paddingTop" to "6.0dip", "android:paddingBottom" to "6.0dip", "android:paddingEnd" to "12.0dip",
+        ),
+        "senders" to mapOf("android:layout_marginTop" to "6.0dip"),
+        "attachment_chips" to mapOf("android:paddingTop" to "4.0dip"),
+    ),
+    COMPACT_ROW to mapOf(
+        null to mapOf("android:paddingBottom" to "3.0dip", "android:minHeight" to "44.0dip"),
+        "compact_checkbox" to mapOf("android:layout_height" to "40.0dip", "android:paddingTop" to "4.0dip"),
+        "senders" to mapOf("android:layout_marginTop" to "4.0dip"),
+        "subject" to mapOf("android:layout_marginTop" to "2.0dip"),
+        "star" to mapOf("android:layout_height" to "20.0dip"),
+    ),
 )
 
 private val gmailCompactRowPatch: ResourcePatch = resourcePatch {
     execute {
-        decode(COMPACT_ROW)
-        document(COMPACT_ROW).use { xml ->
-            val root = xml.documentElement
-            val all = xml.getElementsByTagName("*").let { list -> (0 until list.length).map { list.item(it) as Element } }
-            for ((id, attributes) in SPACING) {
-                val element = if (id == null) root else all.singleOrNull { it.getAttribute("android:id").substringAfter('/') == id }
-                    ?: throw PatchException("$COMPACT_ROW: no view with id $id")
-                for ((name, value) in attributes) {
-                    if (!element.hasAttribute(name)) throw PatchException("$COMPACT_ROW: ${id ?: "the row"} has no $name")
-                    element.setAttribute(name, value)
+        decode(PICTURE_ROW, COMPACT_ROW, DIMENS)
+        for ((file, views) in SPACING) {
+            document(file).use { xml ->
+                val root = xml.documentElement
+                val all = xml.getElementsByTagName("*").let { list -> (0 until list.length).map { list.item(it) as Element } }
+                fun view(id: String) = all.singleOrNull { it.getAttribute("android:id").substringAfter('/') == id }
+                    ?: throw PatchException("$file: no view with id $id")
+                for ((id, attributes) in views) {
+                    val element = if (id == null) root else view(id)
+                    for ((name, value) in attributes) {
+                        if (!element.hasAttribute(name)) throw PatchException("$file: ${id ?: "the row"} has no $name")
+                        element.setAttribute(name, value)
+                    }
+                }
+                if (file == COMPACT_ROW) {
+                    // The star sat under the date and reached below the subject line; now centred on the subject line.
+                    val star = view("star")
+                    val below = (0 until star.attributes.length).map { star.attributes.item(it).nodeName }
+                        .singleOrNull { it.endsWith(":layout_constraintTop_toBottomOf") }
+                        ?: throw PatchException("$file: the star is no longer placed under the date")
+                    val app = below.substringBefore(':')
+                    star.removeAttribute(below)
+                    star.setAttribute("$app:layout_constraintTop_toTopOf", "@id/subject")
+                    star.setAttribute("$app:layout_constraintBottom_toBottomOf", "@id/subject")
                 }
             }
-            // The star sat under the date and reached below the subject line; it is now centred on the subject line.
-            val star = all.single { it.getAttribute("android:id").substringAfter('/') == "star" }
-            val below = (0 until star.attributes.length).map { star.attributes.item(it).nodeName }
-                .singleOrNull { it.endsWith(":layout_constraintTop_toBottomOf") }
-                ?: throw PatchException("$COMPACT_ROW: the star is no longer placed under the date")
-            val app = below.substringBefore(':')
-            star.removeAttribute(below)
-            star.setAttribute("$app:layout_constraintTop_toTopOf", "@id/subject")
-            star.setAttribute("$app:layout_constraintBottom_toBottomOf", "@id/subject")
+        }
+        document(DIMENS).use { xml ->
+            val dimens = xml.getElementsByTagName("dimen").let { list -> (0 until list.length).map { list.item(it) as Element } }
+            val gap = dimens.singleOrNull { it.getAttribute("name") == LINE_GAP } ?: throw PatchException("$DIMENS: no $LINE_GAP")
+            gap.textContent = "1.0dip"
         }
     }
 }
@@ -118,7 +146,7 @@ private fun isDrawCircle(insn: com.android.tools.smali.dexlib2.iface.instruction
 @Suppress("unused")
 val gmailExtraCompactListPatch: BytecodePatch = bytecodePatch(
     name = "Extra compact list",
-    description = "Tightens the Compact conversation list so more mail fits on screen.",
+    description = "Tightens the conversation list (all densities) so more mail fits on screen.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_GMAIL)
