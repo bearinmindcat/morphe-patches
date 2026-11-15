@@ -51,7 +51,7 @@ public final class VideoEdits {
     }
 
     /** Gallery's own "No apps available to complete this action." */
-    private static CharSequence noEditorMessage(Context context) {
+    static CharSequence noEditorMessage(Context context) {
         int id = context.getResources().getIdentifier("activity_not_found", "string", context.getPackageName());
         return id != 0 ? context.getText(id) : "No apps available to complete this action.";
     }
