@@ -52,5 +52,6 @@ public final class Res {
     // Strings
     public static int plurals_REVIEW_COUNT_SHORT;
     public static int string_EXPAND_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION;
+    public static int string_MEDIA_BROWSE;
     public static int string_MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION;
 }
