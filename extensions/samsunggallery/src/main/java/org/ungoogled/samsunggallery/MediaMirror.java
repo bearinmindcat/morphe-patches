@@ -57,8 +57,15 @@ public final class MediaMirror extends ContentProvider {
      * changes (columns left out, values derived).
      */
     private static final int LAYOUT = 2;
-    /** MediaStore's columns the copy leaves out: no statement of Gallery's reads them, and they are large. */
-    private static final Set<String> NOT_COPIED = new HashSet<>(java.util.Arrays.asList("xmp"));
+    /**
+     * MediaStore's columns the copy leaves out: no statement of Gallery's reads them. xmp is large; oem_metadata (Android
+     * 16) is answered only as NULL to apps, and naming it in a projection fails ("Invalid column NULL AS
+     * oem_metadata"), which made every sync fall back to copying every column, xmp included.
+     */
+    private static final Set<String> NOT_COPIED = new HashSet<>(java.util.Arrays.asList("xmp", "oem_metadata"));
+    private static final Pattern REFUSED_COLUMN = Pattern.compile("Invalid column (?:NULL AS )?([A-Za-z0-9_]+)");
+    /** The columns copied, worked out once per run. */
+    private static volatile String[] copiedColumns;
 
     private static volatile String authority;
     private static volatile MediaMirror instance;
@@ -451,18 +458,35 @@ public final class MediaMirror extends ContentProvider {
         return c.getContentResolver().query(files, null, selection, null, null);
     }
 
-    /** MediaStore's columns less the ones the copy leaves out (null: all of them). */
+    /**
+     * MediaStore's columns less the ones the copy leaves out (null: all of them). A column MediaStore lists but refuses
+     * by name (as Android 16 does oem_metadata) is left out too, so a sync never falls back to every column.
+     */
     private static String[] projection(Context c, Uri files) {
-        try (Cursor none = c.getContentResolver().query(files, null, MediaStore.MediaColumns._ID + " = -1", null, null)) {
-            if (none == null) return null;
-            java.util.List<String> keep = new java.util.ArrayList<>();
-            for (String n : none.getColumnNames()) {
+        String[] known = copiedColumns;
+        if (known != null) return known;
+        String none = MediaStore.MediaColumns._ID + " = -1";
+        java.util.List<String> keep = new java.util.ArrayList<>();
+        try (Cursor all = c.getContentResolver().query(files, null, none, null, null)) {
+            if (all == null) return null;
+            for (String n : all.getColumnNames()) {
                 if (!NOT_COPIED.contains(n)) keep.add(n);
             }
-            return keep.toArray(new String[0]);
         } catch (RuntimeException e) {
             return null;
         }
+        for (int attempt = 0; attempt < 8; attempt++) {
+            String[] candidate = keep.toArray(new String[0]);
+            try (Cursor test = c.getContentResolver().query(files, candidate, none, null, null)) {
+                copiedColumns = candidate;
+                return candidate;
+            } catch (RuntimeException e) {
+                Matcher refused = REFUSED_COLUMN.matcher(String.valueOf(e.getMessage()));
+                if (!refused.find() || !keep.remove(refused.group(1))) return null;
+                Log.i(TAG, "mirror: MediaStore refuses column " + refused.group(1) + ", not copied");
+            }
+        }
+        return null;
     }
 
     /** Drops the rows MediaStore no longer lists (deleted, trashed, no longer a photo or video). */
