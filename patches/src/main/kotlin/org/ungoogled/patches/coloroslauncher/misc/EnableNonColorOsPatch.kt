@@ -172,6 +172,42 @@ private val REFUSED_USER_CALLS = setOf(
     "Landroid/content/pm/PackageManager;->getApplicationInfoAsUser(Ljava/lang/String;ILandroid/os/UserHandle;)Landroid/content/pm/ApplicationInfo;",
 )
 
+/**
+ * The night page backgrounds. ColorOS's own controls (COUI) are designed for ColorOS's force-dark: at night the window
+ * and list backgrounds stay white (coui_color_background_with_card's night value is white, coui_color_background has
+ * none) and the system darkens them while drawing. Android's force dark does the same on Pixels, but One UI does not,
+ * so on a Galaxy in dark mode the launcher's settings were white text on white. They get COUI's own dark values.
+ */
+private val NIGHT_BACKGROUNDS = mapOf(
+    "coui_color_background" to "#ff000000",
+    "coui_color_background_with_card" to "#ff000000",
+)
+
+private val nightBackgroundsPatch = resourcePatch {
+    execute {
+        val path = "res/values-night/colors.xml"
+        decode(path)
+        if (!get(path).isFile) throw PatchException("no $path")
+        val set = mutableSetOf<String>()
+        document(path).use { xml ->
+            val root = xml.documentElement
+            val colors = xml.getElementsByTagName("color")
+            for (i in 0 until colors.length) {
+                val color = colors.item(i) as org.w3c.dom.Element
+                val value = NIGHT_BACKGROUNDS[color.getAttribute("name")] ?: continue
+                color.textContent = value
+                set += color.getAttribute("name")
+            }
+            for ((name, value) in NIGHT_BACKGROUNDS) {
+                if (name in set) continue
+                root.appendChild(xml.createElement("color").apply { setAttribute("name", name); textContent = value })
+                set += name
+            }
+        }
+        log.info("night backgrounds: $set")
+    }
+}
+
 /** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
 private class HiddenLists(
     val members: Set<String>,
@@ -584,6 +620,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
+        nightBackgroundsPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
