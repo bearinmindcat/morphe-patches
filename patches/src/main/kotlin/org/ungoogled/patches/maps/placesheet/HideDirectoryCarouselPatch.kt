@@ -16,9 +16,13 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
  * look-alike in the class tests with if-eqz and reads one field instead of two.
  */
 private val CAROUSEL_GETTER = listOf(
-    Opcode.IGET_BOOLEAN, Opcode.IF_NEZ, Opcode.CONST_4, Opcode.RETURN_OBJECT,
-    Opcode.IGET_OBJECT, Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT,
+    Opcode.IGET_BOOLEAN, Opcode.IF_NEZ, Opcode.CONST_4, Opcode.IGET_OBJECT, Opcode.IGET_OBJECT,
 )
+
+/** Its opcodes without gotos and returns: R8 returns twice (26.36) or jumps to one return (26.44). */
+private fun com.android.tools.smali.dexlib2.iface.Method.shape() = implementation?.instructions?.map { it.opcode }
+    ?.takeIf { it.lastOrNull() == Opcode.RETURN_OBJECT }
+    ?.filter { it != Opcode.RETURN_OBJECT && it != Opcode.GOTO && it != Opcode.GOTO_16 && it != Opcode.GOTO_32 }
 
 internal val hideDirectoryCarouselPatch = bytecodePatch(
     description = "Hides the row of businesses under an address on its place sheet: a preview of the " +
@@ -38,7 +42,7 @@ internal val hideDirectoryCarouselPatch = bytecodePatch(
         // the sheet lays out exactly as it does there. The Directory button is untouched.
         val getter = mutableClassDefBy(header).methods.filter { m ->
             m.parameterTypes.isEmpty() && m.returnType.startsWith("L") &&
-                m.implementation?.instructions?.map { it.opcode } == CAROUSEL_GETTER
+                m.shape() == CAROUSEL_GETTER
         }.singleOrNull() ?: throw PatchException("directory carousel getter not found in $header")
         // v0 is its one local, overwritten by its own first instruction.
         if (getter.implementation!!.registerCount < 2) throw PatchException("carousel getter has no local register")

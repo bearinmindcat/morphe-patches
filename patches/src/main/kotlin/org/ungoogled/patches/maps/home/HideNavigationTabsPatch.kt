@@ -1,8 +1,21 @@
 package org.ungoogled.patches.maps.home
 
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
+import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.fieldAccess
+import app.morphe.patcher.methodCall
+import app.morphe.patcher.opcode
+import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.util.smali.ExternalLabel
+import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
+import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
 import org.ungoogled.patches.maps.ui.markPatched
@@ -19,31 +32,53 @@ internal val hideNavigationTabsPatch = bytecodePatch(
     execute {
         markPatched("hideTabsPatched")
 
-        // Right after the strip's view holder is stored, hide its root view while
-        // the switch is on. The map's bottom inset follows the strip's own laid-out
-        // height, so nothing is left reserved for it. v2 is free here: both paths
-        // on from this point write it before reading it.
-        //
-        // The skip target is bound to the real instruction that follows, via
-        // addInstructionsWithLabels. An earlier version wrote it as a label inside
-        // the snippet passed to plain addInstructions, which never rebinds such a
-        // label: the branch kept its snippet-relative address (0xb), landed in the
-        // middle of an instruction, and the verifier rejected the home screen's
-        // whole class, so Maps crashed on launch.
-        val method = BottomTabStripBindFingerprint.method
-        val insertAt = BottomTabStripBindFingerprint.instructionMatches.last().index + 1
-        method.addInstructionsWithLabels(
-            insertAt,
-            """
-                sget-boolean v2, $SHAPES->HIDE_TABS:Z
-                if-eqz v2, :tabs_done
-                invoke-virtual {v1}, Lbzok;->a()Landroid/view/View;
-                move-result-object v2
-                if-eqz v2, :tabs_done
-                const/16 v1, 0x8
-                invoke-virtual {v2, v1}, Landroid/view/View;->setVisibility(I)V
-            """,
-            ExternalLabel("tabs_done", method.implementation!!.instructions[insertAt]),
+        // The home fragment binds the bottom tab strip once: `this.strip = factory.create(container)`, the one
+        // (ViewGroup) -> view holder call it keeps in a field. Right after the store the strip's root view is
+        // hidden while the switch is on; the map's bottom inset follows the strip's laid-out height, so nothing
+        // is left reserved for it. The work is a static method added to the holder, so the bind needs no
+        // register of its own.
+        val home = HomeFragmentIdFingerprint.classDef.type
+        val bind = Fingerprint(
+            filters = listOf(
+                methodCall(opcode = Opcode.INVOKE_INTERFACE, parameters = listOf("Landroid/view/ViewGroup;")),
+                opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterImmediately()),
+                fieldAccess(opcode = Opcode.IPUT_OBJECT, definingClass = "this", location = MatchAfterImmediately()),
+            ),
+            custom = { _, c -> c.type == home },
+        )
+        val matches = bind.matchAll()
+        val match = matches.singleOrNull() ?: throw PatchException("home tab strip bind: found ${matches.size}")
+        val code = match.method.implementation!!.instructions
+        val call = code[match.instructionMatches.first().index]
+        val holder = ((call as com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction).reference as MethodReference).returnType
+        val holderClass = mutableClassDefBy(holder)
+        val viewGetter = holderClass.methods.singleOrNull { it.parameterTypes.isEmpty() && it.returnType == "Landroid/view/View;" }
+            ?: throw PatchException("$holder has no single root view getter")
+        holderClass.methods.add(
+            ImmutableMethod(
+                holder, "uaHideTabs", listOf(ImmutableMethodParameter(holder, null, null)), "V",
+                AccessFlags.PUBLIC.value or AccessFlags.STATIC.value, null, null, MutableMethodImplementation(3),
+            ).toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        sget-boolean v0, $SHAPES->HIDE_TABS:Z
+                        if-eqz v0, :tabs_done
+                        invoke-virtual { p0 }, $holder->${viewGetter.name}()Landroid/view/View;
+                        move-result-object v0
+                        if-eqz v0, :tabs_done
+                        const/16 v1, 0x8
+                        invoke-virtual { v0, v1 }, Landroid/view/View;->setVisibility(I)V
+                        :tabs_done
+                        return-void
+                    """,
+                )
+            },
+        )
+        val stored = (code[match.instructionMatches[1].index] as OneRegisterInstruction).registerA
+        match.method.addInstructions(
+            match.instructionMatches.last().index + 1,
+            "invoke-static/range { v$stored .. v$stored }, $holder->uaHideTabs($holder)V",
         )
     }
 }

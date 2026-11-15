@@ -49,6 +49,9 @@ private object AskMapsInNavigationFingerprint : Fingerprint(
     filters = listOf(string("AskMapsNavigationFeatureAvailabilityImpl.isAskMapsInNavigationEnabled")),
 )
 
+/** ASK_MAPS_MODE_ASSISTIVE_SHORTCUT, "Ask Maps": the home screen's shortcut chip, first under the search bar. */
+private val ASK_MAPS_SHORTCUT get() = mapsId(ResourceType.STRING, "ASK_MAPS_MODE_ASSISTIVE_SHORTCUT")
+
 /** SEARCH_LIST_NAVIGATION_HEADER_ASK_MAPS_MODE_BUTTON: loaded right after the "is Ask Maps on" checks. */
 private val ASK_MAPS_SEARCH_HEADER_BUTTON get() = mapsId(ResourceType.STRING, "SEARCH_LIST_NAVIGATION_HEADER_ASK_MAPS_MODE_BUTTON")
 
@@ -71,6 +74,15 @@ private object ReviewSummaryLayoutFingerprint : Fingerprint(
 private val KBYG_GETTER_TAIL = listOf(
     Opcode.IGET_OBJECT, Opcode.RETURN_OBJECT, Opcode.CONST_4, Opcode.RETURN_OBJECT,
 )
+
+/** The same tail as 26.44 lays it out: `slot` and `null` meet at one return (a goto between them). */
+private val KBYG_GETTER_TAIL_MERGED = listOf(Opcode.IGET_OBJECT, Opcode.CONST_4, Opcode.RETURN_OBJECT)
+
+private fun Method.hasKbygTail(): Boolean {
+    val opcodes = implementation?.instructions?.map { it.opcode }?.filter { it != Opcode.GOTO && it != Opcode.GOTO_16 && it != Opcode.GOTO_32 }
+        ?: return false
+    return opcodes.takeLast(KBYG_GETTER_TAIL.size) == KBYG_GETTER_TAIL || opcodes.takeLast(KBYG_GETTER_TAIL_MERGED.size) == KBYG_GETTER_TAIL_MERGED
+}
 
 /** The review summary's "is there one" check, `return text.length() > 0`. */
 private val SUMMARY_CHECK = listOf(
@@ -103,7 +115,7 @@ internal val hideAiPatch = bytecodePatch(
             } == true
         val kbyg = header.methods.filter { m ->
             m.parameterTypes.isEmpty() && m.returnType.startsWith("L") &&
-                m.implementation?.instructions?.map { it.opcode }?.takeLast(KBYG_GETTER_TAIL.size) == KBYG_GETTER_TAIL &&
+                m.hasKbygTail() &&
                 header.methods.any { it != m && it.returnType == m.returnType && calls(it, m) }
         }.singleOrNull() ?: throw PatchException("Know before you go getter not found in ${header.type}")
         // v0 is its one local, overwritten by its own first instruction.
@@ -128,7 +140,7 @@ internal val hideAiPatch = bytecodePatch(
             // The header's Know before you go: its getter returns this field, filled from the place's slot table by
             // `slots.map.get(Integer.valueOf(place.data().slots.config.kbyg))` -- the names the extension follows.
             val getterCode = kbyg.implementation!!.instructions.toList()
-            val kbygField = (getterCode[getterCode.size - KBYG_GETTER_TAIL.size] as ReferenceInstruction).reference as FieldReference
+            val kbygField = (getterCode.last { it.opcode == Opcode.IGET_OBJECT } as ReferenceInstruction).reference as FieldReference
             var path: String? = null
             var slotTable: FieldReference? = null
             for (m in header.methods) {
@@ -140,13 +152,20 @@ internal val hideAiPatch = bytecodePatch(
                 }
                 if (store < 0) continue
                 fun ref(i: Int) = (code[i] as? ReferenceInstruction)?.reference
-                val get = (store downTo 0).firstOrNull { i ->
-                    code[i].opcode == Opcode.INVOKE_INTERFACE && (ref(i) as? MethodReference)?.let { it.definingClass == "Ljava/util/Map;" && it.name == "get" } == true
-                } ?: continue
-                val boxed = (get downTo 0).firstOrNull { i ->
-                    (ref(i) as? MethodReference)?.let { it.definingClass == "Ljava/lang/Integer;" && it.name == "valueOf" } == true
-                } ?: continue
-                val id = (boxed downTo 0).firstOrNull { code[it].opcode == Opcode.IGET } ?: continue
+                fun MethodReference.isMapGet() = definingClass == "Ljava/util/Map;" && name == "get"
+                fun MethodReference.isBoxing() = definingClass == "Ljava/lang/Integer;" && name == "valueOf"
+                // The slot id: the last int field read before the store. 26.36 looks it up right here; 26.44 hands
+                // it to a helper of the header that does `slots.map.get(Integer.valueOf(id))`.
+                val id = (store downTo 0).firstOrNull { code[it].opcode == Opcode.IGET } ?: continue
+                val looksUp = (id until store).any { i ->
+                    val r = ref(i) as? MethodReference ?: return@any false
+                    if (r.isMapGet()) return@any true
+                    if (r.definingClass != header.type) return@any false
+                    val helper = header.methods.firstOrNull { it.name == r.name && it.parameterTypes == r.parameterTypes && it.returnType == r.returnType }
+                    val refs = helper?.implementation?.instructions?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }.orEmpty()
+                    refs.any { it.isMapGet() } && refs.any { it.isBoxing() }
+                } || (id until store).any { (ref(it) as? MethodReference)?.isBoxing() == true }
+                if (!looksUp) continue
                 val kbygSlot = ref(id) as FieldReference
                 val config = (id downTo 0).firstNotNullOfOrNull { i ->
                     (ref(i) as? FieldReference)?.takeIf { code[i].opcode == Opcode.IGET_OBJECT && it.type == kbygSlot.definingClass }
@@ -182,9 +201,11 @@ internal val hideAiPatch = bytecodePatch(
                     if (get < 3 || get + 4 >= code.size) continue
                     val ownSlot = (code[get - 3] as? ReferenceInstruction)?.reference as? FieldReference
                     if (code[get - 3].opcode != Opcode.IGET || ownSlot?.definingClass != c.type) continue
-                    if (code[get + 1].opcode != Opcode.MOVE_RESULT_OBJECT || code[get + 2].opcode != Opcode.CHECK_CAST ||
-                        code[get + 3].opcode != Opcode.IF_NEZ || code[get + 4].opcode != Opcode.RETURN_VOID
-                    ) continue
+                    // `if (content == null) return`: an if-nez over a return (26.36), or an if-eqz to the method's
+                    // final return (26.44)
+                    val nullReturns = (code[get + 3].opcode == Opcode.IF_NEZ && code[get + 4].opcode == Opcode.RETURN_VOID) ||
+                        (code[get + 3].opcode == Opcode.IF_EQZ && code.last().opcode == Opcode.RETURN_VOID)
+                    if (code[get + 1].opcode != Opcode.MOVE_RESULT_OBJECT || code[get + 2].opcode != Opcode.CHECK_CAST || !nullReturns) continue
                     // looked up in the place's slot table (other modules look up other tables the same way)
                     val readsSlots = code.take(get).any { insn ->
                         insn.opcode == Opcode.IGET_OBJECT && ((insn as ReferenceInstruction).reference as FieldReference).let {
@@ -275,7 +296,9 @@ internal val hideAiPatch = bytecodePatch(
         val check = mutableClassDefBy(model).methods.singleOrNull {
             it.name == gate.name && it.parameterTypes.isEmpty() && it.returnType == "Z"
         } ?: throw PatchException("review summary check not found in $model")
-        if (check.implementation?.instructions?.map { it.opcode } != SUMMARY_CHECK) {
+        // (26.44 joins the two returns: `true; goto; false; return`)
+        val shape = check.implementation?.instructions?.map { it.opcode }
+        if (shape != SUMMARY_CHECK && shape != SUMMARY_CHECK.take(5) + listOf(Opcode.GOTO, Opcode.CONST_4, Opcode.RETURN)) {
             throw PatchException("review summary check in $model has an unexpected shape")
         }
         // `if (length > 0) return true;` becomes `return !HIDE_AI`. The method has no spare register,
@@ -321,6 +344,36 @@ internal val hideAiPatch = bytecodePatch(
         fun Method.literalAt(id: Int) = implementation?.instructions?.indexOfFirst {
             (it as? NarrowLiteralInstruction)?.narrowLiteral == id
         } ?: -1
+
+        // The home screen's Ask Maps shortcut chip. Since 26.43 it has a server switch of its own, not the Ask Maps
+        // one below: the chip shows while `flags.shortcut()` says so, asked through one getter, `return
+        // this.flags.x()`. That answer goes through HIDE_AI (false stays false, true becomes !HIDE_AI).
+        run {
+            val shortcut = ASK_MAPS_SHORTCUT
+            val owners = mutableListOf<String>()
+            classDefForEach { c ->
+                if (!c.type.startsWith("Lorg/ungoogled/") && c.methods.any { it.literalAt(shortcut) >= 0 }) owners += c.type
+            }
+            val owner = mutableClassDefBy(owners.singleOrNull() ?: throw PatchException("Ask Maps shortcut chip: found ${owners.size}"))
+            val gates = owner.methods.filter { m ->
+                val code = m.implementation?.instructions?.toList() ?: return@filter false
+                m.returnType == "Z" && m.parameterTypes.isEmpty() &&
+                    code.map { it.opcode } == listOf(Opcode.IGET_OBJECT, Opcode.INVOKE_VIRTUAL, Opcode.MOVE_RESULT, Opcode.RETURN) &&
+                    ((code[0] as ReferenceInstruction).reference as FieldReference).definingClass == owner.type
+            }
+            val gate = gates.singleOrNull() ?: throw PatchException("Ask Maps shortcut chip's switch: found ${gates.size}")
+            val ret = gate.implementation!!.instructions.last()
+            val r = (ret as OneRegisterInstruction).registerA
+            gate.addInstructionsWithLabels(
+                3,
+                """
+                    if-eqz v$r, :shortcut_off
+                    sget-boolean v$r, $SHAPES->HIDE_AI:Z
+                    xor-int/lit8 v$r, v$r, 0x1
+                """,
+                ExternalLabel("shortcut_off", ret),
+            )
+        }
 
         // Ask Maps as a whole (issue #82). Maps asks one server switch whether Ask Maps exists at all -- the
         // home screen's shortcut chip ("Ask Maps", first under the search bar), the search list's Ask Maps
@@ -382,9 +435,13 @@ internal val hideAiPatch = bytecodePatch(
             classDefForEach { c ->
                 if (owner == null && c.methods.any { it.literalAt(placeAction) >= 0 }) owner = c.type
             }
-            val show = mutableClassDefBy(owner ?: throw PatchException("place sheet Ask action not found")).methods.singleOrNull {
-                it.name == "c" && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/Boolean;"
-            } ?: throw PatchException("place sheet Ask action has no visibility answer")
+            // The action's Boolean answers: constants (FALSE), and this one, a boxed flag of the action's own.
+            val show = mutableClassDefBy(owner ?: throw PatchException("place sheet Ask action not found")).methods.filter { m ->
+                m.parameterTypes.isEmpty() && m.returnType == "Ljava/lang/Boolean;" &&
+                    m.implementation?.instructions?.any { insn ->
+                        insn.opcode == Opcode.IGET_BOOLEAN && ((insn as ReferenceInstruction).reference as FieldReference).definingClass == owner
+                    } == true
+            }.singleOrNull() ?: throw PatchException("place sheet Ask action has no visibility answer")
             // It reads its flag into its only register, `this`, then boxes it: the flag is changed in between,
             // false stays false, true becomes !HIDE_AI.
             val read = show.implementation!!.instructions.indexOfFirst { it.opcode == Opcode.IGET_BOOLEAN }
