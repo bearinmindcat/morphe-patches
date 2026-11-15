@@ -18,11 +18,20 @@ import java.lang.reflect.Method;
  * written it -- and skips the callback's own area clamp while the setting is on.
  *
  * Everything here reaches Maps' picker objects by reflection (field and method
- * names of Maps 26.36.04) and fails soft: on any error the picker behaves
- * exactly as it did before.
+ * names of Maps 26.44.06; the Compose state accessors are written in by the
+ * patch) and fails soft: on any error the picker behaves exactly as it did before.
  */
 public final class OfflinePicker {
     private OfflinePicker() {}
+
+    /** Rewritten by the patch: Compose MutableState's getValue() name. */
+    static String stateGetter() { return "a"; }
+    /** Rewritten by the patch: Compose MutableState's setValue(Object) name. */
+    static String stateSetter() { return "b"; }
+    /** Rewritten by the patch: the picker model's window-coordinates selection state field. */
+    static String windowField() { return "h"; }
+    /** Rewritten by the patch: the picker model's Activity field. */
+    static String activityField() { return "a"; }
 
     /** Picker diagnostics under logcat tag UA; off in release builds. */
     static final boolean TRACE = false;
@@ -107,7 +116,7 @@ public final class OfflinePicker {
     static void pickerSet(Object state, Object value) {
         try {
             if (state == null) return;
-            Method m = state.getClass().getMethod("d", Object.class);
+            Method m = state.getClass().getMethod(stateSetter(), Object.class);
             m.setAccessible(true);
             m.invoke(state, value);
         } catch (Throwable ignored) {}
@@ -132,11 +141,11 @@ public final class OfflinePicker {
             Object p = presenter(model);
             if (p == null) { log("picker: no presenter"); return; }
             try {
-                Field fh = model.getClass().getDeclaredField("h");
+                Field fh = model.getClass().getDeclaredField(windowField());
                 fh.setAccessible(true);
                 Object st = fh.get(model);
-                Object cur = st.getClass().getMethod("mj").invoke(st);
-                log("picker: aoph.h = " + cur);
+                Object cur = st.getClass().getMethod(stateGetter()).invoke(st);
+                log("picker: model.h = " + cur);
             } catch (Throwable t) { log("picker: read-back failed: " + t); }
             try {
                 Method h = p.getClass().getMethod("h");   // re-runs the estimate
@@ -206,7 +215,7 @@ public final class OfflinePicker {
             int n = cols * rows;
             if (n <= 1 || presenter == null) { original.run(); return; }
             try {
-                Field fh = model.getClass().getDeclaredField("h");
+                Field fh = model.getClass().getDeclaredField(windowField());
                 fh.setAccessible(true);
                 Object state = fh.get(model);
                 Method j = presenter.getClass().getMethod("j", String.class);
@@ -220,7 +229,7 @@ public final class OfflinePicker {
                 pickerSet(state, new RectF(box));
                 log("picker: queued " + made + " downloads");
                 try {
-                    Field fa = model.getClass().getDeclaredField("a");
+                    Field fa = model.getClass().getDeclaredField(activityField());
                     fa.setAccessible(true);
                     android.content.Context ctx = (android.content.Context) fa.get(model);
                     android.widget.Toast.makeText(ctx, "Downloading " + made + " maps",
@@ -245,7 +254,7 @@ public final class OfflinePicker {
             Field fd = model.getClass().getDeclaredField("d");
             fd.setAccessible(true);
             Object state = fd.get(model);
-            Object value = state.getClass().getMethod("mj").invoke(state);
+            Object value = state.getClass().getMethod(stateGetter()).invoke(state);
             if (value == null) return -1L;
             Field b = value.getClass().getDeclaredField("b");
             b.setAccessible(true);
@@ -407,7 +416,7 @@ public final class OfflinePicker {
             Field fd = model.getClass().getDeclaredField("d");
             fd.setAccessible(true);
             Object state = fd.get(model);
-            return state.getClass().getMethod("mj").invoke(state);
+            return state.getClass().getMethod(stateGetter()).invoke(state);
         } catch (Throwable t) {
             return null;
         }
@@ -442,7 +451,7 @@ public final class OfflinePicker {
 
     static Object pickerWindowState(Object model) {
         try {
-            Field fh = model.getClass().getDeclaredField("h");
+            Field fh = model.getClass().getDeclaredField(windowField());
             fh.setAccessible(true);
             return fh.get(model);
         } catch (Throwable t) {
