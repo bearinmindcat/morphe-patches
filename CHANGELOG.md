@@ -1,3 +1,30 @@
+## [2.9.10](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.9...v2.9.10) (2026-11-15)
+
+### 🐛 Bug Fixes
+
+* maps account sheet cleanup and remove sign-in prompts work on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([3ac4c29](https://github.com/bearinmindcat/morphe-patches/commit/3ac4c2999f1657842e734be49669707fbc0c4fc3))
+* maps avoid flock cameras works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([c3c2395](https://github.com/bearinmindcat/morphe-patches/commit/c3c23952637499bef5181b3ccf9755b9fe94c8e4))
+* maps better offline maps works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([9f8f5c2](https://github.com/bearinmindcat/morphe-patches/commit/9f8f5c25ced386da191d4cb5b758d44e2b37cac2))
+* maps black theme works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([d1a25e8](https://github.com/bearinmindcat/morphe-patches/commit/d1a25e8996fe1e666a74cb10dbb906310d0bc000))
+* maps bypass play services checks works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([1016e40](https://github.com/bearinmindcat/morphe-patches/commit/1016e408941426951d7256c86eedd9008235a276))
+* maps follow playing media works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([39b9963](https://github.com/bearinmindcat/morphe-patches/commit/39b996310cfd55d5dd63ee0a400af7b4133e97de))
+* maps hide ads and clutter works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([b61e1f8](https://github.com/bearinmindcat/morphe-patches/commit/b61e1f8f4205d6336457da4094ca403a3220bfe8))
+* maps light map works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([3ed7d8f](https://github.com/bearinmindcat/morphe-patches/commit/3ed7d8f157f633ff7cde9ecbdd077999640588fb))
+* maps location provider toggle works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([82e0f30](https://github.com/bearinmindcat/morphe-patches/commit/82e0f30e1bff1921ac4c154a0ac01e33383cce45))
+* maps offline saved places works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([79d5fba](https://github.com/bearinmindcat/morphe-patches/commit/79d5fbaa7f1e2ae240b004562c5b406d3ad2ad70))
+* maps patches target google maps 26.44.06; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([2a20f6e](https://github.com/bearinmindcat/morphe-patches/commit/2a20f6ef032b9b722e4162b51a2b7a1261d8a0a5))
+* maps power saving mode works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([ef809a5](https://github.com/bearinmindcat/morphe-patches/commit/ef809a5ee144e8758f7bb3bc7cf99efd41303c6f))
+* maps remove telemetry works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([c8bd4c2](https://github.com/bearinmindcat/morphe-patches/commit/c8bd4c2aa73e0f6e34e6a8e3e67964d43353e414))
+* maps resolves resource ids by name at patch time; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([340f804](https://github.com/bearinmindcat/morphe-patches/commit/340f804439aa18eb6702102dbdbf58815fcca534))
+* maps settings list has a customization row; issue [#164](https://github.com/bearinmindcat/morphe-patches/issues/164) ([2ba1c6d](https://github.com/bearinmindcat/morphe-patches/commit/2ba1c6db52b39bf4d9c88bbbc0b1ff805e766721))
+* maps shared hooks find their code by shape on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([f899fb0](https://github.com/bearinmindcat/morphe-patches/commit/f899fb00e362dd02b0196c55fc14806159f1bdec))
+* maps trim account menu works on google maps 26.44; issue [#189](https://github.com/bearinmindcat/morphe-patches/issues/189) ([6a87fc5](https://github.com/bearinmindcat/morphe-patches/commit/6a87fc528f0493633bd1dda84f0d4c5db9c1dbce))
+* oneplus system launcher locks the screen with a double tap on empty space; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([158af58](https://github.com/bearinmindcat/morphe-patches/commit/158af58b82d4be4569b5f49944ae0eb8ed9eee8c))
+* oneplus system launcher shows the blue check on every selected app in edit mode; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([205d451](https://github.com/bearinmindcat/morphe-patches/commit/205d4511b871fe0822e82d44f2c5e498beabdfeb))
+* samsung gallery edit opens a photo editor instead of asking for the galaxy store; issue [#197](https://github.com/bearinmindcat/morphe-patches/issues/197) ([8a1a584](https://github.com/bearinmindcat/morphe-patches/commit/8a1a584b389ad534ddd8075e9d8a5234841497b9))
+* samsung gallery moves into albums at the top of a storage; issue [#133](https://github.com/bearinmindcat/morphe-patches/issues/133) ([db521f3](https://github.com/bearinmindcat/morphe-patches/commit/db521f39c21228b5f71c3faae026a04761f1104b))
+* samsung video library view as switches the list, folders have spacing and hide folders works; issue [#180](https://github.com/bearinmindcat/morphe-patches/issues/180) ([2e0ae14](https://github.com/bearinmindcat/morphe-patches/commit/2e0ae142eb2f7daabfb0880bff6e2e9d701ed0d0))
+
 ## [2.9.9](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.8...v2.9.9) (2026-11-15)
 
 ### 🐛 Bug Fixes

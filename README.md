@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.9](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.9)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
+> **[v2.9.10](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.10)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;216 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -27,7 +27,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <img src="docs/screenshots/com.google.android.apps.maps/5-navigation-zoomed-out.png" width="19%" alt="Navigation zoomed out" title="Navigation zoomed out">
 </p>
 
-**Supported version(s):** 26.36.04.973607363
+**Supported version(s):** 26.44.06.1006895251
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -43,7 +43,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Bypass Play Services checks](#bypass-play-services-checks) | Makes Maps' bundled Play services signature and availability checks always pass, so it runs re-signed and with Play services disabled or absent, and lets it load tiles, search and routing by sending Google's own package and certificate in the identity headers the Maps backend checks. Where Play services rejects the re-signed app, Maps degrades instead of crashing. Also skips Google's "isn't Play Protect certified" page, and with no Play services at all uses Android's own Cronet so the map still loads. |  |
 | [Change app name](#change-app-name) | Sets the launcher and in-app app name. | • App name |
 | [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy. | • Package name |
-| [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet, with switches for the patches here that can be turned back off inside the app. |  |
+| [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet and at the top of Settings, with switches for the patches here that can be turned back off inside the app. |  |
 | [Flock cameras](#flock-cameras) | Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the ones near you from an OpenStreetMap server, over the same area as the speed cameras. |  |
 | [Follow playing media](#follow-playing-media) | Navigation's media controls show what any app is playing (needs notification access). |  |
 | [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
