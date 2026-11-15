@@ -12,6 +12,7 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import org.w3c.dom.Element
 
@@ -33,6 +34,9 @@ private const val MEDIA_PLAYER = "Lcom/samsung/android/gallery/support/library/v
 private const val MEDIA_MIRROR = "Lorg/ungoogled/samsunggallery/MediaMirror;"
 private const val MEDIA_MOVES = "Lorg/ungoogled/samsunggallery/MediaMoves;"
 private const val HIDDEN_ALBUMS = "Lorg/ungoogled/samsunggallery/HiddenAlbums;"
+/** Gallery's content uris for items, and its file helpers, unobfuscated. */
+private const val CONTENT_URI = "Lcom/samsung/android/gallery/module/data/ContentUri;"
+private const val FILE_UTILS = "Lcom/samsung/android/gallery/support/utils/FileUtils;"
 /** Gallery's album writes to Samsung's media provider (hide state), unobfuscated. */
 private const val ALBUM_API = "Lcom/samsung/android/gallery/database/dal/mp/helper/AlbumApi;"
 private const val FILE_OPERATION_SERVICE = "Lcom/samsung/android/gallery/app/service/FileOperationService;"
@@ -282,6 +286,24 @@ internal val mediaChangesPatch = bytecodePatch(
                     "$HIDDEN_ALBUMS->update(Landroid/content/ContentResolver;Landroid/net/Uri;Landroid/content/ContentValues;" +
                     "Ljava/lang/String;[Ljava/lang/String;)I",
             )
+        }
+
+        // Moves (and renames, date and location edits) of photos and videos on a memory card failed ("operation failed
+        // [move][OP_LOCAL_FAIL]"): for an item on removable storage Gallery writes through MediaStore's files uri of that
+        // volume (content://media/<volume>/file/<id>), which the user's write access (given for the item's image or video
+        // uri) does not cover. Android's MediaStore takes the image or video uri for memory card items too, as Gallery
+        // already uses for everything else.
+        method(CONTENT_URI, "build", listOf(FILE_ITEM, "Z")).apply {
+            val instructions = implementation!!.instructions
+            val removable = instructions.indexOfFirst {
+                it.opcode == Opcode.INVOKE_STATIC &&
+                    (it as ReferenceInstruction).reference.toString() == "$FILE_UTILS->isInRemovableStorage(Ljava/lang/String;)Z"
+            }
+            val result = instructions.getOrNull(removable + 1)
+            if (removable < 0 || result?.opcode != Opcode.MOVE_RESULT) {
+                throw PatchException("Gallery's writable uri no longer checks for removable storage")
+            }
+            addInstructions(removable + 2, "const/16 v${(result as OneRegisterInstruction).registerA}, 0x0")
         }
 
         // Delete permanently from the bin's viewer ends with dump(), not done().
