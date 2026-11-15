@@ -255,6 +255,29 @@ private val morphIconStylePatch = bytecodePatch {
     }
 }
 
+/**
+ * Selecting apps in edit mode: every app after the first kept its grey check until the page redrew (the selection itself
+ * worked). The check's animation marks the icon for redrawing, but that did not reach the page; the icon's parents are
+ * now asked to redraw too (see Views.invalidateUp).
+ */
+private val selectCheckPatch = bytecodePatch {
+    execute {
+        // 15.6.24 redraws the check through its render manager (no such method; not seen there).
+        if (packageMetadata.versionName == "15.6.24") return@execute
+        val renderer = mutableClassDefBy("Lcom/android/launcher3/iconrender/impl/SelectStateIconRenderer;")
+        val request = renderer.methods.firstOrNull { it.name == "requestInvalidate" && it.returnType == "V" && it.parameterTypes.isEmpty() }
+            ?: throw PatchException("SelectStateIconRenderer.requestInvalidate not found")
+        val instructions = request.implementation!!.instructions
+        val call = instructions.indexOfFirst {
+            it.opcode == Opcode.INVOKE_VIRTUAL &&
+                ((it as ReferenceInstruction).reference as? MethodReference)?.let { r -> r.name == "invalidate" && r.parameterTypes.isEmpty() } == true
+        }
+        if (call < 0) throw PatchException("SelectStateIconRenderer.requestInvalidate: no invalidate() call")
+        val view = (instructions[call] as FiveRegisterInstruction).registerC
+        request.replaceInstruction(call, "invoke-static { v$view }, $EXT/Views;->invalidateUp(Ljava/lang/Object;)V")
+    }
+}
+
 /** One version's generated lists (.github/scripts/coloros-launcher/hidden.py). */
 private class HiddenLists(
     val members: Set<String>,
@@ -667,7 +690,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
-        nightBackgroundsPatch, morphIconStylePatch,
+        nightBackgroundsPatch, morphIconStylePatch, selectCheckPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
