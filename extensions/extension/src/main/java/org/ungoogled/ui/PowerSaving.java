@@ -109,6 +109,11 @@ public final class PowerSaving {
         return app != null && allPhones(app);
     }
 
+    /** Maps' answer to "is power saving mode available" (server flag AND nativeMinMode), forced to yes when switched on. */
+    public static boolean available(boolean google) {
+        return forceAvailable() || google;
+    }
+
     /** This class does SystemUI's part: switched on, and SystemUI cannot do it itself. */
     static boolean standIn(Context c) {
         return allPhones(c) && !nativeMinMode(c);

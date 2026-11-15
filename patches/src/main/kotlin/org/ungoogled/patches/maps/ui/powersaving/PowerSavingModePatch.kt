@@ -32,6 +32,8 @@ import org.ungoogled.patches.maps.ui.refreshrate.frameRateHookPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 import org.w3c.dom.Element
+import org.ungoogled.patches.shared.addInstructionsAtLabel
+import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 
 /** org.ungoogled.ui.PowerSaving, the extension half: stands in for Pixel's SystemUI. */
@@ -138,46 +140,56 @@ val powerSavingModePatch = bytecodePatch(
     execute {
         markPatched("powerSavingPatched")
 
-        // 1. Availability. Maps offers the feature only when a server flag is on AND
-        //    Pixel's SystemUI has min mode; exactly one method asks both, and it is the
-        //    only caller of the device check. Answering yes there shows the setting and
-        //    registers the listener that arms min mode when navigation starts. The
-        //    extension answers first, and a "no" from it runs Google's own check.
+        // 1. Availability. Maps offers the feature only when a server flag is on AND Pixel's SystemUI has
+        //    min mode. Since 26.43 the question is asked inline, in one case of a provider switch:
+        //
+        //        if (serverFlag) { ... available = deviceCheck(), cached ... } else available = false
+        //        return Boolean.valueOf(available)
+        //
+        //    The boxed answer goes through the extension, which says yes when Power saving mode is on in
+        //    Power Saving Options and leaves Google's answer otherwise. The box is the one the server
+        //    flag's test jumps to: the first Boolean.valueOf at or after its target.
         val check = MinModeDeviceCheckFingerprint.method
         val callers = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
         classDefForEach { classDef ->
             if (classDef.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
             for (method in classDef.methods) {
-                if (method.returnType != "Z" || !AccessFlags.STATIC.isSet(method.accessFlags)) continue
                 val calls = method.implementation?.instructions?.any { insn ->
                     val ref = (insn as? ReferenceInstruction)?.reference as? MethodReference
                     ref != null && ref.definingClass == check.definingClass && ref.name == check.name &&
                         ref.returnType == "Z" && ref.parameterTypes.isEmpty()
                 } ?: false
-                if (calls) callers += classDef.type to method
+                if (calls && classDef.type != check.definingClass) callers += classDef.type to method
             }
         }
-        val (ownerType, availability) = callers.singleOrNull()
+        val (ownerType, asker) = callers.singleOrNull()
             ?: throw PatchException("expected one caller of the min-mode device check, found ${callers.size}")
         mutableClassDefBy(ownerType).methods
-            .single { it.name == availability.name && it.parameterTypes == availability.parameterTypes }
+            .single { it.name == asker.name && it.parameterTypes == asker.parameterTypes && it.returnType == asker.returnType }
             .apply {
-                // v0 must be a local, not a parameter: the original code runs after it.
-                // Static, so the parameters are all there is (wide ones take two registers).
-                val impl = implementation!!
-                val parameterRegisters = parameterTypes.size + parameterTypes.count { it == "J" || it == "D" }
-                if (impl.registerCount - parameterRegisters < 1) {
-                    throw PatchException("min-mode availability check has no free local register")
-                }
-                addInstructionsWithLabels(
-                    0,
+                val code = implementation!!.instructions
+                // From the device check call back to the server flag's test (an iget-boolean, then if-eqz).
+                val first = code.indices.firstOrNull { i ->
+                    ((code[i] as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                        it.definingClass == check.definingClass && it.name == check.name && it.parameterTypes.isEmpty()
+                    } == true
+                } ?: throw PatchException("min-mode availability: the device check call not found")
+                val flagTest = (first - 1 downTo 1).firstOrNull { i ->
+                    code[i].opcode == Opcode.IF_EQZ && code[i - 1].opcode == Opcode.IGET_BOOLEAN
+                } ?: throw PatchException("min-mode availability: the server flag's test not found")
+                val target = (code[flagTest] as BuilderOffsetInstruction).target.location.index
+                val box = (target until minOf(code.size, target + 6)).firstOrNull { i ->
+                    ((code[i] as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+                        code[i].opcode == Opcode.INVOKE_STATIC && it.definingClass == "Ljava/lang/Boolean;" && it.name == "valueOf"
+                    } == true
+                } ?: throw PatchException("min-mode availability: the answer's Boolean.valueOf not found")
+                val answer = (code[box] as Instruction35c).registerC
+                addInstructionsAtLabel(
+                    box,
                     """
-                        invoke-static {}, $POWER_SAVING->forceAvailable()Z
-                        move-result v0
-                        if-eqz v0, :google_check
-                        return v0
+                        invoke-static/range { v$answer .. v$answer }, $POWER_SAVING->available(Z)Z
+                        move-result v$answer
                     """,
-                    ExternalLabel("google_check", impl.instructions.first()),
                 )
             }
 
