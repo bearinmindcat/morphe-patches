@@ -490,12 +490,18 @@ public final class CustomizationActivity extends Activity {
             wazeChime.setChecked(WazeAlerts.chime(this));
             wazeChime.setEnabled(waze.isChecked());
             body.addView(toggleRow("Chime for a Waze alert ahead", null, wazeChime));
+            Switch wazeStart = new Switch(this);
+            wazeStart.setChecked(WazeAlerts.startWaze(this));
+            wazeStart.setEnabled(waze.isChecked());
+            body.addView(toggleRow("Start Waze with Maps", "Runs Waze in the background while Maps is open", wazeStart));
             // all read live, so no restart
             waze.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 WazeAlerts.setEnabled(this, on);
                 wazeMap.setEnabled(on);
                 wazeChime.setEnabled(on);
+                wazeStart.setEnabled(on);
             });
+            wazeStart.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setStartWaze(this, on));
             wazeMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setOnMap(this, on));
             wazeChime.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setChime(this, on));
             // The last word from Waze; tap to ask it for its list again.

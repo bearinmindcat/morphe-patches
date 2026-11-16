@@ -3,9 +3,11 @@ package org.ungoogled.ui;
 import android.app.Activity;
 import android.app.Application;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -14,6 +16,7 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.widget.Toast;
@@ -51,6 +54,11 @@ public final class WazeAlerts {
     public static final String KEY_MAP = "waze_alerts_map";
     public static final String KEY_CHIME = "waze_alerts_chime";
     public static final String KEY_KINDS = "waze_alerts_kinds";
+    /** Issue #207: start Waze in the background while Maps is open (or navigating). */
+    public static final String KEY_START = "waze_alerts_start";
+    /** To Waze's bridge, as the action of a bind of Waze's AIDLService (exported in Waze's own manifest). */
+    static final String ACTION_WAKE = "org.ungoogled.waze.WAKE";
+    private static final String WAZE = "com.waze";
 
     /** The kinds Waze alert types offers; Waze's own alert types (AlerterType numbers) are grouped into them. */
     static final int POLICE = 0, CRASH = 1, HAZARD = 2, JAM = 3, CLOSURE = 4, CAMERA = 5, OTHER = 6;
@@ -71,8 +79,8 @@ public final class WazeAlerts {
     /** Without a word from Waze for this long the alerts are dropped: Waze was closed. */
     private static final long STALE_MS = 3 * 60 * 1000L;
 
-    /** Receiving at all; the alerts as pins; the chime for one ahead. */
-    static volatile boolean ON, MAP, CHIME;
+    /** Receiving at all; the alerts as pins; the chime for one ahead; Waze started with Maps. */
+    static volatile boolean ON, MAP, CHIME, START;
     static volatile int KINDS = DEFAULT_KINDS;
 
     static final class Alert {
@@ -133,6 +141,15 @@ public final class WazeAlerts {
         return prefs(c).getInt(KEY_KINDS, DEFAULT_KINDS);
     }
 
+    public static boolean startWaze(Context c) {
+        return prefs(c).getBoolean(KEY_START, false);
+    }
+
+    public static void setStartWaze(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_START, on).commit();
+        refresh(c);
+    }
+
     public static void setEnabled(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_ON, on).commit();
         refresh(c);
@@ -173,6 +190,7 @@ public final class WazeAlerts {
         ON = enabled(c);
         MAP = ON && onMap(c);
         CHIME = ON && chime(c);
+        START = ON && startWaze(c);
         KINDS = kinds(c);
         Context app = c.getApplicationContext();
         if (!tracking && app instanceof Application) {
@@ -182,6 +200,7 @@ public final class WazeAlerts {
         MAIN.post(() -> {
             receiver(app);
             listen();
+            wake();
         });
     }
 
@@ -191,7 +210,59 @@ public final class WazeAlerts {
         MAIN.post(() -> {
             navigating = on;
             listen();
+            wake();
         });
+    }
+
+    // ---- Waze started with Maps (issue #207) -------------------------------------------
+
+    private static ServiceConnection waze;
+    private static int started;
+
+    /**
+     * Main thread: bound to Waze while Maps is on screen or navigating, with Start Waze with Maps on. The bind
+     * starts Waze's process and its bridge starts Waze itself (patched with Share alerts with Maps); a bound
+     * Waze counts as in the foreground, and with BIND_INCLUDE_CAPABILITIES it may use location as Maps does.
+     */
+    private static void wake() {
+        Context c = Shapes.appContext();
+        if (c == null) return;
+        boolean want = START && (started > 0 || navigating);
+        if (want == (waze != null)) return;
+        try {
+            if (want) {
+                ServiceConnection conn = new ServiceConnection() {
+                    @Override public void onServiceConnected(ComponentName n, IBinder b) {
+                        android.util.Log.i("UA", "waze alerts: Waze started");
+                        // Waze's bridge is up with its process; its engine follows. Ask now and once it is online.
+                        MAIN.postDelayed(WazeAlerts::ask, 2_000L);
+                        MAIN.postDelayed(WazeAlerts::ask, 20_000L);
+                    }
+                    @Override public void onServiceDisconnected(ComponentName n) {
+                        android.util.Log.i("UA", "waze alerts: Waze closed");
+                    }
+                };
+                int flags = Context.BIND_AUTO_CREATE;
+                if (Build.VERSION.SDK_INT >= 30) flags |= Context.BIND_INCLUDE_CAPABILITIES;
+                Intent i = new Intent(ACTION_WAKE).setComponent(new ComponentName(WAZE, "com.waze.AIDLService"))
+                        .putExtra("from", c.getPackageName());
+                if (c.bindService(i, conn, flags)) {
+                    waze = conn;
+                } else {
+                    try {
+                        c.unbindService(conn);
+                    } catch (Throwable ignored) {
+                    }
+                    android.util.Log.i("UA", "waze alerts: Waze is not installed");
+                }
+            } else {
+                c.unbindService(waze);
+                waze = null;
+            }
+        } catch (Throwable t) {
+            waze = null;
+            android.util.Log.w("UA", "waze alerts: start Waze", t);
+        }
     }
 
     // ---- the list from Waze ------------------------------------------------------------
@@ -436,8 +507,8 @@ public final class WazeAlerts {
         }
         @Override public void onActivityPaused(Activity a) { resumed = Math.max(0, resumed - 1); listen(); }
         @Override public void onActivityCreated(Activity a, Bundle b) {}
-        @Override public void onActivityStarted(Activity a) {}
-        @Override public void onActivityStopped(Activity a) {}
+        @Override public void onActivityStarted(Activity a) { started++; wake(); }
+        @Override public void onActivityStopped(Activity a) { started = Math.max(0, started - 1); wake(); }
         @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
         @Override public void onActivityDestroyed(Activity a) {}
     }
