@@ -10,6 +10,7 @@ import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
@@ -137,6 +138,10 @@ private val updateCheckPatch = bytecodePatch(
     }
 }
 
+/** 21.5.91.33 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_VOICE_RECORDER_EXTENSION, "Lorg/ungoogled/samsungvoicerecorder/Android13;", "SamsungVoiceRecorder")
+
 /**
  * Off One UI Voice Recorder dies at once on SemFloatingFeature (a One UI class). The extension carries stand-ins for
  * the 42 One UI classes it calls; on a Samsung phone the framework's own classes load first, so they never run there.
@@ -151,6 +156,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         sprDrawablesPatch, oneUiMembersPatch, buttonAnimatorPatch, recorderProgressPatch,
         galaxyStoreChecksPatch("Samsung Voice Recorder"), updateCheckPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_VOICE_RECORDER_EXTENSION)
 }
