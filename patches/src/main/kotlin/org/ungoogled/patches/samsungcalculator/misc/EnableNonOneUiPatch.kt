@@ -4,6 +4,7 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import org.ungoogled.patches.samsung.convertSprDrawables
+import org.ungoogled.patches.samsung.lowerMinSdkPatch
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsungcalculator.SamsungCalculatorConstants.COMPATIBILITY_SAMSUNG_CALCULATOR
 
@@ -37,6 +38,9 @@ private val oneUiMembersPatch = bytecodePatch(
     }
 }
 
+/** 12.4.00.13 makes no Android 14 or newer calls: it runs on Android 13 as it is. */
+private val minSdkPatch = lowerMinSdkPatch(33)
+
 /**
  * Off One UI Calculator dies at once on SemFloatingFeature (a One UI class). The extension carries stand-ins for the 7
  * One UI classes it calls; on a Samsung phone the framework's own classes load first, so they never run there.
@@ -48,6 +52,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_CALCULATOR)
-    dependsOn(sprDrawablesPatch, oneUiMembersPatch)
+    dependsOn(sprDrawablesPatch, oneUiMembersPatch, minSdkPatch)
     extendWith(SAMSUNG_CALCULATOR_EXTENSION)
 }

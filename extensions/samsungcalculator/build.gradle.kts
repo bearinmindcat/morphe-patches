@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungcalculator"
 
     defaultConfig {
-        // Samsung Calculator 12.4 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Samsung Calculator 12.4 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 
