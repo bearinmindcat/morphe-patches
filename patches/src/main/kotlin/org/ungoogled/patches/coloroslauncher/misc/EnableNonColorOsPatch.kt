@@ -353,6 +353,125 @@ private val workspaceRedrawPatch = bytecodePatch {
 }
 
 /**
+ * The background behind the app drawer, folders and an app's menu (see Backgrounds): a row in Home screen settings
+ * (Effects; 15.6.24: the first section) chooses the grey stand-in for ColorOS's blurred wallpaper, a real blur (Android
+ * 12+ window blur), transparent or a colour with a transparency.
+ */
+private val backgroundSettingsResourcesPatch = resourcePatch {
+    execute {
+        document("res/values/strings.xml").use { strings ->
+            strings.documentElement.appendChild(strings.createElement("string").apply {
+                setAttribute("name", "ungoogled_menu_background_title")
+                textContent = "Background behind the drawer and menus"
+            })
+        }
+        val path = "res/xml/launcher_settings.xml"
+        if (!get(path).isFile) throw PatchException("no $path")
+        document(path).use { xml ->
+            val categories = xml.getElementsByTagName("com.coui.appcompat.preference.COUIPreferenceCategory")
+            val all = (0 until categories.length).map { categories.item(it) as org.w3c.dom.Element }
+            val category = all.firstOrNull { it.getAttribute("android:key") == "category_launcher_vfx" }
+                ?: all.firstOrNull { it.getAttribute("android:key") == "launcher_category" }
+                ?: throw PatchException("no Effects section in $path")
+            category.appendChild(xml.createElement("com.coui.appcompat.preference.COUIJumpPreference").apply {
+                setAttribute("android:key", "ungoogled_menu_background")
+                setAttribute("android:title", "@string/ungoogled_menu_background_title")
+                setAttribute("android:persistent", "false")
+            })
+        }
+    }
+}
+
+private val backgroundsPatch = bytecodePatch {
+    dependsOn(backgroundSettingsResourcesPatch)
+    execute {
+        val ext = "$EXT/Backgrounds;"
+        // The drawer/folder blur layer.
+        val staticView = mutableClassDefBy("Lcom/android/launcher/views/OplusStaticBlurView;")
+        var backgrounds = 0
+        for (method in staticView.methods) {
+            val instructions = method.implementation?.instructions ?: continue
+            instructions.withIndex().filter { (_, insn) ->
+                insn.opcode == Opcode.INVOKE_VIRTUAL && ((insn as ReferenceInstruction).reference as? MethodReference)?.let {
+                    it.name == "setBackground" && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/graphics/drawable/Drawable;")
+                } == true
+            }.map { it.index }.reversed().forEach { index ->
+                val call = instructions[index] as FiveRegisterInstruction
+                method.replaceInstruction(
+                    index,
+                    "invoke-static { v${call.registerC}, v${call.registerD} }, $ext->setStaticBackground(Landroid/view/View;Landroid/graphics/drawable/Drawable;)V",
+                )
+                backgrounds++
+            }
+        }
+        // Measured against 16.4.30 and 15.6.24: 2 (the default colour, the blurred wallpaper).
+        if (backgrounds == 0) throw PatchException("OplusStaticBlurView sets no background")
+        val alpha = staticView.methods.firstOrNull { it.name == "setAlpha" && it.parameterTypes.map { t -> t.toString() } == listOf("F") }
+            ?: throw PatchException("OplusStaticBlurView.setAlpha not found")
+        alpha.addInstructions(0, "invoke-static { p0, p1 }, $ext->staticAlpha(Landroid/view/View;F)V")
+
+        // 15.6.24's drawer also draws a dark tint over the blur (OplusAllAppsBg; 16.4.30 has none).
+        mutableClassDefByOrNull("Lcom/android/launcher3/allapps/search/OplusAllAppsBg;")?.methods?.forEach { method ->
+            val instructions = method.implementation?.instructions ?: return@forEach
+            instructions.withIndex().filter { (_, insn) ->
+                insn.opcode == Opcode.INVOKE_VIRTUAL && ((insn as ReferenceInstruction).reference as? MethodReference)?.let {
+                    it.name == "setBackground" && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/graphics/drawable/Drawable;")
+                } == true
+            }.map { it.index }.reversed().forEach { index ->
+                val call = instructions[index] as FiveRegisterInstruction
+                method.replaceInstruction(
+                    index,
+                    "invoke-static { v${call.registerC}, v${call.registerD} }, $ext->setDrawerTint(Landroid/view/View;Landroid/graphics/drawable/Drawable;)V",
+                )
+            }
+        }
+
+        // An app's menu.
+        val popup = mutableClassDefBy("Lcom/android/launcher3/popup/PopupBlurView;")
+        val wallpaper = popup.methods.firstOrNull { it.name == "setWallpaperDrawable" && it.parameterTypes.size == 1 }
+            ?: throw PatchException("PopupBlurView.setWallpaperDrawable not found")
+        wallpaper.addInstructions(
+            0,
+            """
+                invoke-static { p0, p1 }, $ext->popupWallpaper(Landroid/view/View;Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+                move-result-object p1
+            """,
+        )
+        val dragLayer = popup.methods.firstOrNull { it.name == "setDragLayerDrawable" && it.parameterTypes.size == 1 }
+            ?: throw PatchException("PopupBlurView.setDragLayerDrawable not found")
+        dragLayer.addInstructions(
+            0,
+            """
+                invoke-static { p0, p1 }, $ext->popupDragLayer(Landroid/view/View;Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+                move-result-object p1
+            """,
+        )
+        val anim = popup.methods.firstOrNull {
+            it.name == "createBlurAnim" && it.returnType == "Landroid/animation/ObjectAnimator;" && it.parameterTypes.map { t -> t.toString() } == listOf("Z")
+        } ?: throw PatchException("PopupBlurView.createBlurAnim not found")
+        val animReturns = anim.implementation!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_OBJECT }
+        if (animReturns.isEmpty()) throw PatchException("PopupBlurView.createBlurAnim has no return")
+        for ((index, insn) in animReturns.reversed()) {
+            val register = (insn as OneRegisterInstruction).registerA
+            anim.addInstructions(index, "invoke-static/range { v$register .. v$register }, $ext->popupAnimator(Landroid/animation/ObjectAnimator;)V")
+        }
+        val finish = popup.methods.firstOrNull { it.name == "finish" && it.returnType == "V" }
+            ?: throw PatchException("PopupBlurView.finish not found")
+        finish.addInstructions(0, "invoke-static { p0 }, $ext->popupGone(Landroid/view/View;)V")
+
+        // The settings row.
+        val settings = mutableClassDefBy("Lcom/android/launcher/settings/LauncherSettingsFragment;").methods.firstOrNull {
+            it.name == "onCreatePreferences" && it.returnType == "V" && it.parameterTypes.size == 2
+        } ?: throw PatchException("LauncherSettingsFragment.onCreatePreferences not found")
+        val returns = settings.implementation!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_VOID }.map { it.index }
+        if (returns.isEmpty()) throw PatchException("LauncherSettingsFragment.onCreatePreferences has no return")
+        for (index in returns.reversed()) {
+            settings.addInstructions(index, "invoke-static { p0 }, $ext->attach(Ljava/lang/Object;)V")
+        }
+    }
+}
+
+/**
  * Selecting apps in edit mode: every app after the first kept its grey check until the page redrew (the selection itself
  * worked). The check's animation marks the icon for redrawing, but that did not reach the page; the icon's parents are
  * now asked to redraw too (see Views.invalidateUp).
@@ -787,7 +906,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
-        nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch, workspaceRedrawPatch,
+        nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch, workspaceRedrawPatch, backgroundsPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.

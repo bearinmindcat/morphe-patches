@@ -70,8 +70,12 @@ public final class Lock {
                 .setPositiveButton("Accessibility", (d, w) -> openAccessibility(a))
                 .setNegativeButton("Not now", null);
         if (restricted) b.setNeutralButton("App info", (d, w) -> openAppInfo(a));
-        AlertDialog dialog = b.show();
-        // The launcher's own theme makes Android's dialog buttons white: the system accent instead.
+        accentButtons(a, b.show());
+    }
+
+    /** The launcher's own theme makes Android's dialog buttons white: the system accent instead. */
+    static void accentButtons(Activity a, AlertDialog dialog) {
+        boolean night = (a.getResources().getConfiguration().uiMode & 0x30) == 0x20;
         int accent;
         if (Build.VERSION.SDK_INT >= 31) {
             accent = a.getColor(night ? android.R.color.system_accent1_200 : android.R.color.system_accent1_600);
