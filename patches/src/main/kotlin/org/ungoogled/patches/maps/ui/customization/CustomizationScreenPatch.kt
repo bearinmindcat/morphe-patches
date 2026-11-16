@@ -18,6 +18,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
+import org.ungoogled.patches.maps.ui.appLanguagePatch
 import org.ungoogled.patches.maps.ui.mapsId
 import org.ungoogled.patches.maps.ui.screenHostPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
@@ -65,7 +66,8 @@ val customizationScreenPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationManifestPatch)
+    // appLanguagePatch: Maps' theme without Android's per-app night mode, which lost the app language (issue #198).
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, screenHostPatch, customizationManifestPatch, appLanguagePatch)
 
     execute {
         // A row of our own on the sheet's row holder, built the way Maps builds "Your data in Maps",

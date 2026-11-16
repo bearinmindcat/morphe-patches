@@ -212,6 +212,7 @@ public final class Shapes {
     public static void processStart(Context c) {
         try {
             if (microgPatched()) MicroG.processStart(c);
+            AppLanguage.processStart(c);
             refreshLightMap(c);
             refreshMapRegion(c);
             dropStaleTiles(c);
@@ -939,7 +940,10 @@ public final class Shapes {
             applyProxy(base);
             if (lastBottom <= 0) loadPlacement(base);
             startPopupTicker();
-            if (!RECT && !BLACK) return base;
+            // Maps' own theme (Light / Dark) reaches its screens through this override too: Maps no longer sets
+            // Android's per-app night mode (issue #198, see AppLanguage).
+            int night = mapsNightMode(base);
+            if (!RECT && !BLACK && (night == 0 || !AppLanguage.patched())) return base;
             Configuration current = base.getResources().getConfiguration();
             Configuration c = new Configuration();   // all undefined: the rest follows the screen
             c.setLocales(current.getLocales());
@@ -947,13 +951,13 @@ public final class Shapes {
             if (BLACK) {
                 c.mcc = MCC_BLACK;   // night itself comes from Maps' own dark_mode setting, see setBlackEnabled
                 enforceDark(base);   // ...pinned again at every Activity, unless the user changed it (themePickedInMaps)
+                night = mapsNightMode(base);
             }
             // Maps applies its own theme setting to its AppCompat screens (Settings and its
             // pages) by updating each Activity's configuration after it is attached, and a
             // configuration context made here never takes that update: those screens kept the
             // system's day/night, so with Maps dark on a light system they drew dark labels on a
             // dark page (Settings -> Navigation). Carry Maps' own choice over instead.
-            int night = mapsNightMode(base);
             if (night != 0) c.uiMode = (current.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | night;
             return base.createConfigurationContext(c);
         } catch (Throwable t) {

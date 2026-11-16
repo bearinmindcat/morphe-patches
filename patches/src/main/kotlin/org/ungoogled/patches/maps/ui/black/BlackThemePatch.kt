@@ -18,6 +18,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.ShapeResources
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
+import org.ungoogled.patches.maps.ui.appLanguagePatch
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.shapeShimsPatch
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
@@ -168,7 +169,8 @@ val blackThemePatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(sharedExtensionPatch, activityContextHookPatch, shapeShimsPatch, blackThemeResourcePatch)
+    // Black theme pins Maps' theme to dark, which used to lose the app language (issue #198).
+    dependsOn(sharedExtensionPatch, activityContextHookPatch, shapeShimsPatch, blackThemeResourcePatch, appLanguagePatch)
 
     execute {
         markPatched("blackThemePatched")
