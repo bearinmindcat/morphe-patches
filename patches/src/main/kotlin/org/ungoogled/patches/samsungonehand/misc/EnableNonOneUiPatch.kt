@@ -17,6 +17,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -44,6 +45,12 @@ private val oneUiMembersPatch = bytecodePatch(
         if (calls < 20) throw PatchException("only $calls One UI calls found")
     }
 }
+
+/**
+ * 9.3.13.0 asks for Android 14 but runs on Android 13: the few Android 14 and newer calls it makes without checking
+ * the version (scrolling, back gestures, NFC) go through Android13, which answers them there.
+ */
+private val android13Patch = android13Patch(SAMSUNG_ONE_HAND_EXTENSION, "$EXT/Android13;", "OneHandOperation")
 
 /**
  * Declares the accessibility service the user turns on (extension ActionService): it performs gestures and Android's
@@ -521,6 +528,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_ONE_HAND)
-    dependsOn(oneUiMembersPatch, manifestPatch, oneUiLookPatch, supportedOsPatch, oneUi8Patch, actionsPatch, windowsPatch, touchableRegionPatch, foregroundAppPatch, quickToolsPatch, accessPatch)
+    dependsOn(oneUiMembersPatch, manifestPatch, oneUiLookPatch, supportedOsPatch, oneUi8Patch, actionsPatch, windowsPatch, touchableRegionPatch, foregroundAppPatch, quickToolsPatch, accessPatch, android13Patch)
     extendWith(SAMSUNG_ONE_HAND_EXTENSION)
 }

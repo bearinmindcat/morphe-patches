@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungonehand"
 
     defaultConfig {
-        // One Hand Operation + 9.3 itself requires Android 14 (API 34).
-        minSdk = 34
+        // One Hand Operation + 9.3 asks for Android 14; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 
