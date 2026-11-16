@@ -20,6 +20,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
+import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
@@ -938,11 +939,94 @@ private fun BytecodePatchContext.savedOnMap(featureType: String, positionType: S
                         const/4 v1, 0x1
                         invoke-virtual { p0, v1 }, $generatorType->$changedFlag(Z)V
                         iget-object v0, p0, $generatorType->${placesField.name}:$IMMUTABLE_LIST
+                        invoke-static { p0, v0 }, $SAVED_ON_MAP->placesFor(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+                        move-result-object v0
+                        check-cast v0, $IMMUTABLE_LIST
                         invoke-virtual { p0, v0 }, $generatorType->${setter.name}($IMMUTABLE_LIST)V
                         return-void
                     """,
                 )
             },
+    )
+
+    // Pins along a route (issue #55). Maps hides the generator whenever a route is drawn, in directions and in
+    // navigation: its owner (the generator's one constructor parameter) turns it on and off, and a controller's
+    // (Z)V toggle picks which. The toggle asks SavedOnMap.visible first, which keeps it shown while warning pins
+    // can be drawn; withLocal then hands it only those pins, so Maps' own places stay off the route as before.
+    // (The same toggle hook as in JohninNL's Dutch App Patches, GPLv3.)
+    val ownerType = generator.methods.filter { it.name == "<init>" }.singleOrNull()?.let { params(it) }?.singleOrNull()
+        ?.takeIf { it.startsWith("L") } ?: throw PatchException("$generatorType's constructor no longer takes its owner alone")
+    val owner = classDefBy(ownerType)
+    val ownerGenerator = owner.fields.singleOrNull { !AccessFlags.STATIC.isSet(it.accessFlags) && it.type == generatorType }
+        ?: throw PatchException("$ownerType keeps no single $generatorType")
+    // The owner's on and off: its ()V methods passing a literal 1 or 0 to the generator's switch.
+    fun switchesTo(m: com.android.tools.smali.dexlib2.iface.Method): Set<Int> {
+        val code = m.implementation?.instructions?.toList() ?: return emptySet()
+        return code.indices.mapNotNull { i ->
+            val call = code[i].ref() as? MethodReference ?: return@mapNotNull null
+            if (code[i].opcode != Opcode.INVOKE_VIRTUAL || call.definingClass != generatorType || call.name != switch.name) return@mapNotNull null
+            val register = (code[i] as Instruction35c).registerD
+            (i - 1 downTo 0).map { code[it] }.firstOrNull { (it as? OneRegisterInstruction)?.registerA == register && it.opcode.setsRegister() }
+                ?.let { (it as? NarrowLiteralInstruction)?.narrowLiteral }
+        }.toSet()
+    }
+    fun ownerSwitch(on: Int) = owner.methods.singleOrNull { it.returnType == "V" && it.parameterTypes.isEmpty() && switchesTo(it) == setOf(on) }
+        ?: throw PatchException("$ownerType has no single method turning $generatorType ${if (on == 1) "on" else "off"}")
+    val enable = ownerSwitch(1)
+    val disable = ownerSwitch(0)
+    class Toggle(val type: String, val method: String, val created: FieldReference, val holder: FieldReference)
+    val toggles = mutableListOf<Toggle>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            if (AccessFlags.STATIC.isSet(m.accessFlags) || m.returnType != "V" || params(m) != listOf("Z")) continue
+            val code = m.implementation?.instructions?.toList() ?: continue
+            val calls = code.mapNotNull { (it.ref() as? MethodReference)?.takeIf { r -> r.definingClass == ownerType }?.name }.toSet()
+            if (calls != setOf(enable.name, disable.name)) continue
+            if (code.none { it.opcode == Opcode.CHECK_CAST && (it.ref() as TypeReference).type == ownerType }) continue
+            val created = code.mapNotNull { i -> (i.ref() as? FieldReference)?.takeIf { i.opcode == Opcode.IGET_BOOLEAN && it.definingClass == c.type } }
+                .distinct().singleOrNull() ?: continue
+            val holder = code.mapNotNull { i -> (i.ref() as? FieldReference)?.takeIf { i.opcode == Opcode.IGET_OBJECT && it.definingClass == c.type } }
+                .distinct().singleOrNull() ?: continue
+            toggles += Toggle(c.type, m.name, created, holder)
+        }
+    }
+    val toggle = toggles.singleOrNull()
+        ?: throw PatchException("expected one $ownerType visibility toggle, found ${toggles.map { "${it.type}->${it.method}" }}")
+    val toggleClass = mutableClassDefBy(toggle.type)
+    toggleClass.methods.add(
+        ImmutableMethod(toggle.type, "uaGenerator", emptyList(), "Ljava/lang/Object;", AccessFlags.PUBLIC.value, null, null, MutableMethodImplementation(3))
+            .toMutable().apply {
+                addInstructions(
+                    0,
+                    """
+                        iget-boolean v0, p0, ${toggle.created.definingClass}->${toggle.created.name}:Z
+                        if-eqz v0, :none
+                        iget-object v0, p0, ${toggle.holder.definingClass}->${toggle.holder.name}:${toggle.holder.type}
+                        instance-of v1, v0, $ownerType
+                        if-eqz v1, :none
+                        check-cast v0, $ownerType
+                        iget-object v0, v0, $ownerType->${ownerGenerator.name}:$generatorType
+                        return-object v0
+                        :none
+                        const/4 v0, 0x0
+                        return-object v0
+                    """,
+                )
+            },
+    )
+    val toggleMethod = toggleClass.methods.single { it.name == toggle.method && params(it) == listOf("Z") && it.returnType == "V" }
+    toggleMethod.implementation!!.let {
+        if (it.registerCount - 2 < 1 || it.registerCount > 16) throw PatchException("${toggle.type}->${toggle.method} has no room for the hook")
+    }
+    // At entry every local is free; p1 becomes SavedOnMap's answer.
+    toggleMethod.addInstructions(
+        0,
+        """
+            invoke-virtual { p0 }, ${toggle.type}->uaGenerator()Ljava/lang/Object;
+            move-result-object v0
+            invoke-static { v0, p1 }, $SAVED_ON_MAP->visible(Ljava/lang/Object;Z)Z
+            move-result p1
+        """,
     )
 
     // The extension's stubs, written against those classes.
