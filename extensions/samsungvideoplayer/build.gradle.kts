@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungvideoplayer"
 
     defaultConfig {
-        // Video Player 7.3 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Video Player 7.3 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

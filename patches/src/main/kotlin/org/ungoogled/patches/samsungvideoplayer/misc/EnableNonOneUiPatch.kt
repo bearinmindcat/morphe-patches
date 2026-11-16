@@ -5,6 +5,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.implementOneUiInterfaceMethods
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -237,6 +238,10 @@ private val openedFilesPatch = bytecodePatch(
     }
 }
 
+/** 7.3.47.1 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_VIDEO_PLAYER_EXTENSION, "Lorg/ungoogled/samsungvideoplayer/Android13;", "SamsungVideoPlayer")
+
 /**
  * Off One UI Video Player dies at start-up on One UI classes it calls (SemMultiWindowManager first) and plays every
  * video with One UI's SemMediaPlayer. The extension carries stand-ins for the 121 One UI classes it calls, and a
@@ -257,6 +262,7 @@ val enableNonOneUiPatch = bytecodePatch(
         pictureInPicturePatch,
         sprDrawablesPatch,
         openedFilesPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_VIDEO_PLAYER_EXTENSION)
 }

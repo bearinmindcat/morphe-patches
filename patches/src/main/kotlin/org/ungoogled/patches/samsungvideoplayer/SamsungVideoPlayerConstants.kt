@@ -7,7 +7,7 @@ import app.morphe.patcher.patch.Compatibility
 object SamsungVideoPlayerConstants {
     /**
      * Video Player is a single APK from the Galaxy Store. Pinned to 7.3.47.1, the Galaxy Store's build for Android 15:
-     * R8 renames its classes every build.
+     * R8 renames its classes every build. The patch lets it run on Android 13 too.
      */
     val COMPATIBILITY_SAMSUNG_VIDEO_PLAYER = Compatibility(
         name = "Samsung Video Player",
@@ -15,7 +15,7 @@ object SamsungVideoPlayerConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x9A10F0,
         targets = listOf(
-            AppTarget(version = "7.3.47.1", minSdk = 35, description = "needs Android 15 or newer"),
+            AppTarget(version = "7.3.47.1", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }
