@@ -54,6 +54,12 @@ public final class Bridge {
      * Maps without a drive. Never on without that property.
      */
     static final String ACTION_TEST = "org.ungoogled.waze.SELF_TEST";
+    /**
+     * Issue #207: Maps with Start Waze with Maps on binds Waze's AIDLService with this action. The bind starts
+     * Waze's process, and bound() runs Waze's own start-up (engine, location, online) without opening a screen.
+     */
+    static final String ACTION_WAKE = "org.ungoogled.waze.WAKE";
+    private static final android.os.Binder WAKE_BINDER = new android.os.Binder();
     private static final long HEARTBEAT_MS = 60_000L;
     private static final long SAME_AGAIN_MS = 20_000L;
     private static final long ASKED_AGAIN_MS = 2_000L;
@@ -83,6 +89,34 @@ public final class Bridge {
             }
         } catch (Throwable t) {
             Log.w("UA", "Waze alerts bridge", t);
+        }
+    }
+
+    /** From AIDLService.onBind: Maps' wake-up gets a binder of its own and starts Waze; anything else, Waze's [binder]. */
+    public static android.os.IBinder bound(Object binder, Intent intent) {
+        if (!ours(intent)) return (android.os.IBinder) binder;
+        try {
+            Log.i("UA", "Waze alerts bridge: started by " + intent.getStringExtra("from"));
+            if (Customization.on("shareAlerts")) MAIN.post(Bridge::start);
+        } catch (Throwable t) {
+            Log.w("UA", "Waze alerts bridge", t);
+        }
+        return WAKE_BINDER;
+    }
+
+    /** From AIDLService.onUnbind: true for Maps' wake-up, which leaves Waze's AIDL state alone. */
+    public static boolean ours(Intent intent) {
+        return intent != null && ACTION_WAKE.equals(intent.getAction());
+    }
+
+    /** Waze's own start-up, as its splash screen runs it (once: later calls do nothing); uaInitialize() is the patch's. */
+    private static void start() {
+        try {
+            Context c = context();
+            if (c == null) return;
+            c.getClass().getMethod("uaInitialize").invoke(c);
+        } catch (Throwable t) {
+            Log.w("UA", "Waze alerts bridge: start", t);
         }
     }
 
