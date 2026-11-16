@@ -1,3 +1,30 @@
+## [2.10.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.11...v2.10.0) (2026-11-16)
+
+### 🐛 Bug Fixes
+
+* maps can start waze in the background; issue [#207](https://github.com/bearinmindcat/morphe-patches/issues/207) ([4fef234](https://github.com/bearinmindcat/morphe-patches/commit/4fef234f82da283ba182bd5515294560032ffca0))
+* maps keeps the app language you chose; issue [#198](https://github.com/bearinmindcat/morphe-patches/issues/198) ([86cf429](https://github.com/bearinmindcat/morphe-patches/commit/86cf4291b01f072be13055b9543e7337e2f6aca6))
+* maps keeps waze alerts on the map while navigating; issue [#55](https://github.com/bearinmindcat/morphe-patches/issues/55) ([fc6da83](https://github.com/bearinmindcat/morphe-patches/commit/fc6da83a65e7e10defb8b598f4a2647997f05a23))
+* microg gmail and photos can keep their own icon and name; issue [#205](https://github.com/bearinmindcat/morphe-patches/issues/205) ([b18dd38](https://github.com/bearinmindcat/morphe-patches/commit/b18dd386dbd6d31751234992a42f575f10ac2806))
+* samsung calculator runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([0ae4ded](https://github.com/bearinmindcat/morphe-patches/commit/0ae4dedf944e5210ca42c447ca76c3c1be460ede))
+* samsung capture runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([ce096e7](https://github.com/bearinmindcat/morphe-patches/commit/ce096e715dd2f288e0493a0f234886f3b0cd70d3))
+* samsung clock runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([5fe7785](https://github.com/bearinmindcat/morphe-patches/commit/5fe778574cd3fde124ec5d599f4f60aaeaa51413))
+* samsung contacts runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([d0a740f](https://github.com/bearinmindcat/morphe-patches/commit/d0a740f845a533369988c71c8af9c534d6aa3033))
+* samsung editor lite runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([734c11e](https://github.com/bearinmindcat/morphe-patches/commit/734c11e924893ed9ca2a9fd1f6d82f4beddb9dfb))
+* samsung messages runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([31cd066](https://github.com/bearinmindcat/morphe-patches/commit/31cd06697cbc2cbbd259d6521ebe28883824f89d))
+* samsung modes and routines runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([c006dd8](https://github.com/bearinmindcat/morphe-patches/commit/c006dd893a79d4ed181d21c4e3d6951d1d4477fc))
+* samsung my files runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([e5f31f9](https://github.com/bearinmindcat/morphe-patches/commit/e5f31f959acffa2c1d00fdc7a2435d140a31c045))
+* samsung phone runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([2e9c14b](https://github.com/bearinmindcat/morphe-patches/commit/2e9c14b786cfcc391cf0c319518ce139becef3ab))
+* samsung reminder runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([4b999e3](https://github.com/bearinmindcat/morphe-patches/commit/4b999e32a9881c4bd405b150b5d5fc7c820a84f7))
+* samsung sound assistant runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([bb2db5d](https://github.com/bearinmindcat/morphe-patches/commit/bb2db5d16a965428b20c139b17090ea8255e2165))
+* samsung video player runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([ffbf3d4](https://github.com/bearinmindcat/morphe-patches/commit/ffbf3d4c82451183cb0ae1b8bdae99df6fe3461d))
+* samsung voice recorder runs on android 13; issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([5d82bc7](https://github.com/bearinmindcat/morphe-patches/commit/5d82bc7eb1048666bd68802256ab5c9bf2e4d1ec))
+* waze can be started in the background by maps; issue [#207](https://github.com/bearinmindcat/morphe-patches/issues/207) ([b1de6b9](https://github.com/bearinmindcat/morphe-patches/commit/b1de6b9d78cd23fec1a61281961eef2c203d9327))
+
+### ✨ New Features
+
+* samsung apps run on android 13 (one hand operation+ first); issue [#204](https://github.com/bearinmindcat/morphe-patches/issues/204) ([70dd864](https://github.com/bearinmindcat/morphe-patches/commit/70dd864e0495ea1b7777c0a0e193969496ba533a))
+
 ## [2.9.11](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.10...v2.9.11) (2026-11-15)
 
 ### 🐛 Bug Fixes

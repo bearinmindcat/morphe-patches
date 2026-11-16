@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.9.11](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.9.11)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
+> **[v2.10.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -95,7 +95,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. |  |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. | • Keep Gmail's icon and name |
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
@@ -119,7 +119,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs. |  |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs. | • Keep Photos's icon and name |
 | [Hide AI](#hide-ai) | Hides Ask Photos, Gemini, Help me edit, Magic Editor, Remix and the other generative tools. |  |
 | [Hide promos](#hide-promos) | Hides Google One storage offers, backup nags, print offers and "try this" promos. |  |
 | [Remove telemetry](#remove-telemetry) | Stops Firebase Analytics, logging, surveys and promo fetches. |  |
@@ -155,7 +155,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Remove sign-in prompts](#remove-sign-in-prompts) | Stops Waze's own reminder to register your account. |  |
 | [Remove telemetry](#remove-telemetry) | No crash reports, usage stats or performance data. Traffic reporting stays. |  |
 | [Report speed limit](#report-speed-limit) | Lets you correct speed limits from the speedometer (unverified). |  |
-| [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone. Waze must be signed in and open. |  |
+| [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone, which can start Waze for them. Waze must be signed in. |  |
 | [Speed camera alerts](#speed-camera-alerts) | Chime when a speed camera is ahead, from OpenStreetMap, in any country. No map pins or routing. Off until switched on. |  |
 | [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the camera sound even when you are not speeding. |  |
 | [Speed cameras everywhere](#speed-cameras-everywhere) | Camera and police alerts in every country. Camera warnings are illegal in some. |  |
@@ -300,7 +300,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.4.00.13 — needs Android 15 or newer
+**Supported version(s):** 12.4.00.13 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -324,7 +324,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-capture.png" width="20" height="20" align="top"> Samsung Capture&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
-**Supported version(s):** 6.2.12 — needs Android 15 or newer
+**Supported version(s):** 6.2.12 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -337,7 +337,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.4.02.38 — needs Android 15 or newer
+**Supported version(s):** 12.4.02.38 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -349,7 +349,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.00.87 — needs Android 15 or newer
+**Supported version(s):** 16.3.00.87 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -361,7 +361,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 4.0.85.20 — needs Android 14 or newer
+**Supported version(s):** 4.0.85.20 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -527,7 +527,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-messages.png" width="20" height="20" align="top"> Samsung Messages&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.21.1 — needs Android 15 or newer
+**Supported version(s):** 16.3.21.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -539,7 +539,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 5.1.03.1 — needs Android 15 or newer
+**Supported version(s):** 5.1.03.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -563,7 +563,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 15.2.03.2 — needs Android 14 or newer
+**Supported version(s):** 15.2.03.2 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -591,7 +591,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 9.3.13.0 — needs Android 14 or newer
+**Supported version(s):** 9.3.13.0 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -603,7 +603,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 16.3.52.1 — needs Android 15 or newer
+**Supported version(s):** 16.3.52.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -627,7 +627,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 12.8.00.62 — needs Android 15 or newer
+**Supported version(s):** 12.8.00.62 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -651,7 +651,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
-**Supported version(s):** 8.1.00.6 — needs Android 15 or newer
+**Supported version(s):** 8.1.00.6 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -678,7 +678,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 7.3.47.1 — needs Android 15 or newer
+**Supported version(s):** 7.3.47.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
@@ -690,7 +690,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 21.5.91.33 — needs Android 15 or newer
+**Supported version(s):** 21.5.91.33 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
