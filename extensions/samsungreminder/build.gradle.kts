@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungreminder"
 
     defaultConfig {
-        // Samsung Reminder 12.8 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Samsung Reminder 12.8 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

@@ -3,6 +3,7 @@ package org.ungoogled.patches.samsungreminder.misc
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -111,6 +112,10 @@ private val sprDrawablesPatch = resourcePatch(
     }
 }
 
+/** 12.8.00.62 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_REMINDER_EXTENSION, "Lorg/ungoogled/samsungreminder/Android13;", "SamsungReminder")
+
 /**
  * Off One UI Reminder dies at once on One UI members (Build.VERSION.SEM_INT first, in a provider at start-up), its
  * edge panel receiver and its "digital legacy" user check, and has no launcher icon. The extension also carries stand-ins for the One UI classes it calls.
@@ -122,6 +127,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_REMINDER)
-    dependsOn(launcherIconPatch, oneUiMembersPatch, systemServicesPatch, phoneStatePatch, displayPatch, sprDrawablesPatch)
+    dependsOn(launcherIconPatch, oneUiMembersPatch, systemServicesPatch, phoneStatePatch, displayPatch, sprDrawablesPatch, android13Patch)
     extendWith(SAMSUNG_REMINDER_EXTENSION)
 }
