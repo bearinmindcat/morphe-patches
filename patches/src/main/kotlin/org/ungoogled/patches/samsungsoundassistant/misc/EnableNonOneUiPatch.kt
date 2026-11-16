@@ -10,6 +10,7 @@ import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsungsoundassistant.SamsungSoundAssistantConstants.COMPATIBILITY_SAMSUNG_SOUND_ASSISTANT
 import org.w3c.dom.Element
@@ -107,6 +108,10 @@ private val oneUiSettingsPatch = bytecodePatch(
     }
 }
 
+/** 8.1.00.6 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_SOUND_ASSISTANT_EXTENSION, "Lorg/ungoogled/samsungsoundassistant/Android13;", "SoundAssistant")
+
 /**
  * Off One UI the app dies at once on SemSoundAssistantManager, the One UI service every feature goes through. The
  * extension carries stand-ins for the 12 One UI classes it calls.
@@ -118,6 +123,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_SOUND_ASSISTANT)
-    dependsOn(oneUiMembersPatch, appVolumesManifestPatch, oneUiSettingsPatch)
+    dependsOn(oneUiMembersPatch, appVolumesManifestPatch, oneUiSettingsPatch, android13Patch)
     extendWith(SAMSUNG_SOUND_ASSISTANT_EXTENSION)
 }
