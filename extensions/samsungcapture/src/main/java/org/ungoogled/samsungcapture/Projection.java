@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.quicksettings.TileService;
@@ -56,10 +57,14 @@ public final class Projection {
     public static void startRecorderService(Context context, boolean fromQuickPanel) {
         Intent ask = consentIntent(context, fromQuickPanel);
         if (context instanceof TileService) {
-            PendingIntent pending = PendingIntent.getActivity(context, 0, ask,
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             try {
-                ((TileService) context).startActivityAndCollapse(pending);
+                if (Build.VERSION.SDK_INT >= 34) {
+                    ((TileService) context).startActivityAndCollapse(PendingIntent.getActivity(context, 0, ask,
+                            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+                } else {
+                    // Android 13 has only the Intent form.
+                    ((TileService) context).startActivityAndCollapse(ask);
+                }
                 return;
             } catch (RuntimeException e) {
                 Log.w(TAG, "tile could not open the consent screen", e);

@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungcapture"
 
     defaultConfig {
-        // Samsung capture 6.2 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Samsung capture 6.2 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 
