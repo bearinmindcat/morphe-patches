@@ -7,6 +7,7 @@ import app.morphe.patcher.patch.Compatibility
 object SamsungContactsConstants {
     /**
      * Samsung Contacts is a single APK from the Galaxy Store. Pinned to 16.3.00.87: R8 renames its classes every build.
+     * It asks for Android 15; the patch lets it run on Android 13 too.
      */
     val COMPATIBILITY_SAMSUNG_CONTACTS = Compatibility(
         name = "Samsung Contacts",
@@ -14,7 +15,7 @@ object SamsungContactsConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xFF4545,
         targets = listOf(
-            AppTarget(version = "16.3.00.87", minSdk = 35, description = "needs Android 15 or newer"),
+            AppTarget(version = "16.3.00.87", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }

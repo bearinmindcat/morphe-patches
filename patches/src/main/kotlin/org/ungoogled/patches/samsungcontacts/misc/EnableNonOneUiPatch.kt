@@ -9,6 +9,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.samsung.addOneUiFrameworkResources
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
@@ -219,6 +220,10 @@ private val updateCheckPatch = bytecodePatch(
     }
 }
 
+/** 16.3.00.87 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_CONTACTS_EXTENSION, "Lorg/ungoogled/samsungcontacts/Android13;", "SamsungContacts")
+
 /**
  * Off One UI Contacts crashes on refused phone state and settings calls, and its list, editor and details fail on
  * Android's contacts provider. The extension also carries stand-ins for the One UI classes it calls.
@@ -234,6 +239,7 @@ val enableNonOneUiPatch = bytecodePatch(
         manifestPatch, telephonyPatch, providersPatch, displayPatch, settingsPatch, oneUiMembersPatch, systemServicesPatch,
         sprDrawablesPatch,
         galaxyStoreChecksPatch("Samsung Contacts"), updateCheckPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_CONTACTS_EXTENSION)
 }

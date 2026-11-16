@@ -227,7 +227,8 @@ public final class Telephony {
 
     public static boolean isDeviceVoiceCapable(android.telephony.TelephonyManager o) {
         try {
-            return o.isDeviceVoiceCapable();
+            // Android 15 renamed it; below, the older name answers the same.
+            return android.os.Build.VERSION.SDK_INT >= 35 ? o.isDeviceVoiceCapable() : o.isVoiceCapable();
         } catch (SecurityException e) {
             refused("isDeviceVoiceCapable", e);
             return false;
