@@ -7,7 +7,8 @@ import app.morphe.patcher.patch.Compatibility
 object SamsungClockConstants {
     /**
      * Samsung Clock is a single APK from the Galaxy Store. Pinned to 12.4.02.38, the newest that runs on Android 15
-     * (12.5 needs Android 16): R8 renames its classes every build.
+     * (12.5 needs Android 16): R8 renames its classes every build. It asks for Android 15; the patch lets it run on
+     * Android 13 too.
      */
     val COMPATIBILITY_SAMSUNG_CLOCK = Compatibility(
         name = "Samsung Clock",
@@ -15,7 +16,7 @@ object SamsungClockConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0x3E91FF,
         targets = listOf(
-            AppTarget(version = "12.4.02.38", minSdk = 35, description = "needs Android 15 or newer"),
+            AppTarget(version = "12.4.02.38", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }

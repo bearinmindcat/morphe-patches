@@ -10,6 +10,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.addOneUiFrameworkResources
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectOneUiFrameworkLookups
@@ -172,6 +173,10 @@ private val oneUiMembersPatch = bytecodePatch(
     }
 }
 
+/** 12.4.02.38 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_CLOCK_EXTENSION, "Lorg/ungoogled/samsungclock/Android13;", "SamsungClock")
+
 /**
  * Clock also calls 41 classes only One UI has (SemFloatingFeature, the cover and motion managers ...). The extension
  * carries a generated stand-in for each, with just the members Clock uses, answering "absent"; on a Samsung phone the
@@ -184,6 +189,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_CLOCK)
-    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch)
+    dependsOn(manifestPatch, sprDrawablesPatch, oneUiMembersPatch, systemAccessPatch, android13Patch)
     extendWith(SAMSUNG_CLOCK_EXTENSION)
 }
