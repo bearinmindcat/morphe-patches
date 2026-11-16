@@ -14,6 +14,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -270,6 +271,10 @@ private val hideFormatUnmountPatch = bytecodePatch(
     }
 }
 
+/** 15.2.03.2 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_MY_FILES_EXTENSION, "Lorg/ungoogled/samsungmyfiles/Android13;", "SamsungMyFiles")
+
 /**
  * Off One UI My Files dies at once on One UI classes it calls (SemPersonaManager first, at start-up); the Trash,
  * sorting, Manage storage, SD cards and USB drives do not work, and One UI's members and services are missing. The
@@ -285,6 +290,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         oneUiMembersPatch, systemServicesPatch, collationPatch, manageStoragePatch, trashProviderManifestPatch,
         storageVolumesPatch, hideFormatUnmountPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_MY_FILES_EXTENSION)
 }

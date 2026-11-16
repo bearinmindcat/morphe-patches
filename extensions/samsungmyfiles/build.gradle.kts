@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungmyfiles"
 
     defaultConfig {
-        // My Files 15.2 itself requires Android 14 (API 34).
-        minSdk = 34
+        // My Files 15.2 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

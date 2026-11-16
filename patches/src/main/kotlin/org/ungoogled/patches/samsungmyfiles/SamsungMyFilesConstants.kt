@@ -6,8 +6,8 @@ import app.morphe.patcher.patch.Compatibility
 
 object SamsungMyFilesConstants {
     /**
-     * My Files is a single APK from the Galaxy Store. Pinned to 15.2.03.2, the newest that runs on Android 14 and 15
-     * (15.4 and later need Android 16): R8 renames its classes every build.
+     * My Files is a single APK from the Galaxy Store. Pinned to 15.2.03.2 (15.4 and later need Android 16): R8 renames
+     * its classes every build. It asks for Android 14; the patch lets it run on Android 13 too.
      */
     val COMPATIBILITY_SAMSUNG_MY_FILES = Compatibility(
         name = "Samsung My Files",
@@ -15,7 +15,7 @@ object SamsungMyFilesConstants {
         apkFileType = ApkFileType.APK,
         appIconColor = 0xF6BC0B,
         targets = listOf(
-            AppTarget(version = "15.2.03.2", minSdk = 34, description = "needs Android 14 or newer"),
+            AppTarget(version = "15.2.03.2", minSdk = 33, description = "needs Android 13 or newer"),
         ),
     )
 }

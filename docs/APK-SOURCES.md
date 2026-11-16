@@ -71,7 +71,7 @@ The launcher ports are tested on Android 15 and newer; ASUS Launcher, Honor Home
 | Samsung Messages | `com.samsung.android.messaging` | 16.3.21.1 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-messages/samsung-messages-16-3-21-1-release/) |
 | Samsung Modes and Routines | `com.samsung.android.app.routines` | 5.1.03.1 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/bixby-routines/samsung-modes-and-routines-5-1-03-1-release/) |
 | Samsung Music | `com.sec.android.app.music` | 16.2.45.1 | 9+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/music-samsung-electronics-co-ltd/samsung-music-16-2-45-1-release/) |
-| Samsung My Files | `com.sec.android.app.myfiles` | 15.2.03.2 | 14+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-my-files/samsung-my-files-15-2-03-2-release/) |
+| Samsung My Files | `com.sec.android.app.myfiles` | 15.2.03.2 | 13+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-my-files/samsung-my-files-15-2-03-2-release/) |
 | Samsung Notes | `com.samsung.android.app.notes` | 4.4.48.15 | 10+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-notes/samsung-notes-4-4-48-15-release/) |
 | One Hand Operation + | `com.samsung.android.sidegesturepad` | 9.3.13.0 | 13+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/one-hand-operation/samsung-one-hand-operation-9-3-13-0-release/) |
 | Samsung Phone | `com.samsung.android.dialer` | 16.3.52.1 | 15+ | [APKMirror](https://www.apkmirror.com/apk/samsung-electronics-co-ltd/samsung-phone-3/samsung-phone-16-3-52-1-release/) |
