@@ -9,6 +9,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
@@ -273,6 +274,10 @@ private val sprDrawablesPatch = resourcePatch(
     }
 }
 
+/** 16.3.21.1 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_MESSAGES_EXTENSION, "Lorg/ungoogled/samsungmessages/Android13;", "SamsungMessages")
+
 /**
  * Off One UI Messages already has a fallback for phones without Samsung's framework, but as a non-system app it crashes
  * at start on the hidden device idle controller, refused phone state calls and missing providers; it then talks to
@@ -292,6 +297,7 @@ val enableNonOneUiPatch = bytecodePatch(
         manifestPatch, powerSavePatch, telephonyPatch, providerObserversPatch, smsProviderPatch, displayPatch,
         workServicesPatch, relayManifestPatch, sendSmsPatch, settingsPatch, oneUiMembersPatch, systemServicesPatch,
         sprDrawablesPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_MESSAGES_EXTENSION)
 }
