@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungroutines"
 
     defaultConfig {
-        // Modes and Routines 5.1 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Modes and Routines 5.1 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

@@ -9,6 +9,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.galaxyStoreChecksPatch
 import org.ungoogled.patches.samsung.redirectCalls
@@ -398,6 +399,10 @@ private val sprDrawablesPatch = resourcePatch(
     }
 }
 
+/** 5.1.03.1 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_ROUTINES_EXTENSION, "Lorg/ungoogled/samsungroutines/Android13;", "SamsungRoutines")
+
 /**
  * Off One UI Modes and Routines cannot install (SystemUI's user id), then crashes at start on SystemUI's privileges
  * (a "system exempted" foreground service, Do not disturb rules, settings writes), and its engine never sees a
@@ -420,6 +425,7 @@ val enableNonOneUiPatch = bytecodePatch(
         settingsPatch, activityStartsPatch, notificationsPatch, oneUiMembersPatch, systemServicesPatch, sprDrawablesPatch,
         wifiPatch,
         galaxyStoreChecksPatch("Modes and Routines"),
+        android13Patch,
     )
     extendWith(SAMSUNG_ROUTINES_EXTENSION)
 }
