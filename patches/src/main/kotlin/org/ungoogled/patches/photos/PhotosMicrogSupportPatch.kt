@@ -3,9 +3,11 @@ package org.ungoogled.patches.photos
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.AvailabilityResolver
+import app.morphe.patcher.patch.BytecodePatch
 import app.morphe.patcher.patch.InstallerType
 import app.morphe.patcher.patch.PatchAvailability
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.ResourcePatch
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
@@ -16,6 +18,8 @@ import org.ungoogled.patches.gmail.single
 import org.ungoogled.patches.gmail.stringOrNull
 import org.ungoogled.patches.photos.PhotosConstants.COMPATIBILITY_PHOTOS
 import org.ungoogled.patches.shared.MicrogRe
+import org.ungoogled.patches.shared.keepIconAndNameOption
+import org.ungoogled.patches.shared.keepsIconAndName
 import org.ungoogled.patches.shared.microgBadge
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -94,11 +98,13 @@ private val PUSH_ACTIONS_USED = listOf(
 private fun Document.elements(tag: String): List<Element> =
     getElementsByTagName(tag).let { list -> (0 until list.length).map { list.item(it) as Element } }
 
-private val photosMicrogResourcesPatch = resourcePatch(
+private val photosMicrogResourcesPatch: ResourcePatch = resourcePatch(
     description = "Moves Photos' package, providers and permissions under microG Photos' own, points its Play services " +
         "permissions and push actions at microG and tells microG which app to vouch for.",
 ) {
     execute {
+        // Option of photosMicrogSupportPatch: the launcher icon and name stay Photos' own (issue #205).
+        val keep = keepsIconAndName(photosMicrogSupportPatch)
         val counts = linkedMapOf<String, Int>()
         fun count(what: String) { counts[what] = (counts[what] ?: 0) + 1 }
 
@@ -164,10 +170,11 @@ private val photosMicrogResourcesPatch = resourcePatch(
 
             // The launcher, share sheet and app-switcher name, and the launcher icon.
             for (element in manifest.elements("*")) {
-                if (element.getAttribute("android:label") in STOCK_LABELS) {
+                if (!keep && element.getAttribute("android:label") in STOCK_LABELS) {
                     element.setAttribute("android:label", NEW_LABEL)
                     count("label")
                 }
+                if (keep) continue
                 for (attribute in listOf("android:icon", "android:roundIcon")) {
                     if (element.getAttribute(attribute) in STOCK_ICONS) {
                         element.setAttribute(attribute, "@mipmap/$ICON")
@@ -179,7 +186,7 @@ private val photosMicrogResourcesPatch = resourcePatch(
 
         // The app name.
         document("res/values/strings.xml").use { strings ->
-            if (strings.elements("string").none { it.getAttribute("name") == NEW_LABEL.removePrefix("@string/") }) {
+            if (!keep && strings.elements("string").none { it.getAttribute("name") == NEW_LABEL.removePrefix("@string/") }) {
                 strings.documentElement.appendChild(strings.createElement("string").apply {
                     setAttribute("name", NEW_LABEL.removePrefix("@string/"))
                     textContent = APP_NAME
@@ -187,38 +194,41 @@ private val photosMicrogResourcesPatch = resourcePatch(
             }
         }
 
-        // microG Photos' icon: Photos' own pinwheel, with microG's C as a badge.
-        val res = this["res"]
-        File(res, "drawable").mkdirs()
-        File(res, "drawable/ungoogled_microg_badge.xml").writeText(microgBadge())
-        File(res, "drawable/ungoogled_microg_foreground.xml").writeText(
-            """
-            <?xml version="1.0" encoding="utf-8"?>
-            <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-                <item android:drawable="@mipmap/adaptiveproduct_photos_2025_foreground_color_108" />
-                <item android:drawable="@drawable/ungoogled_microg_badge" />
-            </layer-list>
-            """.trimIndent() + "\n",
-        )
-        File(res, "mipmap-anydpi").mkdirs()
-        File(res, "mipmap-anydpi/$ICON.xml").writeText(
-            """
-            <?xml version="1.0" encoding="utf-8"?>
-            <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-                <background android:drawable="@color/google_white" />
-                <foreground android:drawable="@drawable/ungoogled_microg_foreground" />
-                <monochrome android:drawable="@drawable/photos_launchericon_release_monochrome" />
-            </adaptive-icon>
-            """.trimIndent() + "\n",
-        )
+        if (!keep) {
+            // microG Photos' icon: Photos' own pinwheel, with microG's C as a badge.
+            val res = this["res"]
+            File(res, "drawable").mkdirs()
+            File(res, "drawable/ungoogled_microg_badge.xml").writeText(microgBadge())
+            File(res, "drawable/ungoogled_microg_foreground.xml").writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+                    <item android:drawable="@mipmap/adaptiveproduct_photos_2025_foreground_color_108" />
+                    <item android:drawable="@drawable/ungoogled_microg_badge" />
+                </layer-list>
+                """.trimIndent() + "\n",
+            )
+            File(res, "mipmap-anydpi").mkdirs()
+            File(res, "mipmap-anydpi/$ICON.xml").writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+                    <background android:drawable="@color/google_white" />
+                    <foreground android:drawable="@drawable/ungoogled_microg_foreground" />
+                    <monochrome android:drawable="@drawable/photos_launchericon_release_monochrome" />
+                </adaptive-icon>
+                """.trimIndent() + "\n",
+            )
+        }
 
         // Measured against this Photos version.
         val expected = mapOf(
             "own permission" to 3, "Play services permission" to 3, "task affinity" to 3, "push action" to 1,
             "label" to 20, "icon" to 7,
         )
-        val short = expected.filter { (k, v) -> (counts[k] ?: 0) < v }
-        if (short.isNotEmpty()) throw PatchException("microG Photos found less than expected: " + short.keys.joinToString { "$it ${counts[it] ?: 0}/${expected[it]}" })
+        val checked = if (keep) expected - setOf("label", "icon") else expected
+        val short = checked.filter { (k, v) -> (counts[k] ?: 0) < v }
+        if (short.isNotEmpty()) throw PatchException("microG Photos found less than expected: " + short.keys.joinToString { "$it ${counts[it] ?: 0}/${checked[it]}" })
     }
 }
 
@@ -227,12 +237,13 @@ private const val SIGNATURE_HISTORY = "Unable to obtain package certificate hist
 private const val GMS_VERSION_KEY = "com.google.android.gms.version"
 
 @Suppress("unused")
-val photosMicrogSupportPatch = bytecodePatch(
+val photosMicrogSupportPatch: BytecodePatch = bytecodePatch(
     name = "Add microG-RE support",
     description = "Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_PHOTOS)
+    keepIconAndNameOption("Photos")
     category("microG-RE")
     // A mount install keeps stock Photos' manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->

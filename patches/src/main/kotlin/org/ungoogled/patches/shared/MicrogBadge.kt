@@ -1,5 +1,8 @@
 package org.ungoogled.patches.shared
 
+import app.morphe.patcher.patch.Patch
+import app.morphe.patcher.patch.PatchBuilder
+import app.morphe.patcher.patch.booleanOption
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
@@ -36,3 +39,17 @@ internal fun microgBadge(): String {
         append("</vector>\n")
     }
 }
+
+/** The option on a microG app's "Add microG-RE support" patch that keeps the app's own launcher icon and name. */
+internal const val KEEP_ICON_AND_NAME = "keepIconAndName"
+
+/** Adds the [KEEP_ICON_AND_NAME] option, for [app] (Gmail, Photos). */
+internal fun PatchBuilder<*>.keepIconAndNameOption(app: String) = booleanOption(
+    key = KEEP_ICON_AND_NAME,
+    default = false,
+    title = "Keep $app's icon and name",
+    description = "No microG badge on the icon and no \"microG\" in the name. Still a separate app.",
+)
+
+/** True when [patch] (a microG app's "Add microG-RE support") was asked to keep the app's own icon and name. */
+internal fun keepsIconAndName(patch: Patch<*>): Boolean = patch.options[KEEP_ICON_AND_NAME]?.value == true

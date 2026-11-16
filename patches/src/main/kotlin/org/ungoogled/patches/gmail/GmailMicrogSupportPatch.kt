@@ -4,9 +4,11 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.AvailabilityResolver
+import app.morphe.patcher.patch.BytecodePatch
 import app.morphe.patcher.patch.InstallerType
 import app.morphe.patcher.patch.PatchAvailability
 import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.ResourcePatch
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
@@ -19,6 +21,8 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.gmail.GmailConstants.COMPATIBILITY_GMAIL
 import org.ungoogled.patches.gmail.GmailConstants.GMAIL_EXTENSION
 import org.ungoogled.patches.shared.MicrogRe
+import org.ungoogled.patches.shared.keepIconAndNameOption
+import org.ungoogled.patches.shared.keepsIconAndName
 import org.ungoogled.patches.shared.microgBadge
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -103,11 +107,13 @@ private val PUSH_ACTIONS_USED = listOf(
 private fun Document.elements(tag: String): List<Element> =
     getElementsByTagName(tag).let { list -> (0 until list.length).map { list.item(it) as Element } }
 
-private val gmailMicrogResourcesPatch = resourcePatch(
+private val gmailMicrogResourcesPatch: ResourcePatch = resourcePatch(
     description = "Moves Gmail's package, providers, permissions and account types under microG Gmail's own, points its " +
         "Play services permissions at microG and tells microG which app to vouch for.",
 ) {
     execute {
+        // Option of gmailMicrogSupportPatch: the launcher icon and name stay Gmail's own (issue #205).
+        val keep = keepsIconAndName(gmailMicrogSupportPatch)
         val counts = linkedMapOf<String, Int>()
         fun count(what: String) { counts[what] = (counts[what] ?: 0) + 1 }
 
@@ -173,10 +179,11 @@ private val gmailMicrogResourcesPatch = resourcePatch(
             // The launcher and app-switcher name and icon.
             for (element in manifest.elements("*")) {
                 // NEW_LABEL already: Change app name ran first and keeps its own name.
-                if (element.getAttribute("android:label") in setOf(STOCK_LABEL, NEW_LABEL)) {
+                if (!keep && element.getAttribute("android:label") in setOf(STOCK_LABEL, NEW_LABEL)) {
                     element.setAttribute("android:label", NEW_LABEL)
                     count("label")
                 }
+                if (keep) continue
                 for (attribute in listOf("android:icon", "android:roundIcon")) {
                     if (element.getAttribute(attribute) in setOf("@mipmap/ic_launcher", "@mipmap/ic_launcher_round")) {
                         element.setAttribute(attribute, "@mipmap/$ICON")
@@ -195,7 +202,7 @@ private val gmailMicrogResourcesPatch = resourcePatch(
                 string.textContent = to
                 count("own name in strings")
             }
-            if (strings.elements("string").none { it.getAttribute("name") == NEW_LABEL.removePrefix("@string/") }) {
+            if (!keep && strings.elements("string").none { it.getAttribute("name") == NEW_LABEL.removePrefix("@string/") }) {
                 strings.documentElement.appendChild(strings.createElement("string").apply {
                     setAttribute("name", NEW_LABEL.removePrefix("@string/"))
                     textContent = APP_NAME
@@ -225,29 +232,31 @@ private val gmailMicrogResourcesPatch = resourcePatch(
             }
         }
 
-        // microG Gmail's icon: Gmail's own, with microG's C as a badge.
-        File(res, "drawable").mkdirs()
-        File(res, "drawable/ungoogled_microg_badge.xml").writeText(microgBadge())
-        File(res, "drawable/ungoogled_microg_foreground.xml").writeText(
-            """
-            <?xml version="1.0" encoding="utf-8"?>
-            <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-                <item android:drawable="@mipmap/adaptiveproduct_gmail_2026_foreground_color_108" />
-                <item android:drawable="@drawable/ungoogled_microg_badge" />
-            </layer-list>
-            """.trimIndent() + "\n",
-        )
-        File(res, "mipmap-anydpi").mkdirs()
-        File(res, "mipmap-anydpi/$ICON.xml").writeText(
-            """
-            <?xml version="1.0" encoding="utf-8"?>
-            <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-                <background android:drawable="@mipmap/adaptiveproduct_gmail_2026_background_color_108" />
-                <foreground android:drawable="@drawable/ungoogled_microg_foreground" />
-                <monochrome android:drawable="@drawable/ic_launcher_monochrome_release" />
-            </adaptive-icon>
-            """.trimIndent() + "\n",
-        )
+        if (!keep) {
+            // microG Gmail's icon: Gmail's own, with microG's C as a badge.
+            File(res, "drawable").mkdirs()
+            File(res, "drawable/ungoogled_microg_badge.xml").writeText(microgBadge())
+            File(res, "drawable/ungoogled_microg_foreground.xml").writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+                    <item android:drawable="@mipmap/adaptiveproduct_gmail_2026_foreground_color_108" />
+                    <item android:drawable="@drawable/ungoogled_microg_badge" />
+                </layer-list>
+                """.trimIndent() + "\n",
+            )
+            File(res, "mipmap-anydpi").mkdirs()
+            File(res, "mipmap-anydpi/$ICON.xml").writeText(
+                """
+                <?xml version="1.0" encoding="utf-8"?>
+                <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+                    <background android:drawable="@mipmap/adaptiveproduct_gmail_2026_background_color_108" />
+                    <foreground android:drawable="@drawable/ungoogled_microg_foreground" />
+                    <monochrome android:drawable="@drawable/ic_launcher_monochrome_release" />
+                </adaptive-icon>
+                """.trimIndent() + "\n",
+            )
+        }
 
         // Measured against this Gmail version.
         val expected = mapOf(
@@ -255,8 +264,9 @@ private val gmailMicrogResourcesPatch = resourcePatch(
             "own permission" to 11, "Play services permission" to 4, "own name in strings" to 9,
             "Google sync adapter" to 1, "shortcut package" to 1, "label" to 1, "icon" to 2, "push action" to 1,
         )
-        val short = expected.filter { (k, v) -> (counts[k] ?: 0) < v }
-        if (short.isNotEmpty()) throw PatchException("microG Gmail found less than expected: " + short.keys.joinToString { "$it ${counts[it] ?: 0}/${expected[it]}" })
+        val checked = if (keep) expected - setOf("label", "icon") else expected
+        val short = checked.filter { (k, v) -> (counts[k] ?: 0) < v }
+        if (short.isNotEmpty()) throw PatchException("microG Gmail found less than expected: " + short.keys.joinToString { "$it ${counts[it] ?: 0}/${checked[it]}" })
     }
 }
 
@@ -273,12 +283,13 @@ private const val GMS_VERSION_KEY = "com.google.android.gms.version"
 private const val COMPONENT_FACTORY = "Landroidx/core/app/CoreComponentFactory;"
 
 @Suppress("unused")
-val gmailMicrogSupportPatch = bytecodePatch(
+val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
     name = "Add microG-RE support",
     description = "Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_GMAIL)
+    keepIconAndNameOption("Gmail")
     category("microG-RE")
     // A mount install keeps stock Gmail's manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->
