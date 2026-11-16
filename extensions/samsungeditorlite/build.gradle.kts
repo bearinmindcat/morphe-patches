@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungeditorlite"
 
     defaultConfig {
-        // Editor Lite 4.0.85 itself requires Android 14 (API 34).
-        minSdk = 34
+        // Editor Lite 4.0.85 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

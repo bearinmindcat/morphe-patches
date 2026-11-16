@@ -4,6 +4,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.redirectCalls
 import org.ungoogled.patches.samsung.redirectOneUiMembers
 import org.ungoogled.patches.samsung.redirectSystemServices
@@ -159,6 +160,10 @@ private val updateCheckPatch = bytecodePatch(
     }
 }
 
+/** 4.0.85.20 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_EDITOR_LITE_EXTENSION, "Lorg/ungoogled/samsungeditorlite/Android13;", "SamsungEditorLite")
+
 /**
  * Off One UI Editor Lite dies at its first screen on One UI classes it calls (SemSystemProperties first), previews
  * with One UI's SemMediaPlayer, draws its timeline with SemAsyncVideoFrameDecoder and saves every cut with One UI's
@@ -172,6 +177,6 @@ val enableNonOneUiPatch = bytecodePatch(
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_SAMSUNG_EDITOR_LITE)
-    dependsOn(manifestPatch, oneUiMembersPatch, callStatePatch, editIntentPatch, saveAsCopyPatch, updateCheckPatch)
+    dependsOn(manifestPatch, oneUiMembersPatch, callStatePatch, editIntentPatch, saveAsCopyPatch, updateCheckPatch, android13Patch)
     extendWith(SAMSUNG_EDITOR_LITE_EXTENSION)
 }
