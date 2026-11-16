@@ -6,8 +6,8 @@ android {
     namespace = "org.ungoogled.samsungphone"
 
     defaultConfig {
-        // Samsung Phone 16.3 itself requires Android 15 (API 35).
-        minSdk = 35
+        // Samsung Phone 16.3 asks for a newer Android; the patch lets it run on Android 13 (API 33).
+        minSdk = 33
     }
 }
 

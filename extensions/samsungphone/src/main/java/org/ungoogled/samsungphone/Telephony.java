@@ -227,7 +227,8 @@ public final class Telephony {
 
     public static boolean isDeviceVoiceCapable(android.telephony.TelephonyManager o) {
         try {
-            return o.isDeviceVoiceCapable();
+            // Android 15 renamed it; below, the older name answers the same.
+            return android.os.Build.VERSION.SDK_INT >= 35 ? o.isDeviceVoiceCapable() : o.isVoiceCapable();
         } catch (SecurityException e) {
             refused("isDeviceVoiceCapable", e);
             return false;
@@ -335,7 +336,8 @@ public final class Telephony {
 
     public static java.lang.String getPrimaryImei(android.telephony.TelephonyManager o) {
         try {
-            return o.getPrimaryImei();
+            // Android 14 and newer; no app can read it anyway.
+            return android.os.Build.VERSION.SDK_INT >= 34 ? o.getPrimaryImei() : null;
         } catch (SecurityException e) {
             refused("getPrimaryImei", e);
             return null;

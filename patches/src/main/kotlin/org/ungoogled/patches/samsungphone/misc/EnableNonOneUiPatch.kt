@@ -10,6 +10,7 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.samsung.addOneUiFrameworkResources
+import org.ungoogled.patches.samsung.android13Patch
 import org.ungoogled.patches.samsung.convertSprDrawables
 import org.ungoogled.patches.samsung.makeLibrariesOptional
 import org.ungoogled.patches.samsung.redirectCalls
@@ -321,6 +322,10 @@ private val sprDrawablesPatch = resourcePatch(
     }
 }
 
+/** 16.3.52.1 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
+private val android13Patch =
+    android13Patch(SAMSUNG_PHONE_EXTENSION, "Lorg/ungoogled/samsungphone/Android13;", "SamsungPhone")
+
 /**
  * Samsung Phone as a dial pad, call history and contacts app beside the user's own phone app, which keeps showing
  * every call: Samsung's in-call screen is a separate system app (InCallUI, part of One UI's phone process), so the
@@ -339,6 +344,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         manifestPatch, noDefaultDialerPromptPatch, callsPatch, optionalCallLogPatch, telephonyPatch, providersPatch,
         displayPatch, settingsPatch, oneUiMembersPatch, systemServicesPatch, sprDrawablesPatch,
+        android13Patch,
     )
     extendWith(SAMSUNG_PHONE_EXTENSION)
 }
