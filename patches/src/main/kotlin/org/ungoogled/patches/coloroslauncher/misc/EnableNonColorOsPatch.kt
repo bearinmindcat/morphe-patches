@@ -329,6 +329,30 @@ private val lockScreenPatch = bytecodePatch {
 }
 
 /**
+ * Home screen pages redraw what changed. ColorOS's workspace replaces Android's (hidden) ViewGroup.dispatchGetDisplayList
+ * with its own loop that rebuilds each page's drawing through hidden View members (mPrivateFlags,
+ * updateDisplayListIfDirty); an installed app may not use them, so a page that changed while the workspace itself did not
+ * was never redrawn: while dragging an app the drop position stayed where the drag began, and in edit mode an app
+ * dropped (back in its place or elsewhere) stayed invisible until edit mode ended. The workspace now uses Android's own
+ * rebuild.
+ */
+private val workspaceRedrawPatch = bytecodePatch {
+    execute {
+        val workspace = mutableClassDefBy("Lcom/android/launcher3/OplusWorkspace;")
+        val method = workspace.methods.firstOrNull {
+            it.name == "dispatchGetDisplayList" && it.returnType == "V" && it.parameterTypes.isEmpty()
+        } ?: throw PatchException("OplusWorkspace.dispatchGetDisplayList not found")
+        method.addInstructions(
+            0,
+            """
+                invoke-super { p0 }, Landroid/view/ViewGroup;->dispatchGetDisplayList()V
+                return-void
+            """,
+        )
+    }
+}
+
+/**
  * Selecting apps in edit mode: every app after the first kept its grey check until the page redrew (the selection itself
  * worked). The check's animation marks the icon for redrawing, but that did not reach the page; the icon's parents are
  * now asked to redraw too (see Views.invalidateUp).
@@ -763,7 +787,7 @@ val enableNonColorOsPatch = bytecodePatch(
     dependsOn(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
-        nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch,
+        nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch, workspaceRedrawPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
