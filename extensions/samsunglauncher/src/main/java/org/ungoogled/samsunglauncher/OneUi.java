@@ -122,8 +122,11 @@ public final class OneUi {
         try {
             return ((Method) m).invoke(receiver, args);
         } catch (InvocationTargetException e) {
-            // A call only the system may make (a system service's permission check): "not there" as well.
-            if (e.getCause() instanceof SecurityException) return absent(receiver, key);
+            // A call only the system may make (a system service's permission check), or on a Galaxy phone one of
+            // Samsung's services refusing this copy (no binder, a failed binder call): "not there" as well.
+            Throwable cause = e.getCause();
+            if (cause instanceof SecurityException || cause instanceof NullPointerException
+                    || cause instanceof android.os.RemoteException) return absent(receiver, key);
             throw rethrow(e);
         } catch (IllegalAccessException e) {
             return absent(receiver, key);
