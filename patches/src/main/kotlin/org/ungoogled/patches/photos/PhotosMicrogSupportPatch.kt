@@ -239,7 +239,7 @@ private const val GMS_VERSION_KEY = "com.google.android.gms.version"
 @Suppress("unused")
 val photosMicrogSupportPatch: BytecodePatch = bytecodePatch(
     name = "Add microG-RE support",
-    description = "Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs.",
+    description = "Builds microG Photos, a separate app next to the built-in Photos that signs in through microG-RE. Not for root installs.",
     default = false,
 ) {
     compatibleWith(COMPATIBILITY_PHOTOS)
