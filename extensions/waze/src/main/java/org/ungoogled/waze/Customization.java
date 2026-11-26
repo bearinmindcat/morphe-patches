@@ -190,6 +190,8 @@ public final class Customization {
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", new Label("Enforcement zones on freeways", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_BLOCKED_LANE_ALERT_DISTANCE", new Label("Blocked lanes", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ALERTS_DISTANCE_BETWEEN_ALERTS", new Label("Least distance between two alerts", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_ALERTS_SPEED_LIMIT_DECREASE_ALERT_DISTANCE_METERS", new Label("Reduced speed ahead", "m", 1, 20000));
+        VALUE_LABELS.put("CONFIG_VALUE_INSIGHTS_INFRA_ENFORCEMENT_ZONE_APPROACH_DISTANCE", new Label("Average speed zones", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_NORMAL", new Label("Android Auto heads-up, normal roads", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_ANDROID_AUTO_HEADS_UP_DISTANCE_FREEWAY", new Label("Android Auto heads-up, freeways", "m", 1, 20000));
         VALUE_LABELS.put("CONFIG_VALUE_TRAFFIC_BAR_MIN_TIME_IN_TRAFFIC_SECONDS", new Label("Traffic bar: time in traffic", "s", 1, 3600));

@@ -204,6 +204,8 @@ val wazeAlertDistancesPatch = bytecodePatch(
     val freeways by intOption(key = "freeways", default = 1200, title = "Enforcement zones on freeways", description = "Where Waze shows zones, not cameras. Waze: 2000 m.")
     val blockedLane by intOption(key = "blockedLane", default = 1000, title = "Blocked lanes", description = "Waze: 400 m.")
     val between by intOption(key = "between", default = 200, title = "Least distance between two alerts", description = "Waze: 300 m.")
+    val speedDecrease by intOption(key = "speedDecrease", default = 1000, title = "Reduced speed ahead", description = "Waze: 1000 m.")
+    val averageSpeedZones by intOption(key = "averageSpeedZones", default = 600, title = "Average speed zones", description = "Waze: 600 m.")
 
     execute {
         police?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_POLICE_ALERT_DISTANCE_METERS", it) }
@@ -218,6 +220,10 @@ val wazeAlertDistancesPatch = bytecodePatch(
         streets?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_STREETS", it) }
         highways?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_HIGHWAY", it) }
         freeways?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_ENFORCEMENT_ALERTS_DISTANCE_FREEWAY", it) }
+        // Issue #157: "Reduced speed ahead" (speed limit decrease alerts) and average speed zones (enforcement zones
+        // of Waze's insights) have distances of their own, apart from the camera distance above.
+        speedDecrease?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_SPEED_LIMIT_DECREASE_ALERT_DISTANCE_METERS", it) }
+        averageSpeedZones?.let { keepWazeConfig("alertDistances", "CONFIG_VALUE_INSIGHTS_INFRA_ENFORCEMENT_ZONE_APPROACH_DISTANCE", it) }
         // Waze's server turns this on (issue #157): then an alert comes only as far ahead as the car drives in
         // 22 s (30 s for police; at least 200 m), so longer distances never showed. Off, the distances hold.
         keepWazeConfig("alertDistances", "CONFIG_VALUE_ALERTS_MAX_TRIGGER_TIME_ENABLED", false)
