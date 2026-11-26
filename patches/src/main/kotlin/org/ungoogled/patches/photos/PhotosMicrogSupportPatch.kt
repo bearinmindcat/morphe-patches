@@ -21,13 +21,17 @@ import org.ungoogled.patches.shared.MicrogRe
 import org.ungoogled.patches.shared.keepIconAndNameOption
 import org.ungoogled.patches.shared.keepsIconAndName
 import org.ungoogled.patches.shared.microgBadge
+import org.ungoogled.patches.shared.microgPackageName
+import org.ungoogled.patches.shared.microgPackageNameOption
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import java.io.File
 
 private const val STOCK_PACKAGE = "com.google.android.apps.photos"
 /** microG Photos' own package, so it installs beside stock Photos (usually built into the phone). */
-private const val MICROG_PHOTOS = "org.ungoogled.android.apps.photos.microg"
+private const val MICROG_PHOTOS_DEFAULT = "org.ungoogled.android.apps.photos.microg"
+/** The package of this run: MICROG_PHOTOS_DEFAULT unless the patch option names another (issue #244). */
+private var microgPhotos = MICROG_PHOTOS_DEFAULT
 /** Photos' signing certificate (SHA-1, the legacy signer), which microG reports to Google for this app. */
 private const val STOCK_CERT_SHA1 = "24bb24c05e47e0aefa68a58a766179d9b613a600"
 private const val APP_NAME = "microG Photos"
@@ -61,14 +65,20 @@ private val PERMISSIONS = listOf(
 
 /** A name of Photos' own, moved under microG Photos' package. */
 private fun moved(name: String): String = when {
-    name == STOCK_PACKAGE -> MICROG_PHOTOS
-    name.startsWith("$STOCK_PACKAGE.") -> MICROG_PHOTOS + name.substring(STOCK_PACKAGE.length)
-    name.startsWith("com.google.android.") -> "$MICROG_PHOTOS." + name.removePrefix("com.google.android.")
-    else -> "$MICROG_PHOTOS.$name"
+    name == STOCK_PACKAGE -> microgPhotos
+    name.startsWith("$STOCK_PACKAGE.") -> microgPhotos + name.substring(STOCK_PACKAGE.length)
+    name.startsWith("com.google.android.") -> "$microgPhotos." + name.removePrefix("com.google.android.")
+    else -> "$microgPhotos.$name"
 }
 
 /** Every name of Photos' own the patch moves, old to new: its package (its own intents and components), authorities, permissions. */
-private val OWN_NAMES: Map<String, String> = (listOf(STOCK_PACKAGE) + AUTHORITIES + PERMISSIONS).associateWith(::moved)
+private var ownNamesFor: String? = null
+private var ownNamesCache: Map<String, String> = emptyMap()
+private val OWN_NAMES: Map<String, String>
+    get() {
+        if (ownNamesFor != microgPhotos) { ownNamesCache = (listOf(STOCK_PACKAGE) + AUTHORITIES + PERMISSIONS).associateWith(::moved); ownNamesFor = microgPhotos }
+        return ownNamesCache
+    }
 
 /** microG Photos' name for one of Photos' own names, or a content URI of Photos' own; null if neither. */
 private fun ownName(value: String): String? {
@@ -105,13 +115,14 @@ private val photosMicrogResourcesPatch: ResourcePatch = resourcePatch(
     execute {
         // Option of photosMicrogSupportPatch: the launcher icon and name stay Photos' own (issue #205).
         val keep = keepsIconAndName(photosMicrogSupportPatch)
+        microgPhotos = microgPackageName(photosMicrogSupportPatch, MICROG_PHOTOS_DEFAULT, STOCK_PACKAGE)
         val counts = linkedMapOf<String, Int>()
         fun count(what: String) { counts[what] = (counts[what] ?: 0) + 1 }
 
         document("AndroidManifest.xml").use { manifest ->
             val root = manifest.documentElement
             if (root.getAttribute("package") != STOCK_PACKAGE) throw PatchException("not Photos' manifest")
-            root.setAttribute("package", MICROG_PHOTOS)
+            root.setAttribute("package", microgPhotos)
 
             // Photos' own permissions: their declarations, the ones it holds, and the components they guard.
             val declared = manifest.elements("permission").map { it.getAttribute("android:name") }.toSet()
@@ -244,6 +255,7 @@ val photosMicrogSupportPatch: BytecodePatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_PHOTOS)
     keepIconAndNameOption("Photos")
+    microgPackageNameOption("Photos", MICROG_PHOTOS_DEFAULT)
     category("microG-RE")
     // A mount install keeps stock Photos' manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->

@@ -24,13 +24,17 @@ import org.ungoogled.patches.shared.MicrogRe
 import org.ungoogled.patches.shared.keepIconAndNameOption
 import org.ungoogled.patches.shared.keepsIconAndName
 import org.ungoogled.patches.shared.microgBadge
+import org.ungoogled.patches.shared.microgPackageName
+import org.ungoogled.patches.shared.microgPackageNameOption
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import java.io.File
 
 private const val STOCK_PACKAGE = "com.google.android.gm"
 /** microG Gmail's own package, so it installs beside stock Gmail (usually built into the phone). */
-private const val MICROG_GMAIL = "org.ungoogled.android.gm.microg"
+private const val MICROG_GMAIL_DEFAULT = "org.ungoogled.android.gm.microg"
+/** The package of this run: MICROG_GMAIL_DEFAULT unless the patch option names another (issue #244). */
+private var microgGmail = MICROG_GMAIL_DEFAULT
 /** Gmail's signing certificate (SHA-1, the legacy signer, the same as Maps'), which microG reports to Google for this app. */
 private const val STOCK_CERT_SHA1 = "38918a453d07199354f8b19af05ec6562ced5788"
 private const val APP_NAME = "microG Gmail"
@@ -70,16 +74,22 @@ private val ACCOUNT_TYPES = listOf("com.google.android.gm.exchange", "com.google
 
 /** A name of Gmail's own, moved under microG Gmail's package. */
 private fun moved(name: String): String = when {
-    name == STOCK_PACKAGE -> MICROG_GMAIL
-    name.startsWith("$STOCK_PACKAGE.") -> MICROG_GMAIL + name.substring(STOCK_PACKAGE.length)
-    name.endsWith(".$STOCK_PACKAGE") -> name.removeSuffix(STOCK_PACKAGE) + MICROG_GMAIL
-    name.startsWith("com.google.android.") -> "$MICROG_GMAIL." + name.removePrefix("com.google.android.")
-    name.startsWith("com.android.") -> "$MICROG_GMAIL." + name.removePrefix("com.")
-    else -> "$MICROG_GMAIL.$name"
+    name == STOCK_PACKAGE -> microgGmail
+    name.startsWith("$STOCK_PACKAGE.") -> microgGmail + name.substring(STOCK_PACKAGE.length)
+    name.endsWith(".$STOCK_PACKAGE") -> name.removeSuffix(STOCK_PACKAGE) + microgGmail
+    name.startsWith("com.google.android.") -> "$microgGmail." + name.removePrefix("com.google.android.")
+    name.startsWith("com.android.") -> "$microgGmail." + name.removePrefix("com.")
+    else -> "$microgGmail.$name"
 }
 
 /** Every name of Gmail's own the patch moves, old to new. */
-private val OWN_NAMES: Map<String, String> = (AUTHORITIES + PERMISSIONS + ACCOUNT_TYPES).associateWith(::moved)
+private var ownNamesFor: String? = null
+private var ownNamesCache: Map<String, String> = emptyMap()
+private val OWN_NAMES: Map<String, String>
+    get() {
+        if (ownNamesFor != microgGmail) { ownNamesCache = (AUTHORITIES + PERMISSIONS + ACCOUNT_TYPES).associateWith(::moved); ownNamesFor = microgGmail }
+        return ownNamesCache
+    }
 
 /** microG Gmail's name for one of Gmail's own names, or a content URI with one of its authorities; null if neither. */
 private fun ownName(value: String): String? {
@@ -114,13 +124,14 @@ private val gmailMicrogResourcesPatch: ResourcePatch = resourcePatch(
     execute {
         // Option of gmailMicrogSupportPatch: the launcher icon and name stay Gmail's own (issue #205).
         val keep = keepsIconAndName(gmailMicrogSupportPatch)
+        microgGmail = microgPackageName(gmailMicrogSupportPatch, MICROG_GMAIL_DEFAULT, STOCK_PACKAGE)
         val counts = linkedMapOf<String, Int>()
         fun count(what: String) { counts[what] = (counts[what] ?: 0) + 1 }
 
         document("AndroidManifest.xml").use { manifest ->
             val root = manifest.documentElement
             if (root.getAttribute("package") != STOCK_PACKAGE) throw PatchException("not Gmail's manifest")
-            root.setAttribute("package", MICROG_GMAIL)
+            root.setAttribute("package", microgGmail)
 
             // Gmail's own permissions: their declarations, the ones it holds, and the components they guard.
             val declared = manifest.elements("permission").map { it.getAttribute("android:name") }.toSet()
@@ -224,7 +235,7 @@ private val gmailMicrogResourcesPatch: ResourcePatch = resourcePatch(
                             count("Google sync adapter")
                         }
                         if (element.getAttribute("android:targetPackage") == STOCK_PACKAGE) {
-                            element.setAttribute("android:targetPackage", MICROG_GMAIL)
+                            element.setAttribute("android:targetPackage", microgGmail)
                             count("shortcut package")
                         }
                     }
@@ -290,6 +301,7 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_GMAIL)
     keepIconAndNameOption("Gmail")
+    microgPackageNameOption("Gmail", MICROG_GMAIL_DEFAULT)
     category("microG-RE")
     // A mount install keeps stock Gmail's manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->
