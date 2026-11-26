@@ -909,11 +909,12 @@ val enableNonColorOsPatch = bytecodePatch(
         nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch, workspaceRedrawPatch, backgroundsPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
-    // OPPO's badge provider (other apps set icon counts through it) and authorities OPPO's SDKs build from the package name.
+    // Authorities OPPO's SDKs build from the package name. OPPO's badge provider (com.android.badge) moves like the
+    // other names: Honor's launcher declares it too, and Android refused the install there (issue #232).
     dependsOn(
         org.ungoogled.patches.shared.launcherCoexistencePatch(
             keep = setOf(
-                "com.android.badge", "com.android.launcher.epona", "com.android.launcher.custom.DictProvider",
+                "com.android.launcher.epona", "com.android.launcher.custom.DictProvider",
                 "com.android.launcher.upk.FileProvider",
             ),
         ),
