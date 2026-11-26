@@ -23,6 +23,9 @@ import org.ungoogled.patches.samsunglauncher.SamsungLauncherConstants.COMPATIBIL
 import org.ungoogled.patches.samsunglauncher.v16.HIDDEN_CONSTRUCTORS as V16_HIDDEN_CONSTRUCTORS
 import org.ungoogled.patches.samsunglauncher.v16.HIDDEN_MEMBERS as V16_HIDDEN_MEMBERS
 import org.ungoogled.patches.samsunglauncher.v16.HIDDEN_SUPERCLASSES as V16_HIDDEN_SUPERCLASSES
+import org.ungoogled.patches.samsunglauncher.v151.HIDDEN_CONSTRUCTORS as V151_HIDDEN_CONSTRUCTORS
+import org.ungoogled.patches.samsunglauncher.v151.HIDDEN_MEMBERS as V151_HIDDEN_MEMBERS
+import org.ungoogled.patches.samsunglauncher.v151.HIDDEN_SUPERCLASSES as V151_HIDDEN_SUPERCLASSES
 import org.ungoogled.patches.shared.redirectNewerJavaCalls
 import org.ungoogled.patches.shared.supportedVersionCheck
 import org.w3c.dom.Element
@@ -35,10 +38,14 @@ private const val ACTIVITY_OPTIONS = "Landroid/app/ActivityOptions;"
 private val log = java.util.logging.Logger.getLogger("OneUiHome")
 
 /**
- * 16.0.09.35 is the Android 13 build (One UI 6/7's home screen): its lists are generated against Android 13, 15, 16 and
- * 17 (v16/SamsungLauncher16Members.kt), and a few of its own classes have an older shape.
+ * 16.0.09.35 and 15.1.03.75 are the Android 13 builds (One UI 6/7's and One UI 6.1.1's home screens): their lists are
+ * generated against Android 13, 15, 16 and 17 (v16/SamsungLauncher16Members.kt, v151/SamsungLauncher151Members.kt),
+ * and a few of their own classes have an older shape.
  */
-private fun isAndroid13Build(version: String?) = version?.startsWith("16.") == true
+private fun isAndroid13Build(version: String?) = version?.startsWith("16.") == true || isOneUi61Build(version)
+
+/** 15.1.03.75, One UI 6.1.1's home screen: older still than 16.0 in a few places (see the hooks below). */
+private fun isOneUi61Build(version: String?) = version?.startsWith("15.") == true
 
 private val SETTINGS_SHAPES = listOf(
     "getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;" to "GetString",
@@ -117,7 +124,7 @@ private val resourcesPatch = resourcePatch(
     execute {
         val converted = convertSprDrawables()
         log.info("SPR drawables: $converted")
-        // Measured against 18.0.07.59: 9 files; 16.0.09.35: 10.
+        // Measured against 18.0.07.59: 9 files; 16.0.09.35: 10; 15.1.03.75: 10.
         if (converted == 0) throw PatchException("no SPR drawables found")
 
         document("AndroidManifest.xml").use { manifest ->
@@ -164,7 +171,8 @@ private val oneUiMembersPatch = bytecodePatch(
     execute {
         val (calls, fields) = redirectOneUiMembers("$EXT/OneUi;", "$EXT/Sem;")
         log.info("One UI members: $calls calls, $fields fields")
-        // Measured against 18.0.07.59: 314 calls, 81 field accesses; 16.0.09.35: 217 calls, 67 field accesses.
+        // Measured against 18.0.07.59: 314 calls, 81 field accesses; 16.0.09.35: 217 calls, 67 field accesses;
+        // 15.1.03.75: 378 calls, 77 field accesses.
         if (calls < 50) throw PatchException("only $calls One UI calls found")
     }
 }
@@ -210,19 +218,35 @@ private val hiddenApisPatch = bytecodePatch(
     extendWith(SAMSUNG_LAUNCHER_EXTENSION)
 
     execute {
-        val android13Build = isAndroid13Build(packageMetadata.versionName)
+        val version = packageMetadata.versionName
+        val android13Build = isAndroid13Build(version)
+        val oneUi61Build = isOneUi61Build(version)
         // Java 21 library calls first (see Java21): Android 13 has none of them, and the member helper could only answer
         // them "absent". 18.0 needs Android 15, which has them.
         val java = if (android13Build) redirectNewerJavaCalls("$EXT/Java21;") else 0
         val (calls, fields) = redirectHiddenMembers(
             "$EXT/OneUi;", "$EXT/Hidden;",
-            (if (android13Build) V16_HIDDEN_MEMBERS else HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17) + REFUSED_CALLS,
+            when {
+                oneUi61Build -> V151_HIDDEN_MEMBERS
+                android13Build -> V16_HIDDEN_MEMBERS
+                else -> HIDDEN_MEMBERS + HIDDEN_MEMBERS_16_17
+            } + REFUSED_CALLS,
         )
         val constructors = redirectConstructors(
             "$EXT/OneUi;", "$EXT/Hidden;",
-            if (android13Build) V16_HIDDEN_CONSTRUCTORS else HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17,
+            when {
+                oneUi61Build -> V151_HIDDEN_CONSTRUCTORS
+                android13Build -> V16_HIDDEN_CONSTRUCTORS
+                else -> HIDDEN_CONSTRUCTORS + HIDDEN_CONSTRUCTORS_16_17
+            },
         )
-        val rebased = rebaseSubclasses(if (android13Build) REBASES + V16_HIDDEN_SUPERCLASSES else REBASES)
+        val rebased = rebaseSubclasses(
+            when {
+                oneUi61Build -> REBASES + V151_HIDDEN_SUPERCLASSES
+                android13Build -> REBASES + V16_HIDDEN_SUPERCLASSES
+                else -> REBASES
+            },
+        )
         skipCastOfNull("$EXT/Hidden;")
         log.info(
             "java calls: $java; hidden members: $calls calls, $fields fields; constructors: $constructors; " +
@@ -248,8 +272,9 @@ private val hiddenApisPatch = bytecodePatch(
             }
         }
         // Measured against 18.0.07.59: 947 calls, 359 field accesses, 63 constructors, 24 rebased classes; 16.0.09.35: one
-        // Java call, 775 calls, 293 field accesses, 49 constructors, 9 rebased classes.
-        if (android13Build && java == 0) throw PatchException("no newer Java library calls found")
+        // Java call, 775 calls, 293 field accesses, 49 constructors, 9 rebased classes; 15.1.03.75: no
+        // Java call, 740 calls, 251 field accesses, 37 constructors, 10 rebased classes.
+        if (android13Build && !oneUi61Build && java == 0) throw PatchException("no newer Java library calls found")
         if (calls < 100) throw PatchException("only $calls hidden member calls found")
         if (constructors == 0 || rebased == 0) throw PatchException("hidden constructors not found")
     }
@@ -265,6 +290,7 @@ private val systemPrivilegesPatch = bytecodePatch(
     extendWith(SAMSUNG_LAUNCHER_EXTENSION)
 
     execute {
+        val oneUi61Build = isOneUi61Build(packageMetadata.versionName)
         val services = redirectSystemServices("$EXT/Services;")
         val settings = redirectCalls(SETTINGS_CALLS)
         val widgets = redirectCalls(WIDGET_BINDS)
@@ -273,34 +299,50 @@ private val systemPrivilegesPatch = bytecodePatch(
         val reflection = redirectCalls(REFLECTION_CALLS)
         log.info("reflection lookups: $reflection")
 
-        // The Kotlin reflection helper asks Reflect.invoke first (a drag event's display, so icons can be moved).
-        val invoke = mutableClassDefBy("Lcom/honeyspace/common/reflection/ReflectionUtilsKt;").methods.firstOrNull {
-            it.name == "invokeReflection" && it.parameterTypes.size == 3
-        } ?: throw PatchException("ReflectionUtilsKt.invokeReflection not found")
-        invoke.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { p0, p1, p2 }, $EXT/Reflect;->invoke(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;
-                move-result-object v0
-                sget-object v1, $EXT/Reflect;->NONE:Ljava/lang/Object;
-                if-eq v0, v1, :own
-                return-object v0
-            """,
-            ExternalLabel("own", invoke.implementation!!.instructions.first()),
-        )
+        // The Kotlin reflection helper asks Reflect.invoke first (a drag event's display, so icons can be moved). 15.1 has
+        // no such helper and does not ask a drag event for its display.
+        val reflectionHelper = mutableClassDefByOrNull("Lcom/honeyspace/common/reflection/ReflectionUtilsKt;")
+        if (reflectionHelper == null && !oneUi61Build) throw PatchException("ReflectionUtilsKt not found")
+        if (reflectionHelper != null) {
+            val invoke = reflectionHelper.methods.firstOrNull {
+                it.name == "invokeReflection" && it.parameterTypes.size == 3
+            } ?: throw PatchException("ReflectionUtilsKt.invokeReflection not found")
+            invoke.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { p0, p1, p2 }, $EXT/Reflect;->invoke(Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;
+                    move-result-object v0
+                    sget-object v1, $EXT/Reflect;->NONE:Ljava/lang/Object;
+                    if-eq v0, v1, :own
+                    return-object v0
+                """,
+                ExternalLabel("own", invoke.implementation!!.instructions.first()),
+            )
+        }
         log.info("system services: $services, settings calls: $settings, widget binds: $widgets, windows: $windows, wallpaper reads: $wallpapers")
-        // Measured against 18.0.07.59: 168 settings calls; 16.0.09.35: 117.
+        // Measured against 18.0.07.59: 168 settings calls; 16.0.09.35: 117; 15.1.03.75: 159.
         if (settings < 50) throw PatchException("only $settings settings calls found")
         if (widgets == 0) throw PatchException("no widget binds found")
-        // Measured against 18.0.07.59: 1 (the Home Up backup picture).
+        // Measured against 18.0.07.59: 1 (the Home Up backup picture); 15.1.03.75: 1.
         if (wallpapers == 0) throw PatchException("the wallpaper read of Home Up backups was not found")
 
         // App launches: without the remote animation permission, Android's own launch (the path One UI Home itself
-        // takes in DeX).
+        // takes in DeX). 15.1's method takes one argument, the newer ones two.
         val launchOptions = mutableClassDefBy("Lcom/honeyspace/transition/ShellTransitionManager;").methods.firstOrNull {
-            it.name == "getActivityLaunchOptions" && it.parameterTypes.size == 2 &&
+            it.name == "getActivityLaunchOptions" && it.parameterTypes.size in 1..2 &&
                 it.returnType == "Lcom/honeyspace/transition/utils/ActivityOptionsWrapper;"
         } ?: throw PatchException("ShellTransitionManager.getActivityLaunchOptions not found")
+        // 15.1's wrapper also takes the callbacks to run when the launch ends (none here).
+        val wrapper = "Lcom/honeyspace/transition/utils/ActivityOptionsWrapper;"
+        val wrap = if (oneUi61Build) {
+            """
+                new-instance v2, Lcom/honeyspace/transition/utils/RunnableList;
+                invoke-direct { v2 }, Lcom/honeyspace/transition/utils/RunnableList;-><init>()V
+                invoke-direct { v1, v0, v2 }, $wrapper-><init>(${ACTIVITY_OPTIONS}Lcom/honeyspace/transition/utils/RunnableList;)V
+            """
+        } else {
+            "invoke-direct { v1, v0 }, $wrapper-><init>($ACTIVITY_OPTIONS)V"
+        }
         launchOptions.addInstructionsWithLabels(
             0,
             """
@@ -309,12 +351,28 @@ private val systemPrivilegesPatch = bytecodePatch(
                 if-nez v0, :remote
                 invoke-static { }, $ACTIVITY_OPTIONS->makeBasic()$ACTIVITY_OPTIONS
                 move-result-object v0
-                new-instance v1, Lcom/honeyspace/transition/utils/ActivityOptionsWrapper;
-                invoke-direct { v1, v0 }, Lcom/honeyspace/transition/utils/ActivityOptionsWrapper;-><init>($ACTIVITY_OPTIONS)V
+                new-instance v1, $wrapper
+                $wrap
                 return-object v1
             """,
             ExternalLabel("remote", launchOptions.implementation!!.instructions.first()),
         )
+
+        // A widget view's mode is read from a hidden field: 16.0 and 15.1 cast the refused answer (null) to int, and 15.1
+        // died adding a widget (see Widgets.viewMode). 18.0 takes null itself.
+        val viewMode = mutableClassDefBy("Lcom/honeyspace/ui/common/reflection/AppWidgetHostViewReflection;").methods.firstOrNull {
+            it.name == "getRemoteViewMode" && it.parameterTypes.size == 1
+        } ?: throw PatchException("AppWidgetHostViewReflection.getRemoteViewMode not found")
+        if (viewMode.returnType == "I") {
+            viewMode.addInstructions(
+                0,
+                """
+                    invoke-static { p1 }, $EXT/Widgets;->viewMode(Landroid/appwidget/AppWidgetHostView;)I
+                    move-result p1
+                    return p1
+                """,
+            )
+        }
 
         // Suggested apps come from Android's app prediction service, which only answers a caller with usage access
         // (PACKAGE_USAGE_STATS); without it there are no suggestions instead of a crash.
@@ -333,12 +391,12 @@ private val systemPrivilegesPatch = bytecodePatch(
         )
 
         // The home screen's own close/recents transitions are registered with the shell as remote transitions, which
-        // likewise needs the permission: without it they are not registered (Android's own animations play).
+        // likewise needs the permission: without it they are not registered (Android's own animations play). 15.1
+        // registers them all in registerRemoteTransitions.
         val shell = mutableClassDefBy("Lcom/honeyspace/transition/ShellTransitionManager;")
-        for (name in listOf(
-            "registerRemoteTransitions", "unregisterRemoteTransitions", "setAppCloseRemoteTransition",
-            "setRecentCloseRemoteTransition", "unregisterRecentsRemoteTransitions",
-        )) {
+        val transitions = listOf("registerRemoteTransitions", "unregisterRemoteTransitions") + if (oneUi61Build) emptyList() else
+            listOf("setAppCloseRemoteTransition", "setRecentCloseRemoteTransition", "unregisterRecentsRemoteTransitions")
+        for (name in transitions) {
             val method = shell.methods.firstOrNull { it.name == name && it.returnType == "V" }
                 ?: throw PatchException("ShellTransitionManager.$name not found")
             method.addInstructionsWithLabels(
@@ -354,87 +412,136 @@ private val systemPrivilegesPatch = bytecodePatch(
         }
 
         // While an icon is dragged One UI hides the status bar; elsewhere Android then shows its "Viewing full screen"
-        // hint, a full-screen window that takes the drop, and the icon cannot be moved. The bars stay shown here.
+        // hint, a full-screen window that takes the drop, and the icon cannot be moved. The bars stay shown here. (15.1
+        // does not hide them while dragging: its SystemUIControlUtils has only show/hide helpers nothing calls.)
         val systemUi = mutableClassDefBy("Lcom/honeyspace/ui/common/util/SystemUIControlUtils;")
-        val update = systemUi.methods.firstOrNull {
-            it.name == "updateSystemUI" && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/view/Window;", "Z", "I", "Z")
-        } ?: throw PatchException("SystemUIControlUtils.updateSystemUI not found")
-        update.addInstructionsWithLabels(
-            0,
-            """
-                if-nez p2, :show
-                return-void
-            """,
-            ExternalLabel("show", update.implementation!!.instructions.first()),
-        )
-        if (isAndroid13Build(packageMetadata.versionName)) {
-            // 16.0 works out the bars to keep hidden for the home screen in a helper of its own.
-            val exceptions = systemUi.methods.firstOrNull {
-                it.name == "getShowExceptionTypes" && it.returnType == "I" &&
-                    it.parameterTypes.map { t -> t.toString() } == listOf("I", "Landroid/view/Window;")
-            } ?: throw PatchException("SystemUIControlUtils.getShowExceptionTypes not found")
-            exceptions.addInstructions(0, "const/4 v0, 0x0\nreturn v0")
-        } else {
-            val hideExceptions = systemUi.methods.firstOrNull {
-                it.name.startsWith("updateSystemUI\$lambda") && it.parameterTypes.map { t -> t.toString() } ==
-                    listOf("I", "Landroid/view/WindowInsetsController;", "I")
-            } ?: throw PatchException("SystemUIControlUtils.updateSystemUI lambda not found")
-            hideExceptions.addInstructions(0, "const/4 p2, 0x0")
+        if (!oneUi61Build) {
+            val update = systemUi.methods.firstOrNull {
+                it.name == "updateSystemUI" && it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/view/Window;", "Z", "I", "Z")
+            } ?: throw PatchException("SystemUIControlUtils.updateSystemUI not found")
+            update.addInstructionsWithLabels(
+                0,
+                """
+                    if-nez p2, :show
+                    return-void
+                """,
+                ExternalLabel("show", update.implementation!!.instructions.first()),
+            )
+            if (isAndroid13Build(packageMetadata.versionName)) {
+                // 16.0 works out the bars to keep hidden for the home screen in a helper of its own.
+                val exceptions = systemUi.methods.firstOrNull {
+                    it.name == "getShowExceptionTypes" && it.returnType == "I" &&
+                        it.parameterTypes.map { t -> t.toString() } == listOf("I", "Landroid/view/Window;")
+                } ?: throw PatchException("SystemUIControlUtils.getShowExceptionTypes not found")
+                exceptions.addInstructions(0, "const/4 v0, 0x0\nreturn v0")
+            } else {
+                val hideExceptions = systemUi.methods.firstOrNull {
+                    it.name.startsWith("updateSystemUI\$lambda") && it.parameterTypes.map { t -> t.toString() } ==
+                        listOf("I", "Landroid/view/WindowInsetsController;", "I")
+                } ?: throw PatchException("SystemUIControlUtils.updateSystemUI lambda not found")
+                hideExceptions.addInstructions(0, "const/4 p2, 0x0")
+            }
         }
 
         // Another user's content providers (a work profile's app timers) need INTERACT_ACROSS_USERS: 16.x queries them
         // unguarded and died at start on a phone with a work profile. A provider address in another user is "none"
-        // (null), which every caller already skips.
-        val userUri = mutableClassDefBy("Lcom/honeyspace/common/reflection/UserManagerReflection;").methods.firstOrNull {
-            it.name == "getUserUri" && it.returnType == "Landroid/net/Uri;" &&
-                it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/net/Uri;", "Landroid/os/UserHandle;")
-        } ?: throw PatchException("UserManagerReflection.getUserUri not found")
-        userUri.addInstructionsWithLabels(
-            0,
-            """
-                invoke-static { }, Landroid/os/Process;->myUserHandle()Landroid/os/UserHandle;
-                move-result-object v0
-                invoke-virtual { v0, p2 }, Landroid/os/UserHandle;->equals(Ljava/lang/Object;)Z
-                move-result v0
-                if-nez v0, :own
-                const/4 v0, 0x0
-                return-object v0
-            """,
-            ExternalLabel("own", userUri.implementation!!.instructions.first()),
-        )
+        // (null), which every caller already skips. (15.1 reads its own user's provider only.)
+        if (!oneUi61Build) {
+            val userUri = mutableClassDefBy("Lcom/honeyspace/common/reflection/UserManagerReflection;").methods.firstOrNull {
+                it.name == "getUserUri" && it.returnType == "Landroid/net/Uri;" &&
+                    it.parameterTypes.map { t -> t.toString() } == listOf("Landroid/net/Uri;", "Landroid/os/UserHandle;")
+            } ?: throw PatchException("UserManagerReflection.getUserUri not found")
+            userUri.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { }, Landroid/os/Process;->myUserHandle()Landroid/os/UserHandle;
+                    move-result-object v0
+                    invoke-virtual { v0, p2 }, Landroid/os/UserHandle;->equals(Ljava/lang/Object;)Z
+                    move-result v0
+                    if-nez v0, :own
+                    const/4 v0, 0x0
+                    return-object v0
+                """,
+                ExternalLabel("own", userUri.implementation!!.instructions.first()),
+            )
+        }
 
         // Everything else that asks for a remote animation (widget and recents launches). The method has no spare
         // register, so it is rebuilt with one.
-        val compat = mutableClassDefBy("Lcom/android/systemui/shared/launcher/ActivityOptionsCompat;")
+        val compat = mutableClassDefBy(ACTIVITY_OPTIONS_COMPAT)
+        val adapterOnly = listOf("Landroid/view/RemoteAnimationAdapter;", "Landroid/window/RemoteTransition;")
         val remote = compat.methods.firstOrNull {
-            it.name == "makeRemoteAnimation" && it.returnType == ACTIVITY_OPTIONS && it.parameterTypes.size == 2
+            it.name == "makeRemoteAnimation" && it.returnType == ACTIVITY_OPTIONS && it.parameterTypes.map { t -> t.toString() } == adapterOnly
         } ?: throw PatchException("ActivityOptionsCompat.makeRemoteAnimation not found")
-        val parameters = remote.parameterTypes.map { it.toString() }
         compat.methods.remove(remote)
         compat.methods.add(
-            ImmutableMethod(
-                remote.definingClass, remote.name, parameters.map { ImmutableMethodParameter(it, null, null) },
-                remote.returnType, remote.accessFlags, null, null, MutableMethodImplementation(3),
-            ).toMutable().apply {
-                addInstructionsWithLabels(
+            rebuilt(
+                remote, 3,
+                """
+                    invoke-static { }, $EXT/Launch;->remoteAnimations()Z
+                    move-result v0
+                    if-eqz v0, :basic
+                    invoke-static { p0, p1 }, $ACTIVITY_OPTIONS->makeRemoteAnimation(${adapterOnly.joinToString("")})$ACTIVITY_OPTIONS
+                    move-result-object v0
+                    return-object v0
+                    :basic
+                    invoke-static { }, $ACTIVITY_OPTIONS->makeBasic()$ACTIVITY_OPTIONS
+                    move-result-object v0
+                    return-object v0
+                """,
+            ),
+        )
+        // 15.1 also has overloads that take its RemoteAnimationAdapterCompat and ask Android themselves: the two-argument
+        // one now goes through the method above, the other asks Launch first.
+        val others = compat.methods.filter {
+            it.name == "makeRemoteAnimation" && it.returnType == ACTIVITY_OPTIONS && it.parameterTypes.map { t -> t.toString() } != adapterOnly
+        }
+        if (others.isNotEmpty() != oneUi61Build) throw PatchException("unexpected ActivityOptionsCompat.makeRemoteAnimation overloads: ${others.size}")
+        for (overload in others) {
+            val types = overload.parameterTypes.map { it.toString() }
+            if (types == listOf("$REMOTE_ADAPTER_COMPAT", "Landroid/window/RemoteTransition;")) {
+                compat.methods.remove(overload)
+                compat.methods.add(
+                    rebuilt(
+                        overload, 3,
+                        """
+                            invoke-virtual { p0 }, $REMOTE_ADAPTER_COMPAT->getWrapped()Landroid/view/RemoteAnimationAdapter;
+                            move-result-object v0
+                            invoke-static { v0, p1 }, $ACTIVITY_OPTIONS_COMPAT->makeRemoteAnimation(${adapterOnly.joinToString("")})$ACTIVITY_OPTIONS
+                            move-result-object v0
+                            return-object v0
+                        """,
+                    ),
+                )
+            } else {
+                val implementation = overload.implementation!!
+                if (implementation.registerCount - types.size < 1) throw PatchException("makeRemoteAnimation$types has no spare register")
+                overload.addInstructionsWithLabels(
                     0,
                     """
                         invoke-static { }, $EXT/Launch;->remoteAnimations()Z
                         move-result v0
-                        if-eqz v0, :basic
-                        invoke-static { p0, p1 }, $ACTIVITY_OPTIONS->makeRemoteAnimation(${parameters.joinToString("")})$ACTIVITY_OPTIONS
-                        move-result-object v0
-                        return-object v0
-                        :basic
+                        if-nez v0, :remote
                         invoke-static { }, $ACTIVITY_OPTIONS->makeBasic()$ACTIVITY_OPTIONS
                         move-result-object v0
                         return-object v0
                     """,
+                    ExternalLabel("remote", implementation.instructions.first()),
                 )
-            },
-        )
+            }
+        }
     }
 }
+
+private const val ACTIVITY_OPTIONS_COMPAT = "Lcom/android/systemui/shared/launcher/ActivityOptionsCompat;"
+private const val REMOTE_ADAPTER_COMPAT = "Lcom/android/systemui/shared/launcher/RemoteAnimationAdapterCompat;"
+
+/** [method] with a new body of [registers] registers (the parameters last). */
+private fun rebuilt(method: com.android.tools.smali.dexlib2.iface.Method, registers: Int, body: String) =
+    ImmutableMethod(
+        method.definingClass, method.name, method.parameterTypes.map { ImmutableMethodParameter(it.toString(), null, null) },
+        method.returnType, method.accessFlags, null, null, MutableMethodImplementation(registers),
+    ).toMutable().apply { addInstructionsWithLabels(0, body) }
 
 /** Another version of the app or too old an Android stops here with a clear message (see supportedVersionCheck). */
 private val versionCheckPatch = supportedVersionCheck(COMPATIBILITY_SAMSUNG_LAUNCHER)

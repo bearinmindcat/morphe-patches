@@ -11,4 +11,7 @@ public class SemPersonaManager {
     public static boolean isSecureFolderId(int p0) {
         return false;
     }
+    public int getKioskId() {
+        return 0;
+    }
 }

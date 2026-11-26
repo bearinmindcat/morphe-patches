@@ -12,4 +12,6 @@ public class CocktailProviderInfo {
     public boolean permitVisibilityChanged;
     public int previewImage;
     public android.content.ComponentName provider;
+    public boolean cscPreviewImage;
+    public java.lang.String privateMode;
 }

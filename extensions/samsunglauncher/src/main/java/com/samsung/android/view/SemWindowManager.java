@@ -32,4 +32,7 @@ public class SemWindowManager {
     }
     public interface FoldStateListener {
     }
+    public static java.lang.Object castOrNull(java.lang.Object p0, java.lang.Class p1) {
+        return null;
+    }
 }

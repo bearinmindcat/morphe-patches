@@ -14,4 +14,7 @@ public class CocktailInfo {
     public android.widget.RemoteViews getHelpView() {
         return null;
     }
+    public int getDisplayPolicy() {
+        return 0;
+    }
 }

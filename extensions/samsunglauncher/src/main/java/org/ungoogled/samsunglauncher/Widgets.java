@@ -51,4 +51,19 @@ public final class Widgets {
         }
         return false;
     }
+
+    /**
+     * AppWidgetHostViewReflection.getRemoteViewMode (16.0, 15.1): a widget view's mode, read from AppWidgetHostView's
+     * hidden mViewMode. An installed app may not read it; the launcher then cast null to int and died while adding a
+     * widget (15.1). Where it can't be read the view counts as showing its content (1).
+     */
+    public static int viewMode(android.appwidget.AppWidgetHostView view) {
+        try {
+            java.lang.reflect.Field mode = android.appwidget.AppWidgetHostView.class.getDeclaredField("mViewMode");
+            mode.setAccessible(true);
+            return mode.getInt(view);
+        } catch (Throwable e) {
+            return 1;
+        }
+    }
 }

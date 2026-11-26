@@ -14,4 +14,9 @@ public class CoreRune {
     public static boolean MW_PIP_FORCE_ENABLE_LOG;
     public static boolean MW_RESUMED_AFFORDANCE_SHELL_TRANSITION;
     public static boolean MW_SA_LOGGING;
+    public static boolean FW_CUSTOM_SHELL_TRANSITION_BUG_FIX;
+    public static boolean FW_CUSTOM_SHELL_TRANSITION_MERGE;
+    public static boolean FW_CUSTOM_SHELL_TRANSITION_MERGE_TRANSFER;
+    public static boolean FW_CUSTOM_SHELL_TRANSITION_TRANSIENT_LAUNCH_OVERLAY;
+    public static boolean FW_MERGE_REMOTE_ANIMATION;
 }

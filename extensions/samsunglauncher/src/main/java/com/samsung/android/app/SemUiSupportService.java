@@ -31,4 +31,7 @@ public class SemUiSupportService extends android.app.Service {
     }
     public void stopUiSupportService() {
     }
+    public boolean dispatchTouchEvent(android.view.MotionEvent p0) {
+        return false;
+    }
 }
