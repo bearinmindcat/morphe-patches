@@ -10,6 +10,7 @@ import app.morphe.patcher.patch.PatchAvailability
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.ResourcePatch
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.intOption
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
@@ -302,6 +303,14 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_GMAIL)
     keepIconAndNameOption("Gmail")
     microgPackageNameOption("Gmail", MICROG_GMAIL_DEFAULT)
+    // Google accounts get new mail by push; without it Gmail only synced when opened (issue #216).
+    val syncMinutes = intOption(
+        key = "syncMinutes",
+        default = 15,
+        title = "Check for new mail (minutes)",
+        description = "How often Google accounts sync in the background, push or not. 0 = off.",
+        required = true,
+    ) { it != null && it >= 0 }
     category("microG-RE")
     // A mount install keeps stock Gmail's manifest, so microG never learns whom to vouch for.
     availability(AvailabilityResolver { installer, _ ->
@@ -381,7 +390,16 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
             val returns = implementation!!.instructions.withIndex().filter { it.value.opcode == Opcode.RETURN_OBJECT }
             val ret = returns.singleOrNull() ?: throw PatchException("app component factory: expected one return, found ${returns.size}")
             val register = (ret.value as OneRegisterInstruction).registerA
-            addInstructions(ret.index, "invoke-static { v$register }, Lorg/ungoogled/gmail/NeedsMicrog;->app(Landroid/app/Application;)V")
+            // (ClassLoader, String) -> Application: the parameters are dead at the return, p1 holds the interval.
+            if (register == 1 || parameterTypes.size != 2) throw PatchException("app component factory changed shape")
+            addInstructions(
+                ret.index,
+                """
+                    invoke-static { v$register }, Lorg/ungoogled/gmail/NeedsMicrog;->app(Landroid/app/Application;)V
+                    const p1, ${syncMinutes.value!!.coerceAtLeast(0)}
+                    invoke-static { v$register, p1 }, Lorg/ungoogled/gmail/BackgroundSync;->start(Landroid/app/Application;I)V
+                """,
+            )
         } ?: throw PatchException("app component factory ($COMPONENT_FACTORY) no longer makes the Application")
         factory.methods.singleOrNull {
             it.name == "instantiateActivity" && it.parameterTypes.map(CharSequence::toString) ==
