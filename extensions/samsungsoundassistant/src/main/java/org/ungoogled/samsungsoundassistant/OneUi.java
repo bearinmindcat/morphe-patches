@@ -121,10 +121,25 @@ public final class OneUi {
         try {
             return ((Method) m).invoke(receiver, args);
         } catch (InvocationTargetException e) {
-            throw rethrow(e);
+            if (!refused(key, e.getCause())) throw rethrow(e);
+            Object answer = Fallbacks.call(receiver, key, args);
+            return answer != Fallbacks.NONE ? answer : absent(receiver, key);
         } catch (IllegalAccessException e) {
             return absent(receiver, key);
         }
+    }
+
+    /**
+     * On a Galaxy phone One UI's members are there, but some answer only Samsung's own signed build: its system
+     * services refuse this copy (SecurityException), hand it no binder (Samsung's managers then throw
+     * NullPointerException) or fail across the binder (RemoteException). Such a member answers as if the phone did not
+     * have it.
+     */
+    private static boolean refused(String key, Throwable cause) {
+        if (!(cause instanceof SecurityException) && !(cause instanceof NullPointerException)
+                && !(cause instanceof android.os.RemoteException)) return false;
+        Log.w(TAG, "One UI refused " + key + ": " + cause);
+        return true;
     }
 
     /** A super call cannot be made from here; off One UI there is no super method to call anyway. */
@@ -135,6 +150,8 @@ public final class OneUi {
     public static Object get(Object receiver, String key) {
         Object f = member(key);
         if (f == MISSING) return absent(receiver, key);
+        // An instance field of an object a refused call did not return (see refused) reads as absent.
+        if (receiver == null && !java.lang.reflect.Modifier.isStatic(((Field) f).getModifiers())) return absent(null, key);
         try {
             return ((Field) f).get(receiver);
         } catch (IllegalAccessException e) {
