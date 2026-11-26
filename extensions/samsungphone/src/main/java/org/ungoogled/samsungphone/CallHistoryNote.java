@@ -25,7 +25,10 @@ import java.lang.ref.WeakReference;
  * request is turned down silently, where it does the usual prompt comes up, and once allowed the screen reloads.
  */
 public final class CallHistoryNote {
-    static final String COMMAND = "pm install -r \"$(pm path com.samsung.android.dialer | cut -d: -f2)\"";
+    /** The one-liner for this copy (its package name differs when "Change package name" renamed it). */
+    static String command(Context context) {
+        return "pm install -r \"$(pm path " + context.getPackageName() + " | cut -d: -f2)\"";
+    }
     private static final String PREFS = "ungoogled_phone";
     private static final String SHOWN = "call_history_note_shown";
 
@@ -121,7 +124,7 @@ public final class CallHistoryNote {
                     .setTitle("Call history")
                     .setMessage("Recents needs the Call logs permission, which Android only allows when the app was"
                             + " installed with adb or root. To allow it for this copy, run this once in adb shell or"
-                            + " Shizuku's rish, then reopen the app and allow Call logs:\n\n" + COMMAND
+                            + " Shizuku's rish, then reopen the app and allow Call logs:\n\n" + command(app)
                             + "\n\nIf you turned it down, allow Call logs in App info > Permissions.")
                     .setPositiveButton(android.R.string.ok, (d, w) -> seen.run())
                     .setNeutralButton("Copy command", (d, w) -> {
@@ -139,7 +142,7 @@ public final class CallHistoryNote {
     private static void copy(Context app) {
         try {
             ClipboardManager clipboard = app.getSystemService(ClipboardManager.class);
-            if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("command", COMMAND));
+            if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("command", command(app)));
             Toast.makeText(app, "Command copied", Toast.LENGTH_SHORT).show();
         } catch (RuntimeException e) {
             // Nothing to copy to.
