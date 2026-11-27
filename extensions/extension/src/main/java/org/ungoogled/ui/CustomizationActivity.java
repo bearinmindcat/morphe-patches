@@ -378,9 +378,16 @@ public final class CustomizationActivity extends Activity {
                 chooseMany("Media apps in navigation", labels, mask, out -> {
                     java.util.List<String> picked = new java.util.ArrayList<>();
                     for (int i = 0; i < apps.size(); i++) if ((out & (1 << i)) != 0) picked.add(apps.get(i));
-                    // read when navigation starts, so no restart
+                    // read when navigation starts, so no restart -- unless an app newly picked is one Maps lists
+                    // only when picked (no Android Auto support): Maps collects its media apps once, at start
                     MediaApps.setChosen(this, picked);
                     appsSub.setText(mediaAppsSummary());
+                    for (String p : picked) {
+                        if (!chosen.contains(p) && !MediaApps.listedAnyway(this, p)) {
+                            restartSoon(v);
+                            break;
+                        }
+                    }
                 });
             });
             body.addView(appsRow);

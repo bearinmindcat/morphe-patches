@@ -45,6 +45,11 @@ public final class MediaApps {
 
     private MediaApps() {}
 
+    /** Whether Maps lists the app whatever is chosen: an Android Auto app or a partner. */
+    static boolean listedAnyway(Context c, String pkg) {
+        return PARTNERS.contains(pkg) || androidAuto(c.getPackageManager(), pkg);
+    }
+
     /** Rewritten by the patch: Maps' media app entry class, and its list builder's add method. */
     static String entryClass() { return ""; }
     static String addMethod() { return ""; }
@@ -72,7 +77,10 @@ public final class MediaApps {
         c.getSharedPreferences(Shapes.PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ROW, String.join(",", packages)).commit();
     }
 
-    /** The apps Maps can offer in navigation now, by name: Android Auto media apps, open sessions, Maps' partners. */
+    /**
+     * The apps Maps can offer in navigation now, by name: media apps with Android Auto support or a launcher icon, open
+     * sessions, Maps' partners.
+     */
     public static List<String> candidates(Context c) {
         PackageManager pm = c.getPackageManager();
         Set<String> open = PlayingMedia.sessionPackages(c);
@@ -82,7 +90,9 @@ public final class MediaApps {
             if (r.serviceInfo == null) continue;
             String pkg = r.serviceInfo.packageName;
             if (pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
-            if (PARTNERS.contains(pkg) || androidAuto(pm, pkg) || open.contains(pkg)) out.add(pkg);
+            // Also every app of the user's own with a media browser (issue #78: YouTube Morphe has no Android Auto
+            // support, so it was offered only while playing or once picked as the default media app).
+            if (PARTNERS.contains(pkg) || androidAuto(pm, pkg) || open.contains(pkg) || pm.getLaunchIntentForPackage(pkg) != null) out.add(pkg);
         }
         Collections.sort(out, (a, b) -> label(c, a).compareToIgnoreCase(label(c, b)));
         return out;
@@ -210,11 +220,13 @@ public final class MediaApps {
             // playing media). Every app listed is connected to at each navigation start; one already playing is
             // already running, the rest would all be started for it.
             Set<String> open = PlayingMedia.sessionPackages(c);
+            // The apps chosen in Customization > Media apps in navigation join too, whatever they support.
+            Set<String> picked = new HashSet<>(chosen(c));
             for (ResolveInfo r : pm.queryIntentServices(new Intent("android.media.browse.MediaBrowserService"), 0)) {
                 if (r.serviceInfo == null) continue;
                 String pkg = r.serviceInfo.packageName;
                 if (PARTNERS.contains(pkg) || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
-                if (!androidAuto(pm, pkg) && !open.contains(pkg)) continue;
+                if (!androidAuto(pm, pkg) && !open.contains(pkg) && !picked.contains(pkg)) continue;
                 add.invoke(builder, entry.newInstance(pkg, COLOR, TOUCH_COLOR));
             }
         } catch (Throwable t) {
