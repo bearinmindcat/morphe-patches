@@ -12,11 +12,15 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
 private const val MEDIA_PANEL = "Lorg/ungoogled/ui/MediaPanel;"
+/** org.ungoogled.ui.ScrollRow: the media app row, scrolling sideways. */
+private const val SCROLL_ROW = "Lorg/ungoogled/ui/ScrollRow;"
 // string/EXPAND_ and MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION: the media button's two labels.
 private val EXPAND_MEDIA_CONTROLS get() = mapsId(ResourceType.STRING, "EXPAND_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION")
 private val MINIMIZE_MEDIA_CONTROLS get() = mapsId(ResourceType.STRING, "MINIMIZE_MEDIA_REMOTE_CONTROL_CONTENT_DESCRIPTION")
@@ -29,8 +33,8 @@ private val MINIMIZE_MEDIA_CONTROLS get() = mapsId(ResourceType.STRING, "MINIMIZ
 @Suppress("unused")
 val mediaPanelClosePatch = bytecodePatch(
     name = "Media panel can be closed",
-    description = "Navigation's media button stays above the media controls, so they can be closed again, and the " +
-        "lowered sheet ends right below them.",
+    description = "Navigation's media button stays above the media controls, so they can be closed again; the " +
+        "lowered sheet ends right below them and the row of media apps scrolls.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -108,5 +112,42 @@ val mediaPanelClosePatch = bytecodePatch(
                 move-result v$height
             """,
         )
+
+        // Issue #206: the row of the other media apps under the card is a plain horizontal LinearLayout as wide as the
+        // sheet, so the apps past the fifth or so were cut off. The panel's layout makes the card's layout (the one
+        // naming the card's id) and then the row's; the row's view class becomes the extension's scrolling row.
+        run {
+            fun newInstances(m: Method) = m.implementation?.instructions?.mapNotNull { insn ->
+                ((insn as? ReferenceInstruction)?.reference as? TypeReference)?.type?.takeIf { insn.opcode == Opcode.NEW_INSTANCE }
+            }.orEmpty()
+            val cardLayouts = mutableSetOf<String>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/") || c.superclass == "Ljava/lang/Object;") return@classDefForEach
+                if (c.methods.any { it.parameterTypes.isEmpty() && it.returnType.startsWith("L") && it.hasLiteral(card) }) cardLayouts += c.type
+            }
+            val rows = mutableSetOf<String>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    val made = newInstances(m)
+                    val at = made.indexOfFirst { it in cardLayouts }
+                    if (at < 0) continue
+                    val cardSuper = classDefByOrNull(made[at])?.superclass ?: continue
+                    made.drop(at + 1).firstOrNull { classDefByOrNull(it)?.superclass == cardSuper }?.let { rows += it }
+                }
+            }
+            val row = mutableClassDefBy(rows.singleOrNull() ?: throw PatchException("media app row layout: found ${rows.size}"))
+            val views = row.methods.filter { m ->
+                m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                    it.opcode == Opcode.CONST_CLASS && ((it as ReferenceInstruction).reference as TypeReference).type == "Landroid/widget/LinearLayout;"
+                } == true
+            }
+            val layout = views.singleOrNull() ?: throw PatchException("media app row's layout: found ${views.size}")
+            val classes = layout.implementation!!.instructions.withIndex().filter { (_, insn) ->
+                insn.opcode == Opcode.CONST_CLASS && ((insn as ReferenceInstruction).reference as TypeReference).type == "Landroid/widget/LinearLayout;"
+            }
+            val (at, insn) = classes.singleOrNull() ?: throw PatchException("media app row is no longer one LinearLayout")
+            layout.replaceInstruction(at, "const-class v${(insn as OneRegisterInstruction).registerA}, $SCROLL_ROW")
+        }
     }
 }
