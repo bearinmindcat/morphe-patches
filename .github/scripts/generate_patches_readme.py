@@ -47,7 +47,8 @@ VENDOR_GROUPS = [
     # Home screen apps from every vendor get one dropdown of their own, listed first,
     # instead of sitting in their vendor's.
     ("Launchers", "", (), ("com.sec.android.app.launcher", "com.hihonor.android.launcher", "com.android.launcher",
-                           "com.nothing.launcher", "net.oneplus.launcher", "com.sonymobile.launcher", "com.asus.launcher", "com.motorola.launcher3", "com.miui.home")),
+                           "com.nothing.launcher", "net.oneplus.launcher", "com.sonymobile.launcher", "com.asus.launcher", "com.motorola.launcher3", "com.miui.home",
+                           "com.google.android.apps.nexuslauncher")),
     ("Samsung Apps", "samsung ", ("com.samsung.", "com.sec."), ()),
     ("Xiaomi Apps", "xiaomi ", ("com.miui.", "com.xiaomi."), ("com.android.soundrecorder", "com.android.calendar")),
     ("Nothing Apps", "nothing ", ("com.nothing.",), ()),
