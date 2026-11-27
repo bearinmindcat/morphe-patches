@@ -125,7 +125,8 @@ private val gmailMicrogResourcesPatch: ResourcePatch = resourcePatch(
     execute {
         // Option of gmailMicrogSupportPatch: the launcher icon and name stay Gmail's own (issue #205).
         val keep = keepsIconAndName(gmailMicrogSupportPatch)
-        microgGmail = microgPackageName(gmailMicrogSupportPatch, MICROG_GMAIL_DEFAULT, STOCK_PACKAGE)
+        // Gmail's own package too, for phones without Gmail (issue #249): it then simply is Gmail, signing in through microG-RE.
+        microgGmail = microgPackageName(gmailMicrogSupportPatch, MICROG_GMAIL_DEFAULT, STOCK_PACKAGE, stockAllowed = true)
         val counts = linkedMapOf<String, Int>()
         fun count(what: String) { counts[what] = (counts[what] ?: 0) + 1 }
 
@@ -302,7 +303,7 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_GMAIL)
     keepIconAndNameOption("Gmail")
-    microgPackageNameOption("Gmail", MICROG_GMAIL_DEFAULT)
+    microgPackageNameOption("Gmail", MICROG_GMAIL_DEFAULT, STOCK_PACKAGE)
     // Google accounts get new mail by push; without it Gmail only synced when opened (issue #216).
     val syncMinutes = intOption(
         key = "syncMinutes",
