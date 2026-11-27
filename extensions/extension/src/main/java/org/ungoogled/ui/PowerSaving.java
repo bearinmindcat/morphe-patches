@@ -707,7 +707,7 @@ public final class PowerSaving {
             }
         }
 
-        private static android.view.ViewGroup burnInLayout(View v) {
+        static android.view.ViewGroup burnInLayout(View v) {
             if (v instanceof android.view.ViewGroup) {
                 if (v.getClass().getName().endsWith("BurnInLayout")) return (android.view.ViewGroup) v;
                 android.view.ViewGroup g = (android.view.ViewGroup) v;

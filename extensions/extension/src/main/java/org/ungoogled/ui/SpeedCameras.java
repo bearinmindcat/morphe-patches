@@ -274,6 +274,7 @@ public final class SpeedCameras {
             tracking = true;
             ((Application) app).registerActivityLifecycleCallbacks(new Lifecycle());
         }
+        if (active()) Ahead.track(app);
         MAIN.post(SpeedCameras::listen);
     }
 
@@ -430,7 +431,11 @@ public final class SpeedCameras {
                 bestDistance = d;
             }
         }
-        if (best == null) return;
+        if (best == null) {
+            Ahead.none(Ahead.CAMERAS);
+            return;
+        }
+        Ahead.report(Ahead.CAMERAS, emoji(best.kind), label(best), bestDistance);
         long now = android.os.SystemClock.elapsedRealtime();
         Long at = alerted.get(best.id);
         if (at != null && now - at < 5 * 60 * 1000L) return;
