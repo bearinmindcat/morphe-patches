@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * query or write ("Invalid column ...") and an unknown path throws. The patch sends the app's ContentResolver calls
  * here: other providers are passed straight through; for these an unknown path answers nothing, and a column they
  * lack is learnt from the error, left out of the call (writes), read as null (queries) or as 0 (selections, sort orders), and
- * Samsung's UNICODE_NATURAL collation becomes Android's LOCALIZED.
+ * Samsung's UNICODE_NATURAL collation becomes Android's LOCALIZED. Samsung's group paths are answered by Groups.
  */
 public final class ProviderCalls {
     private static final String TAG = "UA";
@@ -41,6 +41,10 @@ public final class ProviderCalls {
         return "sms".equals(a) || "mms".equals(a) || "mms-sms".equals(a) || "com.android.contacts".equals(a);
     }
 
+    private static boolean contacts(Uri uri) {
+        return "com.android.contacts".equals(uri.getAuthority());
+    }
+
     private static Set<String> missing(Uri uri) {
         List<String> path = uri.getPathSegments();
         String key = uri.getAuthority() + "/" + (path.isEmpty() ? "" : path.get(0));
@@ -48,7 +52,7 @@ public final class ProviderCalls {
     }
 
     /** The column an error names as unknown, or null. */
-    private static String unknownColumn(RuntimeException e) {
+    static String unknownColumn(RuntimeException e) {
         if (e.getMessage() == null) return null;
         Matcher m = NO_COLUMN.matcher(e.getMessage());
         if (!m.find()) return null;
@@ -58,17 +62,35 @@ public final class ProviderCalls {
     }
 
     /** Replaces whole-word uses of the lacking columns in a selection or sort order with 0. */
-    private static String rewrite(String sql, Set<String> missing) {
+    static String rewrite(String sql, Set<String> missing) {
+        return rewrite(sql, missing, false);
+    }
+
+    /**
+     * As above; in the contacts provider Samsung's data view also has the title of the group a membership row is in
+     * (the app removes members by group title): there "title" becomes that group's title.
+     */
+    static String rewrite(String sql, Set<String> missing, boolean contacts) {
         if (sql == null) return null;
         // Samsung's SQLite collation for natural name order; Android's providers have LOCALIZED.
         String out = sql.replace("UNICODE_NATURAL", "LOCALIZED");
+        if (contacts && missing.contains("title")) out = replaceColumn(out, "title", GROUP_TITLE);
         for (String c : missing) {
-            out = out.replaceAll("(?<![A-Za-z0-9_'\"])(?:[A-Za-z0-9_]+\\.)?" + Pattern.quote(c) + "(?![A-Za-z0-9_'\"])", "0");
+            if (contacts && "title".equals(c)) continue;
+            out = replaceColumn(out, c, "0");
         }
         return out;
     }
 
-    private static String[] keep(String[] projection, Set<String> missing) {
+    private static String replaceColumn(String sql, String column, String with) {
+        return sql.replaceAll("(?<![A-Za-z0-9_'\"])(?:[A-Za-z0-9_]+\\.)?" + Pattern.quote(column) + "(?![A-Za-z0-9_'\"])",
+                Matcher.quoteReplacement(with));
+    }
+
+    /** The title of the group a membership row (data1) is in. */
+    private static final String GROUP_TITLE = "(SELECT title FROM groups WHERE groups._id=data1)";
+
+    static String[] keep(String[] projection, Set<String> missing) {
         if (projection == null || missing.isEmpty()) return projection;
         List<String> kept = new ArrayList<>();
         for (String p : projection) {
@@ -85,7 +107,7 @@ public final class ProviderCalls {
         return out;
     }
 
-    private static Cursor shape(Cursor c, String[] projection) {
+    static Cursor shape(Cursor c, String[] projection) {
         if (c == null || projection == null) return c;
         for (String p : projection) {
             if (c.getColumnIndex(p) < 0) return new Columns(c, projection);
@@ -175,12 +197,14 @@ public final class ProviderCalls {
     public static Cursor query(ContentResolver r, Uri uri, String[] projection, String selection, String[] args, String sort,
                                CancellationSignal signal) {
         if (!telephony(uri)) return r.query(uri, projection, selection, args, sort, signal);
+        if (Groups.handles(uri)) return Groups.query(r, uri, projection, selection, args, sort, signal);
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
-                Cursor c = r.query(uri, keep(projection, missing), rewrite(selection, missing), args, rewrite(sort, missing), signal);
+                Cursor c = r.query(uri, keep(projection, missing), rewrite(selection, missing, contacts(uri)), args,
+                        rewrite(sort, missing, contacts(uri)), signal);
                 if (Log.isLoggable(TAG, Log.VERBOSE)) {
-                    Log.v(TAG, "query " + uri + " where " + rewrite(selection, missing) + " " + java.util.Arrays.toString(args)
+                    Log.v(TAG, "query " + uri + " where " + rewrite(selection, missing, contacts(uri)) + " " + java.util.Arrays.toString(args)
                             + " -> " + (c == null ? "null" : c.getCount()));
                 }
                 return shape(c, projection);
@@ -199,6 +223,7 @@ public final class ProviderCalls {
 
     public static Uri insert(ContentResolver r, Uri uri, ContentValues values) {
         if (!telephony(uri)) return r.insert(uri, values);
+        if (Groups.isMembership(uri)) return Groups.insertMembership(r, uri, values);
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
@@ -223,7 +248,7 @@ public final class ProviderCalls {
             try {
                 ContentValues kept = fit(r, uri, keep(values, missing));
                 if (kept != null && kept.size() == 0) return 0;
-                return r.update(uri, kept, rewrite(selection, missing), args);
+                return r.update(uri, kept, rewrite(selection, missing, contacts(uri)), args);
             } catch (SQLiteException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
                 String column = unknownColumn(e);
                 if (column != null && missing.add(column)) {
@@ -242,7 +267,7 @@ public final class ProviderCalls {
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
-                return r.delete(uri, rewrite(selection, missing), args);
+                return r.delete(uri, rewrite(selection, missing, contacts(uri)), args);
             } catch (SQLiteException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
                 String column = unknownColumn(e);
                 if (column != null && missing.add(column)) {

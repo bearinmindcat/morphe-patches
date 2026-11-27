@@ -63,8 +63,9 @@ private val telephonyPatch = bytecodePatch(
 
 /**
  * Contacts reads and writes Android's contacts provider as if it were Samsung's (sec_* columns, UNICODE_NATURAL
- * collation, applyBatch saves with Samsung columns): off One UI the list stayed empty and saving failed. Its calls are
- * fitted to Android's provider (see ProviderCalls); missing providers are not watched (see Providers).
+ * collation, applyBatch saves with Samsung columns, its group paths): off One UI the list stayed empty, saving failed and
+ * groups showed no members. Its calls are fitted to Android's provider (see ProviderCalls, Groups); missing providers are
+ * not watched (see Providers).
  */
 private val providersPatch = bytecodePatch(
     description = "Fits the app's contacts provider calls to Android's.",
