@@ -17,6 +17,8 @@ import java.lang.reflect.Method;
 public final class Languages {
     private static final String PREFS = "org.ungoogled.samsungkeyboard";
     private static final String REFUSED = "galaxyStoreRefused";
+    /** The keyboard's list of languages still waiting for their predictive text download. */
+    private static final String WAITING = "NEED_TO_DOWNLOAD_SELECTED_LANGUAGES";
 
     /** Japanese, Chinese (Hong Kong, China, Taiwan), Cantonese and Hokkien. */
     private static final int[] NEED_DICTIONARY = {
@@ -81,5 +83,15 @@ public final class Languages {
             if (id == needs) return false;
         }
         return true;
+    }
+
+    /**
+     * The keyboard's reads of a string preference, from the methods that name its list of languages waiting for their
+     * predictive text download: that list reads as empty where the download can't complete, so the keyboard stops
+     * offering it (settings banner, toolbar badge, swipe typing's prompt). Every other read is passed through.
+     */
+    public static String waiting(SharedPreferences prefs, String key, String fallback) {
+        if (WAITING.equals(key) && !downloadsPossible()) return fallback;
+        return prefs.getString(key, fallback);
     }
 }
