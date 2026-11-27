@@ -21,6 +21,8 @@ import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.intOption
+import app.morphe.patcher.patch.resourcePatch
+import org.w3c.dom.Element
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 
 /** org.ungoogled.waze.Bridge, the runtime half (extensions/waze). */
@@ -63,6 +65,24 @@ private object AidlServiceUnbindFingerprint : Fingerprint(
     parameters = listOf("Landroid/content/Intent;"),
 )
 
+/**
+ * AIDLService answers Maps' wake-up action as an intent filter too, so Maps finds this Waze under any package name
+ * (issue #207). A root mount install keeps the stock manifest; Maps then falls back to com.waze, which it is.
+ */
+private val wazeWakeFilterPatch = resourcePatch(description = "Lets Maps find this Waze under any package name.") {
+    execute {
+        document("AndroidManifest.xml").use { manifest ->
+            val services = manifest.getElementsByTagName("service")
+            val aidl = (0 until services.length).map { services.item(it) as Element }
+                .singleOrNull { it.getAttribute("android:name").let { n -> n == "com.waze.AIDLService" || n == ".AIDLService" } }
+                ?: throw PatchException("Waze's AIDLService is no longer in its manifest")
+            val filter = manifest.createElement("intent-filter")
+            filter.appendChild(manifest.createElement("action").apply { setAttribute("android:name", "org.ungoogled.waze.WAKE") })
+            aidl.appendChild(filter)
+        }
+    }
+}
+
 @Suppress("unused")
 val wazeShareAlertsPatch = bytecodePatch(
     name = "Share alerts with Maps",
@@ -70,7 +90,7 @@ val wazeShareAlertsPatch = bytecodePatch(
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     // The extension, the Application hook and a switch on Waze's Customization screen.
-    dependsOn(wazeCustomizationPatch)
+    dependsOn(wazeCustomizationPatch, wazeWakeFilterPatch)
 
     execute {
         // p0 is the manager, p1 the update; the Bridge takes them as Objects and reads the update by name.

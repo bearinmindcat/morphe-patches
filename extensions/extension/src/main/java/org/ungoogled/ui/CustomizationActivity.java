@@ -9,6 +9,7 @@ import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -490,18 +491,14 @@ public final class CustomizationActivity extends Activity {
             wazeChime.setChecked(WazeAlerts.chime(this));
             wazeChime.setEnabled(waze.isChecked());
             body.addView(toggleRow("Chime for a Waze alert ahead", null, wazeChime));
-            Switch wazeStart = new Switch(this);
-            wazeStart.setChecked(WazeAlerts.startWaze(this));
-            wazeStart.setEnabled(waze.isChecked());
-            body.addView(toggleRow("Start Waze with Maps", "Runs Waze in the background while Maps is open", wazeStart));
+            LinearLayout startRow = startWazeRow(body);
             // all read live, so no restart
             waze.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
                 WazeAlerts.setEnabled(this, on);
                 wazeMap.setEnabled(on);
                 wazeChime.setEnabled(on);
-                wazeStart.setEnabled(on);
+                updateStartWaze(startRow);
             });
-            wazeStart.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setStartWaze(this, on));
             wazeMap.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setOnMap(this, on));
             wazeChime.setOnCheckedChangeListener((CompoundButton b, boolean on) -> WazeAlerts.setChime(this, on));
             // The last word from Waze; tap to ask it for its list again.
@@ -510,7 +507,47 @@ public final class CustomizationActivity extends Activity {
             wazeNow.setOnClickListener(v -> WazeAlerts.ask());
             body.addView(wazeNow);
             live(() -> wazeNowSub.setText(WazeAlerts.status()));
+        } else {
+            // Always on this page, greyed with the reason when it can't be used (issue #207).
+            startWazeRow(body);
         }
+    }
+
+    /** Start Waze with Maps: a switch, or the reason it can't be used yet (Waze not found, alerts off). */
+    private LinearLayout startWazeRow(LinearLayout body) {
+        Switch sw = new Switch(this);
+        sw.setChecked(Shapes.wazeAlertsPatched() && WazeAlerts.startWaze(this));
+        View row = toggleRow("Start Waze with Maps", "Runs Waze in the background while Maps is open", sw);
+        body.addView(row);
+        LinearLayout holder = new LinearLayout(this);
+        holder.setTag(new Object[] {row, sw});
+        sw.setOnCheckedChangeListener((CompoundButton b, boolean on) -> {
+            if (Shapes.wazeAlertsPatched()) WazeAlerts.setStartWaze(this, on);
+        });
+        updateStartWaze(holder);
+        return holder;
+    }
+
+    private void updateStartWaze(LinearLayout holder) {
+        Object[] parts = (Object[]) holder.getTag();
+        View row = (View) parts[0];
+        Switch sw = (Switch) parts[1];
+        String why = WazeAlerts.startUnusable(this);
+        sw.setEnabled(why == null);
+        row.setAlpha(why == null ? 1f : 0.5f);
+        TextView sub = subtitleOf(row);
+        if (sub != null) sub.setText(why == null ? "Runs Waze in the background while Maps is open" : why);
+    }
+
+    /** The second line of a row made by toggleRow / rowBase, or null. */
+    private static TextView subtitleOf(View row) {
+        if (!(row instanceof ViewGroup)) return null;
+        View first = ((ViewGroup) row).getChildAt(0);
+        if (first instanceof LinearLayout && ((LinearLayout) first).getChildCount() > 1
+                && ((LinearLayout) first).getChildAt(1) instanceof TextView) {
+            return (TextView) ((LinearLayout) first).getChildAt(1);
+        }
+        return null;
     }
 
     /** "Speed cameras: 42 cameras around you", and Flock cameras' line below it when that patch is in. */

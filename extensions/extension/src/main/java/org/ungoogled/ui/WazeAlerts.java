@@ -56,9 +56,15 @@ public final class WazeAlerts {
     public static final String KEY_KINDS = "waze_alerts_kinds";
     /** Issue #207: start Waze in the background while Maps is open (or navigating). */
     public static final String KEY_START = "waze_alerts_start";
-    /** To Waze's bridge, as the action of a bind of Waze's AIDLService (exported in Waze's own manifest). */
+    /**
+     * To Waze's bridge, as the action of a bind of Waze's AIDLService (exported in Waze's own manifest). A Waze
+     * patched since #207's fix also answers it as an intent filter, so Maps finds it under any package name.
+     */
     static final String ACTION_WAKE = "org.ungoogled.waze.WAKE";
-    private static final String WAZE = "com.waze";
+    /** Waze's own package and the service its bridge listens on, for a Waze found by neither of the above. */
+    private static final String WAZE = "com.waze", WAZE_SERVICE = "com.waze.AIDLService";
+    /** The package the last alerts came from: Waze, whatever it is called. */
+    private static final String KEY_FROM = "waze_alerts_from";
 
     /** The kinds Waze alert types offers; Waze's own alert types (AlerterType numbers) are grouped into them. */
     static final int POLICE = 0, CRASH = 1, HAZARD = 2, JAM = 3, CLOSURE = 4, CAMERA = 5, OTHER = 6;
@@ -242,11 +248,16 @@ public final class WazeAlerts {
                         android.util.Log.i("UA", "waze alerts: Waze closed");
                     }
                 };
+                ComponentName service = wazeService(c);
+                if (service == null) {
+                    android.util.Log.i("UA", "waze alerts: no Waze to start");
+                    return;
+                }
                 int flags = Context.BIND_AUTO_CREATE;
                 if (Build.VERSION.SDK_INT >= 30) flags |= Context.BIND_INCLUDE_CAPABILITIES;
-                Intent i = new Intent(ACTION_WAKE).setComponent(new ComponentName(WAZE, "com.waze.AIDLService"))
-                        .putExtra("from", c.getPackageName());
+                Intent i = new Intent(ACTION_WAKE).setComponent(service).putExtra("from", c.getPackageName());
                 if (c.bindService(i, conn, flags)) {
+                    android.util.Log.i("UA", "waze alerts: starting " + service.getPackageName());
                     waze = conn;
                 } else {
                     try {
@@ -263,6 +274,38 @@ public final class WazeAlerts {
             waze = null;
             android.util.Log.w("UA", "waze alerts: start Waze", t);
         }
+    }
+
+    /**
+     * Waze's wake-up service under whatever package name Waze has: the one answering ACTION_WAKE; else (a Waze
+     * patched before that, or a root mount install, whose stock manifest has no such filter) AIDLService in the
+     * package the last alerts came from, or in Waze's own package. Null when none is installed (or visible).
+     */
+    static ComponentName wazeService(Context c) {
+        PackageManager pm = c.getPackageManager();
+        try {
+            for (android.content.pm.ResolveInfo r : pm.queryIntentServices(new Intent(ACTION_WAKE), 0)) {
+                if (r.serviceInfo != null && r.serviceInfo.exported) return new ComponentName(r.serviceInfo.packageName, r.serviceInfo.name);
+            }
+        } catch (Throwable ignored) {
+        }
+        for (String pkg : new String[] {prefs(c).getString(KEY_FROM, null), WAZE}) {
+            if (pkg == null || pkg.isEmpty()) continue;
+            try {
+                ComponentName n = new ComponentName(pkg, WAZE_SERVICE);
+                if (pm.getServiceInfo(n, 0).exported) return n;
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    /** For Waze & external data source: why Start Waze with Maps can't be used now, or null. */
+    static String startUnusable(Context c) {
+        if (!Shapes.wazeAlertsPatched()) return "Needs Maps patched with Waze alerts";
+        if (!enabled(c)) return "Turn on Alerts from Waze first";
+        if (wazeService(c) == null) return "Needs Waze patched with Share alerts with Maps";
+        return null;
     }
 
     // ---- the list from Waze ------------------------------------------------------------
@@ -318,7 +361,11 @@ public final class WazeAlerts {
         alerts = Collections.unmodifiableList(out);
         receivedAt = SystemClock.elapsedRealtime();
         receivedCount = out.size();
-        android.util.Log.i("UA", "waze alerts: " + out.size() + " from " + in.getStringExtra("from"));
+        String from = in.getStringExtra("from");
+        android.util.Log.i("UA", "waze alerts: " + out.size() + " from " + from);
+        if (from != null && host != null && !from.equals(prefs(host).getString(KEY_FROM, null))) {
+            prefs(host).edit().putString(KEY_FROM, from).apply();
+        }
         MAIN.removeCallbacks(EXPIRE);
         if (!out.isEmpty()) MAIN.postDelayed(EXPIRE, STALE_MS + 1000L);
         if (MAP) SavedOnMap.refresh();
