@@ -97,6 +97,62 @@ public final class MediaApps {
     static String failedMethod() { return ""; }
     /** Rewritten by the patch: the media panel's "which app" getter (its package). */
     static String panelAppMethod() { return ""; }
+    /** Rewritten by the patch: the listener Maps asks each media app's browser with, taking only its first answer. */
+    static String probeClass() { return ""; }
+
+    // ---- the answers of the media apps' browsers, kept (issue #78) ----
+
+    /** How long an app's answer is kept: navigation coming back to the front asks every app again. */
+    private static final long KEEP_MS = 10 * 60 * 1000;
+    /** Per app: when it answered and whether it connected (1) or refused (0). */
+    private static final Map<String, long[]> ANSWERS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The listeners asking an app now, by package. */
+    private static final Map<Object, String> ASKING = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * Maps is about to ask an app's media browser whether it connects, with this listener: an answer the app gave
+     * in the last ten minutes is given again at once (true: Maps does not connect). Navigation coming back to the front
+     * (from the power saving screen, another app, the screen turning on) asks every listed app again, and showed its
+     * media panel -- the button too -- only once the slowest had answered.
+     */
+    public static boolean probe(Object connection, Object listener) {
+        try {
+            if (listener == null || !listener.getClass().getName().equals(probeClass())) return false;
+            String pkg = PlayingMedia.servicePackage(connection);
+            if (pkg == null) return false;
+            long[] known = ANSWERS.get(pkg);
+            if (known == null || android.os.SystemClock.elapsedRealtime() - known[0] > KEEP_MS) {
+                ASKING.put(listener, pkg);
+                return false;
+            }
+            int params = known[1] == 1 ? 1 : 0;
+            for (Method m : listener.getClass().getDeclaredMethods()) {
+                if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) || m.getReturnType() != void.class
+                        || m.getParameterTypes().length != params) continue;
+                m.setAccessible(true);
+                m.invoke(listener, params == 1 ? new Object[] {null} : new Object[0]);
+                return true;
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media answer", t);
+        }
+        return false;
+    }
+
+    /** The app's browser connected (or its session was put in): kept. */
+    public static void probeConnected(Object listener) {
+        kept(listener, 1);
+    }
+
+    /** The app's browser refused: kept. */
+    public static void probeRefused(Object listener) {
+        kept(listener, 0);
+    }
+
+    private static void kept(Object listener, int connected) {
+        String pkg = ASKING.remove(listener);
+        if (pkg != null) ANSWERS.put(pkg, new long[] {android.os.SystemClock.elapsedRealtime(), connected});
+    }
 
     // ---- the media panel's row of other apps (issue #78) ----
 

@@ -2,11 +2,13 @@ package org.ungoogled.patches.maps.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
@@ -360,6 +362,52 @@ val anyMediaAppPatch = bytecodePatch(
             }
             init.addInstruction(superInit + 1, "invoke-static { p0, p$connectionParam }, $MEDIA_APPS->connecting(Ljava/lang/Object;Ljava/lang/Object;)V")
             answer("failedMethod", onFailed.name)
+
+            // Issue #78: each time navigation comes back to the front -- from the power saving screen, another app,
+            // the screen turning on -- Maps builds its media panel anew and first asks every listed app's media
+            // browser again, showing the panel (its button too) only once the slowest has answered. An app's answer
+            // is now kept for ten minutes, so the panel is back at once. The asking goes through the connection's
+            // connect method (the one asking for suggested media) with a listener that takes only the first answer.
+            val connect = mutableClassDefBy(connection).methods.singleOrNull { m ->
+                m.returnType == "V" && m.parameterTypes.size == 1 && m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == "android.service.media.extra.SUGGESTED"
+                } == true
+            } ?: throw PatchException("media browser connection's connect method not found")
+            val listener = connect.parameterTypes[0].toString()
+            val probes = mutableListOf<String>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/") || listener !in c.interfaces) return@classDefForEach
+                val once = c.methods.any { m ->
+                    m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                        ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { r ->
+                            r.definingClass == "Ljava/util/concurrent/atomic/AtomicBoolean;" && r.name == "getAndSet"
+                        } == true
+                    } == true
+                }
+                if (once) probes += c.type
+            }
+            val probe = mutableClassDefBy(probes.singleOrNull() ?: throw PatchException("media apps' probe listener: found $probes"))
+            val answersOf = probe.methods.filter { m ->
+                m.name != "<init>" && m.returnType == "V" && !AccessFlags.STATIC.isSet(m.accessFlags) && m.parameterTypes.size <= 1
+            }
+            val refused = answersOf.singleOrNull { it.parameterTypes.isEmpty() }
+            val connected = answersOf.singleOrNull { it.parameterTypes.size == 1 }
+            if (refused == null || connected == null || answersOf.size != 2) throw PatchException("media apps' probe answers: ${answersOf.map { it.name }}")
+            refused.addInstruction(0, "invoke-static { p0 }, $MEDIA_APPS->probeRefused(Ljava/lang/Object;)V")
+            connected.addInstruction(0, "invoke-static { p0 }, $MEDIA_APPS->probeConnected(Ljava/lang/Object;)V")
+            val connectImpl = connect.implementation!!
+            if (connectImpl.registerCount - 2 < 1) throw PatchException("media browser connection's connect method has no register to spare")
+            connect.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { p0, p1 }, $MEDIA_APPS->probe(Ljava/lang/Object;Ljava/lang/Object;)Z
+                    move-result v0
+                    if-eqz v0, :connect
+                    return-void
+                """,
+                ExternalLabel("connect", connectImpl.instructions[0]),
+            )
+            answer("probeClass", probe.type.removePrefix("L").removeSuffix(";").replace('/', '.'))
         }
     }
 }
