@@ -29,9 +29,13 @@ import java.util.WeakHashMap;
  * Auto support in its manifest -- joins them: Poweramp and the like.
  */
 public final class MediaApps {
-    /** Maps' partners: Spotify has a connection of its own; the others Maps lists itself, in their colours. */
+    /** Maps' partners, which Maps lists itself in their colours (Spotify only where its own connection works). */
     private static final Set<String> PARTNERS = new HashSet<>(Arrays.asList(
-            "com.spotify.music", "com.google.android.music", "com.google.android.apps.youtube.music", "com.pandora.android"));
+            "com.google.android.music", "com.google.android.apps.youtube.music", "com.pandora.android"));
+    private static final String SPOTIFY = "com.spotify.music";
+    /** Stock Maps' legacy signing certificate, SHA-1. */
+    private static final String GOOGLE_CERT = "38918a453d07199354f8b19af05ec6562ced5788";
+    private static Boolean googleSigned;
     /**
      * The partners Maps lists itself only when its server says so (issue #78): added after Maps' own list when
      * installed and not already there. Spotify is not one: Maps reaches it through Spotify's own connection.
@@ -45,9 +49,45 @@ public final class MediaApps {
 
     private MediaApps() {}
 
+    /**
+     * Called by the patch with Maps' Spotify integration each time Maps reads it (issue #217). Maps reaches Spotify
+     * through Spotify's own App Remote connection, which Spotify grants only to Maps signed by Google: a re-signed Maps
+     * flashed Spotify's loading screen and gave up. There Maps is told it has no such integration, as on a phone without
+     * it, and Spotify is connected through its media browser like every other app. Kept on a root mount install.
+     */
+    public static Object spotify(Object integration) {
+        return integration != null && googleSigned() ? integration : null;
+    }
+
+    private static boolean googleSigned() {
+        if (googleSigned != null) return googleSigned;
+        boolean found = false;
+        try {
+            Context c = (Context) Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null);
+            if (c == null) return false;
+            android.content.pm.SigningInfo info = c.getPackageManager()
+                    .getPackageInfo(c.getPackageName(), PackageManager.GET_SIGNING_CERTIFICATES).signingInfo;
+            android.content.pm.Signature[] certs = info.hasMultipleSigners()
+                    ? info.getApkContentsSigners() : info.getSigningCertificateHistory();
+            java.security.MessageDigest sha1 = java.security.MessageDigest.getInstance("SHA-1");
+            for (android.content.pm.Signature cert : certs) {
+                StringBuilder hex = new StringBuilder();
+                for (byte b : sha1.digest(cert.toByteArray())) hex.append(String.format("%02x", b));
+                if (GOOGLE_CERT.contentEquals(hex)) found = true;
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media apps: signature", t);
+        }
+        return googleSigned = found;
+    }
+
     /** Whether Maps lists the app whatever is chosen: an Android Auto app or a partner. */
     static boolean listedAnyway(Context c, String pkg) {
-        return PARTNERS.contains(pkg) || androidAuto(c.getPackageManager(), pkg);
+        return partner(pkg) || androidAuto(c.getPackageManager(), pkg);
+    }
+
+    private static boolean partner(String pkg) {
+        return PARTNERS.contains(pkg) || SPOTIFY.equals(pkg) && googleSigned();
     }
 
     /** Rewritten by the patch: Maps' media app entry class, and its list builder's add method. */
@@ -92,7 +132,7 @@ public final class MediaApps {
             if (pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
             // Also every app of the user's own with a media browser (issue #78: YouTube Morphe has no Android Auto
             // support, so it was offered only while playing or once picked as the default media app).
-            if (PARTNERS.contains(pkg) || androidAuto(pm, pkg) || open.contains(pkg) || pm.getLaunchIntentForPackage(pkg) != null) out.add(pkg);
+            if (partner(pkg) || androidAuto(pm, pkg) || open.contains(pkg) || pm.getLaunchIntentForPackage(pkg) != null) out.add(pkg);
         }
         Collections.sort(out, (a, b) -> label(c, a).compareToIgnoreCase(label(c, b)));
         return out;
@@ -225,7 +265,7 @@ public final class MediaApps {
             for (ResolveInfo r : pm.queryIntentServices(new Intent("android.media.browse.MediaBrowserService"), 0)) {
                 if (r.serviceInfo == null) continue;
                 String pkg = r.serviceInfo.packageName;
-                if (PARTNERS.contains(pkg) || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
+                if (partner(pkg) || pkg.equals(c.getPackageName()) || !seen.add(pkg)) continue;
                 if (!androidAuto(pm, pkg) && !open.contains(pkg) && !picked.contains(pkg)) continue;
                 add.invoke(builder, entry.newInstance(pkg, COLOR, TOUCH_COLOR));
             }

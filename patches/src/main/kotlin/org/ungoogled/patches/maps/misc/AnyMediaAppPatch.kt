@@ -2,6 +2,7 @@ package org.ungoogled.patches.maps.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
@@ -10,7 +11,9 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -57,7 +60,7 @@ val anyMediaAppPatch = bytecodePatch(
     name = "Any media app",
     description = "Navigation's Default media app (Settings > Navigation) offers every music and podcast app " +
         "that works with Android Auto, such as Poweramp, also where Google switches media controls off. " +
-        "YouTube Music and Spotify only connect to Google's own Maps.",
+        "Spotify connects like the other apps; YouTube Music only connects to Google's own Maps.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
@@ -181,6 +184,60 @@ val anyMediaAppPatch = bytecodePatch(
                 """,
             )
             }
+        }
+
+        // Issue #217: Spotify. Maps reaches it through Spotify's own App Remote connection, which Spotify grants only to
+        // Maps signed by Google: a re-signed Maps flashed Spotify's loading screen and gave up ("If you want to connect
+        // a media app later..."). Maps takes that path while its Spotify integration is there: the package getter
+        // ("com.spotify.music" when it is) and the checks that cast it. Each read of it goes through
+        // MediaApps.spotify, which keeps it only with Google's signature (a root mount install); otherwise Spotify is
+        // listed and connected through its media browser like any other media app.
+        run {
+            fun Method.strings() = implementation?.instructions?.mapNotNull {
+                ((it as? ReferenceInstruction)?.reference as? StringReference)?.string
+            }.orEmpty()
+            fun Instruction.readsOwn(type: String) = opcode == Opcode.IGET_OBJECT &&
+                ((this as ReferenceInstruction).reference as FieldReference).definingClass == type
+            val getters = mutableListOf<Pair<String, Method>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                c.methods.filter { m ->
+                    m.returnType == "Ljava/lang/String;" && m.parameterTypes.isEmpty() &&
+                        (m.implementation?.instructions?.count() ?: 99) <= 10 && "com.spotify.music" in m.strings() &&
+                        m.implementation!!.instructions.any { it.readsOwn(c.type) }
+                }.forEach { getters += c.type to it }
+            }
+            val (owner, getter) = getters.singleOrNull() ?: throw PatchException("Spotify integration getter: found ${getters.size}")
+            val field = getter.implementation!!.instructions.first { it.readsOwn(owner) }
+                .let { (it as ReferenceInstruction).reference as FieldReference }
+            fun Instruction.readsIntegration() = opcode == Opcode.IGET_OBJECT &&
+                ((this as ReferenceInstruction).reference as FieldReference).let { it.definingClass == owner && it.name == field.name }
+            val holder = mutableClassDefBy(owner)
+            // The checks: the boolean getters that read it and cast it to the integration's type.
+            val checks = holder.methods.filter { m ->
+                val code = m.implementation?.instructions?.toList() ?: return@filter false
+                m.returnType == "Z" && m.parameterTypes.isEmpty() && code.any { it.readsIntegration() } &&
+                    code.any { it.opcode == Opcode.CHECK_CAST }
+            }
+            val casts = checks.flatMap { m ->
+                m.implementation!!.instructions.filter { it.opcode == Opcode.CHECK_CAST }
+                    .map { ((it as ReferenceInstruction).reference as TypeReference).type }
+            }.toSet()
+            if (checks.size < 2 || casts.size != 1) throw PatchException("Spotify integration checks: ${checks.size}, casts $casts")
+            val hooked = holder.methods.filter { m ->
+                m in checks || m.name == getter.name && m.parameterTypes.isEmpty() && m.returnType == getter.returnType
+            }
+            hooked.forEach { m ->
+                val reads = m.implementation!!.instructions.withIndex().filter { it.value.readsIntegration() }.map { it.index }
+                reads.reversed().forEach { at ->
+                    val reg = (m.getInstruction<TwoRegisterInstruction>(at)).registerA
+                    m.addInstructions(at + 1, """
+                        invoke-static { v$reg }, $MEDIA_APPS->spotify(Ljava/lang/Object;)Ljava/lang/Object;
+                        move-result-object v$reg
+                    """)
+                }
+            }
+            if (hooked.size != checks.size + 1) throw PatchException("Spotify integration: hooked ${hooked.size} of ${checks.size + 1}")
         }
 
         // The extension builds entries and adds them by these names.
