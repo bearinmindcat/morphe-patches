@@ -33,6 +33,7 @@ private val MINIMIZE_MEDIA_CONTROLS get() = mapsId(ResourceType.STRING, "MINIMIZ
 // string/DEFAULT_MEDIA_APP_DIALOG_TITLE: the Default media app list (also shown by Show media playback controls).
 private val DEFAULT_MEDIA_APP_TITLE get() = mapsId(ResourceType.STRING, "DEFAULT_MEDIA_APP_DIALOG_TITLE")
 private const val COMPAT_TOKEN = "Landroid/support/v4/media/session/MediaSessionCompat\$Token;"
+private const val IMMUTABLE_LIST = "Lcom/google/common/collect/ImmutableList;"
 
 /**
  * Android lists the active media sessions only to an app with notification access, which only a declared
@@ -163,7 +164,8 @@ val followPlayingMediaPatch = bytecodePatch(
         )
 
         // 3. Such a browser never connected, and MediaBrowser.getRoot() throws then: the helper both browsing and
-        //    the panel's suggestions start with leaves it alone.
+        //    the panel's suggestions start with leaves it alone, and answers with nothing at once -- left unanswered,
+        //    the panel's list spun until it gave up with "Could not load content" (YouTube Music, issue #78).
         val roots = mutableListOf<Method>()
         classDefForEach { c ->
             if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
@@ -180,12 +182,21 @@ val followPlayingMediaPatch = bytecodePatch(
         val browseImpl = browse.implementation!!
         val params = browse.parameterTypes.map { if (it.toString() == "J" || it.toString() == "D") 2 else 1 }.sum()
         if (browseImpl.registerCount - params < 1) throw PatchException("media browsing helper has no register to spare")
+        // The answer: the helper's callback, the one-method interface it is handed, taking Guava's ImmutableList.
+        val answerType = browse.parameterTypes.getOrNull(1)?.toString()
+            ?: throw PatchException("media browsing helper takes no callback")
+        val answer = classDefByOrNull(answerType)?.takeIf { AccessFlags.INTERFACE.isSet(it.accessFlags) }?.methods?.singleOrNull()
+            ?.takeIf { it.returnType == "V" && it.parameterTypes.map { p -> p.toString() } == listOf(IMMUTABLE_LIST) }
+            ?: throw PatchException("media browsing helper's callback $answerType is not a one-method list callback")
         browse.addInstructionsWithLabels(
             0,
             """
                 invoke-static { p0 }, $PLAYING_MEDIA->browsable(Ljava/lang/Object;)Z
                 move-result v0
                 if-nez v0, :browse
+                invoke-static { }, $IMMUTABLE_LIST->of()$IMMUTABLE_LIST
+                move-result-object v0
+                invoke-interface { p1, v0 }, $answerType->${answer.name}($IMMUTABLE_LIST)V
                 return-void
             """,
             ExternalLabel("browse", browseImpl.instructions[0]),
@@ -232,6 +243,41 @@ val followPlayingMediaPatch = bytecodePatch(
             ExternalLabel("browse", buttonImpl.instructions[0]),
         )
 
+        // 4b. The panel's "loading" flag is raised whenever it (re)connects and lowered only by a browse answer, which
+        //     for such an app only comes when its list is opened through Maps' own expand: reconnected while folded
+        //     (following the app's playing session), its list showed loading tiles for good. It reads false for such
+        //     an app. The flag is the panel's Boolean getter of the field the browse callback clears.
+        val cleared = mutableSetOf<String>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/") || answerType !in c.interfaces) return@classDefForEach
+            c.methods.forEach { m ->
+                m.implementation?.instructions?.forEach { insn ->
+                    if (insn.opcode == Opcode.IPUT_BOOLEAN) {
+                        val f = (insn as ReferenceInstruction).reference as FieldReference
+                        if (f.definingClass == panel) cleared += f.name
+                    }
+                }
+            }
+        }
+        val loadingName = cleared.singleOrNull() ?: throw PatchException("media panel's loading flag: found $cleared")
+        val loading = mutable(
+            classDefBy(panel).methods.singleOrNull { m ->
+                m.returnType == "Ljava/lang/Boolean;" && m.parameterTypes.isEmpty() && m.implementation?.instructions?.any {
+                    it.opcode == Opcode.IGET_BOOLEAN && ((it as ReferenceInstruction).reference as FieldReference).name == loadingName
+                } == true
+            } ?: throw PatchException("media panel's loading getter not found"),
+        )
+        // Its only register holds `this`: the extension reads the flag (and the panel's browser) by name.
+        loading.addInstructions(
+            0,
+            """
+                invoke-static { p0 }, $PLAYING_MEDIA->loading(Ljava/lang/Object;)Ljava/lang/Boolean;
+                move-result-object p0
+                return-object p0
+            """,
+        )
+        val loadingNames = listOf(loadingName, panelConnection.name, browserField.name)
+
         // 5. The panel follows its app while connected (issue #78): it connects with the connection's connect method
         //    (the one asking for suggested media) and disconnects with the one disconnecting the MediaBrowser; the
         //    extension reconnects it when the app plays in a session other than the one the panel controls.
@@ -277,6 +323,7 @@ val followPlayingMediaPatch = bytecodePatch(
         }
         answer("connectMethod", panelConnect.name)
         answer("disconnectMethod", panelDisconnect.name)
+        answer("loadingFields", loadingNames.joinToString(","))
 
         // 6. Notification access has no runtime prompt: ask once, where it matters -- when the media panel opens
         //    (its button's click, right after it toggles the panel) and when the Default media app list opens (the

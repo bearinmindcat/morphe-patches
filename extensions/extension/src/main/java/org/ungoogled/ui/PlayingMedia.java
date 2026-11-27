@@ -13,6 +13,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.InstallSourceInfo;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.media.MediaMetadata;
 import android.media.browse.MediaBrowser;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
@@ -42,14 +43,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PlayingMedia {
     private static final String COMPAT_TOKEN = "android.support.v4.media.session.MediaSessionCompat$Token";
-    /** The session Maps was last handed for each app: its browser's, the one followed, or the idle stand-in. */
+    /** The session Maps was last handed for each app: its browser's, the one followed, or a stand-in. */
     private static final Map<String, MediaSession.Token> CHOSEN = new ConcurrentHashMap<>();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     /** Navigation's media panel while it is connected, and the app it shows. */
     private static WeakReference<Object> panel = new WeakReference<>(null);
     private static String panelPackage;
     private static long restarted;
-    private static MediaSession idle;
+    /** The browsers {@link #adopt} put a session in. */
+    private static final Map<Object, Boolean> ADOPTED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    /** Maps' stand-ins for apps that refuse Maps and have nothing playing ({@link #standIn}). */
+    private static final Map<String, MediaSession> STAND_INS = new HashMap<>();
     private static MediaSessionManager.OnActiveSessionsChangedListener watching;
     private static final Map<MediaSession.Token, MediaController.Callback> WATCHED = new HashMap<>();
 
@@ -58,6 +62,9 @@ public final class PlayingMedia {
     /** Rewritten by the patch: the panel's connect and disconnect methods. */
     static String connectMethod() { return ""; }
     static String disconnectMethod() { return ""; }
+    /** Rewritten by the patch: the panel's loading flag, its connection, and the connection's browser (field names). */
+    static String loadingFields() { return ""; }
+    private static Field[] loading;
 
     /** Whether Maps may read the active sessions: its listener has notification access. */
     public static boolean allowed(Context c) {
@@ -325,12 +332,16 @@ public final class PlayingMedia {
             String pkg = servicePackage(connection);
             if (c == null || impl == null || pkg == null) return false;
             MediaController open = sessionOf(c, pkg, true);
-            // Nothing open yet (issue #78: Pocket Casts and TIDAL were offered only while playing): an idle stand-in
-            // of Maps' own, so the app is offered and the panel waits; it moves to the app's session once it plays.
-            MediaSession.Token chosen = open != null ? open.getSessionToken() : idle(c);
+            // Nothing open yet (issue #78: Pocket Casts and TIDAL were offered only while playing), or a session with
+            // nothing in it (YouTube Music before it plays): a stand-in of Maps' own that shows the app with a play
+            // button, so the panel neither spins nor ends in "Could not load content"; play wakes the app, and the
+            // panel moves to the app's session once that plays.
+            if (open != null && !playing(open) && (open.getMetadata() == null || open.getPlaybackState() == null)) open = null;
+            MediaSession.Token chosen = open != null ? open.getSessionToken() : standIn(c, pkg);
             if (chosen == null) return false;
             Field token = fieldOf(impl.getClass(), Class.forName(COMPAT_TOKEN, false, impl.getClass().getClassLoader()));
             token.set(impl, compatToken(token.getType(), chosen));
+            ADOPTED.put(impl, Boolean.TRUE);
             CHOSEN.put(pkg, chosen);
             android.util.Log.i("UA", "media: " + pkg + " refused Maps, using " + (open != null ? "its open session" : "a stand-in until it plays"));
             return true;
@@ -340,11 +351,116 @@ public final class PlayingMedia {
         }
     }
 
-    /** Maps' own idle session, standing in for an app that refuses Maps and has nothing open yet. */
-    private static synchronized MediaSession.Token idle(Context c) {
+    /**
+     * Maps' own session standing in for an app that refuses Maps and has nothing playing: the app's name and icon with
+     * a play button. Inactive, so Android never sends it media buttons; only the panel controls it.
+     */
+    private static synchronized MediaSession.Token standIn(Context c, String pkg) {
         if (!allowed(c)) return null;
-        if (idle == null) idle = new MediaSession(c, "UA idle");
-        return idle.getSessionToken();
+        MediaSession s = STAND_INS.get(pkg);
+        if (s == null) {
+            s = new MediaSession(c, "UA " + pkg);
+            final MediaSession session = s;
+            s.setCallback(new MediaSession.Callback() {
+                @Override
+                public void onPlay() {
+                    wake(c, pkg, session);
+                }
+
+                @Override
+                public void onPlayFromMediaId(String id, android.os.Bundle extras) {
+                    wake(c, pkg, session);
+                }
+            }, MAIN);
+            MediaMetadata.Builder meta = new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, label(c, pkg));
+            android.graphics.Bitmap icon = icon(c, pkg);
+            if (icon != null) meta.putBitmap(MediaMetadata.METADATA_KEY_ART, icon);
+            s.setMetadata(meta.build());
+            stopped(s);
+            STAND_INS.put(pkg, s);
+        }
+        return s.getSessionToken();
+    }
+
+    private static void stopped(MediaSession s) {
+        s.setPlaybackState(new PlaybackState.Builder()
+                .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE)
+                .setState(PlaybackState.STATE_PAUSED, 0, 0f).build());
+    }
+
+    /**
+     * Play on a stand-in: the app plays as from a headset's play button. An app with a session open is told to play
+     * through it (Android lets it start playing for a controller in front); otherwise its media browser is kept bound
+     * meanwhile -- an app bound by the app in front may start playing -- and its play button pressed. Once it plays,
+     * the panel moves to its session ({@link #check}).
+     */
+    private static void wake(Context c, String pkg, MediaSession standIn) {
+        try {
+            standIn.setPlaybackState(new PlaybackState.Builder().setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE)
+                    .setState(PlaybackState.STATE_CONNECTING, 0, 0f).build());
+            MAIN.postDelayed(() -> stopped(standIn), 15000);
+            // Its session's callbacks can come late on a busy phone: look for it playing a few times meanwhile.
+            for (long after : new long[] {1500, 4000, 8000, 12000}) MAIN.postDelayed(PlayingMedia::check, after);
+            for (MediaController s : sessions(c)) {
+                if (!pkg.equals(s.getPackageName())) continue;
+                android.util.Log.i("UA", "media: play on " + pkg + "'s open session");
+                s.getTransportControls().play();
+                return;
+            }
+            Intent browser = new Intent("android.media.browse.MediaBrowserService").setPackage(pkg);
+            List<android.content.pm.ResolveInfo> services = c.getPackageManager().queryIntentServices(browser, 0);
+            if (!services.isEmpty()) {
+                android.content.pm.ServiceInfo si = services.get(0).serviceInfo;
+                android.content.ServiceConnection bound = new android.content.ServiceConnection() {
+                    @Override public void onServiceConnected(ComponentName n, android.os.IBinder b) {}
+                    @Override public void onServiceDisconnected(ComponentName n) {}
+                };
+                if (c.bindService(browser.setComponent(new ComponentName(si.packageName, si.name)), bound, Context.BIND_AUTO_CREATE)) {
+                    MAIN.postDelayed(() -> {
+                        try {
+                            c.unbindService(bound);
+                        } catch (Throwable ignored) {
+                        }
+                    }, 20000);
+                }
+            }
+            List<android.content.pm.ResolveInfo> buttons = c.getPackageManager()
+                    .queryBroadcastReceivers(new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(pkg), 0);
+            android.util.Log.i("UA", "media: waking " + pkg + " (" + buttons.size() + " media button receivers)");
+            for (android.content.pm.ResolveInfo r : buttons) {
+                ComponentName to = new ComponentName(r.activityInfo.packageName, r.activityInfo.name);
+                long at = android.os.SystemClock.uptimeMillis();
+                for (int action : new int[] {android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP}) {
+                    c.sendBroadcast(new Intent(Intent.ACTION_MEDIA_BUTTON).setComponent(to).putExtra(Intent.EXTRA_KEY_EVENT,
+                            new android.view.KeyEvent(at, at, action, android.view.KeyEvent.KEYCODE_MEDIA_PLAY, 0)));
+                }
+                break;
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("UA", "media wake", t);
+        }
+    }
+
+    private static String label(Context c, String pkg) {
+        try {
+            PackageManager pm = c.getPackageManager();
+            return String.valueOf(pm.getApplicationInfo(pkg, 0).loadLabel(pm));
+        } catch (Throwable t) {
+            return pkg;
+        }
+    }
+
+    private static android.graphics.Bitmap icon(Context c, String pkg) {
+        try {
+            android.graphics.drawable.Drawable d = c.getPackageManager().getApplicationIcon(pkg);
+            int side = Math.round(96 * c.getResources().getDisplayMetrics().density);
+            android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(side, side, android.graphics.Bitmap.Config.ARGB_8888);
+            d.setBounds(0, 0, side, side);
+            d.draw(new android.graphics.Canvas(b));
+            return b;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**
@@ -499,6 +615,53 @@ public final class PlayingMedia {
             }
         }
         throw new NoSuchMethodException(o.getClass().getName() + "." + name + "()");
+    }
+
+    /**
+     * The panel's "loading" getter (issue #78): its flag, raised whenever it (re)connects and lowered only by a
+     * browse answer -- but false for a panel whose session {@link #adopt} put in, which has nothing to load. Followed
+     * to its playing session while folded, such an app's list showed loading tiles for good.
+     */
+    public static Boolean loading(Object panel) {
+        boolean flag = true;
+        try {
+            if (loading == null) {
+                String[] names = loadingFields().split(",");
+                Field flagField = declared(panel.getClass(), names[0], boolean.class);
+                Field connection = declared(panel.getClass(), names[1], null);
+                Field browser = declared(connection.getType(), names[2], Object.class);
+                loading = new Field[] {flagField, connection, browser};
+            }
+            flag = loading[0].getBoolean(panel);
+            if (!flag) return Boolean.FALSE;
+            Object connection = loading[1].get(panel);
+            return connection != null && adopted(loading[2].get(connection)) ? Boolean.FALSE : Boolean.TRUE;
+        } catch (Throwable t) {
+            return flag;
+        }
+    }
+
+    /** The instance field of that name (and type, when given): obfuscated classes may reuse a name across types. */
+    private static Field declared(Class<?> c, String name, Class<?> type) throws NoSuchFieldException {
+        for (Class<?> k = c; k != null; k = k.getSuperclass()) {
+            for (Field f : k.getDeclaredFields()) {
+                if (!f.getName().equals(name) || java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                if (type != null ? f.getType() != type : f.getType().isPrimitive()) continue;
+                f.setAccessible(true);
+                return f;
+            }
+        }
+        throw new NoSuchFieldException(c.getName() + "." + name);
+    }
+
+    /** True for a browser whose session {@link #adopt} put in: nothing of it is loading, nor ever will be. */
+    public static boolean adopted(Object browser) {
+        try {
+            Object impl = holderOf(browser, MediaBrowser.class);
+            return impl != null && ADOPTED.containsKey(impl);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** False for a browser that never connected (a session put in by {@link #adopt}): it has nothing to browse. */
