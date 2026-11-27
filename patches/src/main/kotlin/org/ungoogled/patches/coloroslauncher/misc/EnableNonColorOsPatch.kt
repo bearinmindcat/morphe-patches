@@ -8,6 +8,7 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
@@ -472,6 +473,34 @@ private val backgroundsPatch = bytecodePatch {
 }
 
 /**
+ * Uninstalling: the launcher removes apps itself (deletePackageAsUser, DELETE_PACKAGES, a system permission), so every
+ * uninstall failed ("Failed to delete ..."). Without the permission each app goes to Android's uninstall prompt
+ * (see Uninstall); every entry point (home screen, drawer, folders, edit-mode selection) ends in these two methods.
+ */
+private val uninstallPatch = bytecodePatch {
+    execute {
+        val manager = mutableClassDefBy("Lcom/android/launcher/pkg/PackageDeleteManager;")
+        for ((name, helper) in listOf(
+            "uninstallApp" to "prompt(Ljava/lang/Object;)Z",
+            "uninstallApps" to "prompts(Ljava/util/List;)Z",
+        )) {
+            val method = manager.methods.firstOrNull { it.name == name && it.returnType == "V" && it.parameterTypes.size == 1 }
+                ?: throw PatchException("PackageDeleteManager.$name not found")
+            method.addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static { p1 }, $EXT/Uninstall;->$helper
+                    move-result v0
+                    if-eqz v0, :own
+                    return-void
+                """,
+                ExternalLabel("own", method.implementation!!.instructions.first()),
+            )
+        }
+    }
+}
+
+/**
  * Selecting apps in edit mode: every app after the first kept its grey check until the page redrew (the selection itself
  * worked). The check's animation marks the icon for redrawing, but that did not reach the page; the icon's parents are
  * now asked to redraw too (see Views.invalidateUp).
@@ -907,6 +936,7 @@ val enableNonColorOsPatch = bytecodePatch(
         versionCheckPatch, privateClassesPatch, manifestPatch, olderAndroidResourcesPatch, hiddenApisPatch,
         systemPrivilegesPatch, workProfilePatch, wallpaperBrightnessPatch, personalizationPatch, settingsLinksPatch,
         nightBackgroundsPatch, morphIconStylePatch, lockScreenPatch, selectCheckPatch, workspaceRedrawPatch, backgroundsPatch,
+        uninstallPatch,
     )
     extendWith(COLOROS_LAUNCHER_EXTENSION)
     // Authorities OPPO's SDKs build from the package name. OPPO's badge provider (com.android.badge) moves like the
