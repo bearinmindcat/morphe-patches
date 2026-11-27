@@ -120,7 +120,7 @@ public final class Customization {
         LABELS.put("patchedYouTubeMusic", new String[]{"Patched YouTube Music",
                 "YouTube Music from Morphe or ReVanced"});
         LABELS.put("anyMediaApp", new String[]{"Any media app",
-                "Music apps that work with Android Auto"});
+                "Music apps that work with Android Auto, and Spotify"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */

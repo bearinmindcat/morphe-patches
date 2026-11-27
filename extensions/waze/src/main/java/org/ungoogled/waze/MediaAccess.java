@@ -16,8 +16,9 @@ import android.widget.Toast;
 /**
  * Notification access for Any media app. Some music apps -- Metrolist among them -- let only trusted controllers
  * browse their media (Android Auto, the system), and Android trusts an app whose notification listener the user
- * allowed. Waze reads nothing here: being allowed is all that counts, so the listener lets the system unbind it
- * right away (the access stays). A root mount install keeps the stock manifest, so it has no listener to allow.
+ * allowed; it also lets such an app see the media sessions open (Spotify's, for SpotifySession). Waze reads nothing
+ * here: being allowed is all that counts, so the listener lets the system unbind it right away (the access stays).
+ * A root mount install keeps the stock manifest, so it has no listener to allow.
  */
 public final class MediaAccess extends NotificationListenerService {
     private static final String TAG = "UA";
@@ -55,14 +56,15 @@ public final class MediaAccess extends NotificationListenerService {
 
     /**
      * [label] refused Waze's media browser. Without notification access: ask for it once ("Not now" never asks
-     * again), then a short note on each pick; with it, the app shares its music with no other app.
+     * again), then a short note on each pick; with it, the app shares its music with no other app. [session]: Waze
+     * can follow the app's media session instead (Spotify), which needs the same access.
      */
-    static void refused(String label) {
+    static void refused(String label, boolean session) {
         try {
             Context c = Customization.appContext();
             if (c == null) return;
             if (allowed(c) || !declared(c)) {
-                toast(c, label + " doesn't share its music with Waze");
+                if (!session) toast(c, label + " doesn't share its music with Waze");
                 return;
             }
             SharedPreferences prefs = c.getSharedPreferences("ungoogled_waze", Context.MODE_PRIVATE);
@@ -71,7 +73,9 @@ public final class MediaAccess extends NotificationListenerService {
                 toast(c, label + " needs notification access for Waze");
                 return;
             }
-            String ask = label + " shares its music only with apps that have notification access. "
+            String ask = session
+                    ? "To show and control " + label + ", Waze needs notification access. Allow it? Waze reads no notifications."
+                    : label + " shares its music only with apps that have notification access. "
                     + "Allow it for Waze? Waze reads no notifications.";
             AlertDialog.Builder b = new AlertDialog.Builder(a)
                     .setMessage(restricted(c) ? ask + "\n\n" + GREYED : ask)

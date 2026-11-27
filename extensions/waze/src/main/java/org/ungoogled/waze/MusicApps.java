@@ -46,6 +46,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * opens a partner's when the partner connects, so Waze's own media browser does the rest: track, artwork,
  * play/pause/skip and browsing.
  *
+ * Spotify (issue #213) reaches Waze through its own SDK or App Remote, which Spotify grants only to Waze signed by
+ * Waze, so a re-signed Waze showed "Nothing is playing". There Spotify takes the media app route too, and when its
+ * media browser refuses Waze, Waze's player is handed Waze's own copy of Spotify's media session (SpotifySession).
+ * A root mount install keeps Waze's signature and Spotify's own route.
+ *
  * Idea from Pilotkosinus/morphe-waze-patches ("Patched YouTube Music Support", GPL-3.0).
  */
 public final class MusicApps {
@@ -56,7 +61,9 @@ public final class MusicApps {
     private static final String TAG = "UA";
     private static final String ACTION_INIT = "com.waze.sdk.audio.ACTION_INIT";
     private static final String YOUTUBE_MUSIC = "com.google.android.apps.youtube.music";
-    private static final String SPOTIFY = "com.spotify.music";
+    static final String SPOTIFY = "com.spotify.music";
+    /** An action nothing receives. */
+    private static final String ACTION_NOBODY = "org.ungoogled.waze.NOBODY";
     private static final String MEDIA_BROWSER = "android.media.browse.MediaBrowserService";
     /** Android Auto's marker in an app's manifest. */
     private static final String CAR_APP = "com.google.android.gms.car.application";
@@ -64,6 +71,10 @@ public final class MusicApps {
     private static final int FEATURE_AUDIO = 0x200000;
     private static final String CONFIG = "com.waze.sdk.SdkConfiguration";
     static final String ACTION_TEST = "org.ungoogled.waze.MUSIC_TEST";
+    /** Waze's signing certificate (SHA-256): Play Store installs and root mount installs have it. */
+    private static final String WAZE_CERT = "03637f6c5d8f604e6fdb79a6ffbfa578de4e318f8da22fc6106665247f8807d7";
+    /** Spotify refused Waze's media browser (kept across starts, so Waze goes to its session at once). */
+    private static final String KEY_SPOTIFY_REFUSED = "spotify_refused";
 
     /** Added package -> the listed partner it is a renamed copy of. */
     private static final Map<String, String> partnerOf = new ConcurrentHashMap<>();
@@ -93,6 +104,37 @@ public final class MusicApps {
 
     private static boolean mediaOn() {
         return Customization.patched(MEDIA_FEATURE) && Customization.on(MEDIA_FEATURE);
+    }
+
+    private static volatile Boolean wazeSigned;
+
+    /** Whether this Waze carries Waze's own signature (Spotify then knows it). */
+    private static boolean wazeSigned(Context c) {
+        Boolean known = wazeSigned;
+        if (known != null) return known;
+        boolean found = false;
+        try {
+            android.content.pm.SigningInfo info = c.getPackageManager()
+                    .getPackageInfo(c.getPackageName(), PackageManager.GET_SIGNING_CERTIFICATES).signingInfo;
+            android.content.pm.Signature[] certs = info.hasMultipleSigners()
+                    ? info.getApkContentsSigners() : info.getSigningCertificateHistory();
+            java.security.MessageDigest sha = java.security.MessageDigest.getInstance("SHA-256");
+            for (android.content.pm.Signature cert : certs) {
+                StringBuilder hex = new StringBuilder();
+                for (byte b : sha.digest(cert.toByteArray())) hex.append(String.format("%02x", b));
+                if (WAZE_CERT.contentEquals(hex)) found = true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Waze music apps: signature", t);
+        }
+        return wazeSigned = found;
+    }
+
+    /** Spotify goes the media app route: Any media app is on and Waze is not Waze-signed. */
+    private static boolean spotifyHere() {
+        if (!mediaOn()) return false;
+        Context c = Customization.appContext();
+        return c != null && !wazeSigned(c);
     }
 
     // ---- start-up -------------------------------------------------------------------------
@@ -202,6 +244,24 @@ public final class MusicApps {
             }
             mediaApps = Collections.unmodifiableSet(media2);
 
+            // Spotify through its session: an audio app only, since nothing of Waze's goes to Spotify (no data
+            // sharing question); listed when Waze's server did not list it.
+            if (media && spotifyHere()) {
+                int at = listed.indexOf(SPOTIFY);
+                if (at >= 0) {
+                    scopes[at] = FEATURE_AUDIO;
+                } else if (!addPackages.contains(SPOTIFY)) {
+                    try {
+                        android.content.pm.ApplicationInfo info = pm.getApplicationInfo(SPOTIFY, 0);
+                        addPackages.add(SPOTIFY);
+                        addNames.add(label(pm, info, "Spotify"));
+                        addScopes.add(FEATURE_AUDIO);
+                    } catch (PackageManager.NameNotFoundException ignored) {
+                        // not installed
+                    }
+                }
+            }
+
             String summary = addPackages.toString();
             if (!summary.equals(lastAdded)) {
                 lastAdded = summary;
@@ -269,7 +329,7 @@ public final class MusicApps {
         try {
             if (intent == null || !ACTION_INIT.equals(intent.getAction())) return false;
             String pkg = intent.getPackage();
-            return pkg != null && mediaApps.contains(pkg) && mediaOn();
+            return pkg != null && (mediaApps.contains(pkg) && mediaOn() || SPOTIFY.equals(pkg) && spotifyHere());
         } catch (Throwable t) {
             return false;
         }
@@ -282,7 +342,11 @@ public final class MusicApps {
      */
     public static void started(String pkg, Intent intent) {
         try {
-            if (pkg == null || intent == null || !mediaApps.contains(pkg) || !mediaOn()) return;
+            if (pkg == null || intent == null) return;
+            boolean spotify = SPOTIFY.equals(pkg) && spotifyHere();
+            if (!spotify && !(mediaApps.contains(pkg) && mediaOn())) return;
+            // Spotify's own Waze SDK is left out (it would open a second session): the broadcast goes nowhere.
+            if (spotify) intent.setAction(ACTION_NOBODY).setPackage(Customization.appContext().getPackageName());
             // Waze keeps one player per app; one whose media browser refused it never retries, so it is dropped.
             if (refused.remove(pkg)) dropPlayer(pkg);
             final String token = intent.getStringExtra("token");
@@ -316,7 +380,7 @@ public final class MusicApps {
             connect.setAccessible(true);
             Object ok = connect.invoke(instance.invoke(null), c.getResources(), pkg, token, new Bundle(), messenger());
             Log.i(TAG, "Waze media app " + pkg + (Boolean.TRUE.equals(ok) ? " connected" : " refused"));
-            if (Boolean.TRUE.equals(ok)) probe(c, pkg, token != null);
+            if (Boolean.TRUE.equals(ok)) probe(c, pkg, token != null, SPOTIFY.equals(pkg) && spotifyMirrored);
         } catch (Throwable t) {
             Log.w(TAG, "Waze media app " + pkg, t);
         }
@@ -327,9 +391,10 @@ public final class MusicApps {
 
     /**
      * Whether the app lets Waze browse it, asked as Waze's player asks (same app, same answer). Some apps let only
-     * trusted controllers in; a pick by the user ([asked]) then says why, or asks for notification access.
+     * trusted controllers in; a pick by the user ([asked]) then says why, or asks for notification access. Spotify
+     * refusing moves Waze's player to its session; [mirrored]: the player already is there, only remember the answer.
      */
-    private static void probe(Context c, String pkg, boolean asked) {
+    private static void probe(Context c, String pkg, boolean asked, boolean mirrored) {
         try {
             Intent i = new Intent(MEDIA_BROWSER).setPackage(pkg);
             List<ResolveInfo> found = c.getPackageManager().queryIntentServices(i, 0);
@@ -340,21 +405,94 @@ public final class MusicApps {
                 @Override
                 public void onConnected() {
                     refused.remove(pkg);
+                    if (SPOTIFY.equals(pkg)) spotifyRefused(c, false);
                     b[0].disconnect();
                 }
 
                 @Override
                 public void onConnectionFailed() {
+                    boolean access = MediaAccess.allowed(c);
+                    Log.i(TAG, "Waze media app " + pkg + ": its media browser refused Waze, notification access " + access);
+                    if (SPOTIFY.equals(pkg)) {
+                        spotifyRefused(c, true);
+                        if (mirrored) return;
+                        refused.add(pkg);
+                        // With access, Waze's player goes to Spotify's session; without, ask for it.
+                        if (access) spotifyAgain();
+                        else if (asked) MediaAccess.refused(label(c.getPackageManager(), pkg), true);
+                        return;
+                    }
                     refused.add(pkg);
-                    Log.i(TAG, "Waze media app " + pkg + ": its media browser refused Waze, notification access "
-                            + MediaAccess.allowed(c));
-                    if (asked) MediaAccess.refused(label(c.getPackageManager(), pkg));
+                    if (asked) MediaAccess.refused(label(c.getPackageManager(), pkg), false);
                 }
             }, null);
             b[0].connect();
         } catch (Throwable t) {
             Log.w(TAG, "Waze media app " + pkg, t);
         }
+    }
+
+    // ---- Spotify through its media session (issue #213) --------------------------------------
+
+    /** Whether Waze's player for Spotify was handed its session (the last one made). */
+    private static volatile boolean spotifyMirrored;
+    private static long spotifyPicked;
+
+    /** The audio pick's "is it Spotify" (Spotify's own SDK or App Remote): not when Spotify goes the media app route. */
+    public static boolean spotifyRoute(boolean spotify) {
+        try {
+            return spotify && !spotifyHere();
+        } catch (Throwable t) {
+            return spotify;
+        }
+    }
+
+    /**
+     * Waze makes its player (a media browser) for an app: for Spotify that refuses Waze's media browser, the browser
+     * Waze connects to is its own (SpotifySession), which hands over a copy of Spotify's session. Needs notification
+     * access, which lets Waze see Spotify's session.
+     */
+    public static android.content.ComponentName browser(String pkg, android.content.ComponentName real) {
+        try {
+            if (!SPOTIFY.equals(pkg) || !spotifyHere()) return real;
+            Context c = Customization.appContext();
+            android.content.ComponentName own = new android.content.ComponentName(c, SpotifySession.class);
+            boolean mirror = spotifyRefused(c) && MediaAccess.allowed(c) && declared(c, own);
+            spotifyMirrored = mirror;
+            if (!mirror) return real;
+            Log.i(TAG, "Waze media app " + pkg + ": through its media session");
+            return own;
+        } catch (Throwable t) {
+            Log.w(TAG, "Waze media app " + pkg, t);
+            return real;
+        }
+    }
+
+    private static boolean declared(Context c, android.content.ComponentName service) {
+        try {
+            c.getPackageManager().getServiceInfo(service, 0);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static boolean spotifyRefused(Context c) {
+        return c.getSharedPreferences("ungoogled_waze", Context.MODE_PRIVATE).getBoolean(KEY_SPOTIFY_REFUSED, false);
+    }
+
+    private static void spotifyRefused(Context c, boolean refusedNow) {
+        if (spotifyRefused(c) != refusedNow) {
+            c.getSharedPreferences("ungoogled_waze", Context.MODE_PRIVATE).edit().putBoolean(KEY_SPOTIFY_REFUSED, refusedNow).apply();
+        }
+    }
+
+    /** Spotify just refused Waze's player: pick it again (at most once in 10 s), now through its session. */
+    private static void spotifyAgain() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - spotifyPicked < 10000) return;
+        spotifyPicked = now;
+        accessGranted();
     }
 
     private static String label(PackageManager pm, String pkg) {
@@ -385,8 +523,9 @@ public final class MusicApps {
     }
 
     /**
-     * Notification access was just allowed (the listener connected, or Waze is back from Android's page with it): the
-     * app Waze is connected to that refused it is picked again, as a tap in the audio panel would.
+     * Notification access was just allowed (the listener connected, or Waze is back from Android's page with it), or
+     * Spotify refused Waze with access allowed: the app Waze is connected to that refused it is picked again, as a tap
+     * in the audio panel would.
      */
     static void accessGranted() {
         main.post(() -> {
@@ -405,7 +544,7 @@ public final class MusicApps {
                         }
                     }
                 }
-                Log.i(TAG, "Waze media access allowed, reconnecting " + current);
+                Log.i(TAG, "Waze media app refused Waze, reconnecting " + current);
                 if (current != null) pick(current);
             } catch (Throwable t) {
                 Log.w(TAG, "Waze media access", t);

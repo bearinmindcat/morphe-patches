@@ -1,6 +1,7 @@
 package org.ungoogled.patches.waze
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
@@ -22,12 +23,15 @@ import org.w3c.dom.Element
 private const val MEDIA_BROWSER = "android.media.browse.MediaBrowserService"
 private const val ACTION_INIT = "com.waze.sdk.audio.ACTION_INIT"
 private const val MEDIA_FEATURE = "anyMediaApp"
+private const val SPOTIFY = "com.spotify.music"
 
 /**
  * Since Android 11 Waze sees only the apps its manifest names: its <queries> lists the audio SDK's broadcast and
  * Spotify, so a music app without the SDK was invisible to it. Ask for every app with a media browser service.
  * Some apps let only trusted controllers browse them, and Android trusts an app whose notification listener the
- * user allowed: declare one (org.ungoogled.waze.MediaAccess). A root mount install keeps the stock manifest.
+ * user allowed: declare one (org.ungoogled.waze.MediaAccess). Spotify's session reaches a re-signed Waze's player
+ * through a media browser of Waze's own (org.ungoogled.waze.SpotifySession). A root mount install keeps the stock
+ * manifest.
  */
 private val wazeMediaAppsManifestPatch = resourcePatch(
     description = "Lets Waze see every app with a media browser service.",
@@ -60,6 +64,12 @@ private val wazeMediaAppsManifestPatch = resourcePatch(
                             )
                         },
                     )
+                },
+            )
+            application.appendChild(
+                manifest.createElement("service").apply {
+                    setAttribute("android:name", "org.ungoogled.waze.SpotifySession")
+                    setAttribute("android:exported", "false")
                 },
             )
         }
@@ -102,12 +112,13 @@ private fun String.javaName() = removePrefix("L").removeSuffix(";").replace('/',
  * Waze's audio player offers only the music apps that carry Waze's audio SDK and are on its server's partner list.
  * Every other media app for Android Auto is added to that list here; Waze calls it installed, and when it is picked
  * its session is opened inside Waze -- what the SDK in a partner app would do -- so Waze's own media browser shows
- * the track, plays, pauses, skips and browses (issues #240, #233).
+ * the track, plays, pauses, skips and browses (issues #240, #233). Spotify grants its own route only to Waze signed by
+ * Waze: a re-signed Waze takes this route for it too, following Spotify's media session (issue #213).
  */
 @Suppress("unused")
 val wazeAnyMediaAppPatch = bytecodePatch(
     name = "Any media app",
-    description = "Lets Waze's audio player use any music app that works with Android Auto.",
+    description = "Lets Waze's audio player use any music app that works with Android Auto, and Spotify.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
     // The extension, the partner list hook, a switch on Waze's Customization screen and the apps' visibility.
@@ -170,6 +181,47 @@ val wazeAnyMediaAppPatch = bytecodePatch(
                 0,
                 "invoke-static/range { p0 .. p1 }, $MUSIC_APPS->started(Ljava/lang/String;Landroid/content/Intent;)V",
             )
+
+        // Spotify: the pick's "is it Spotify" (Spotify's own SDK or App Remote route) asks the extension, so a re-signed
+        // Waze takes the media app route for it.
+        mutableClassDefBy(picker).methods.single {
+            it.name == pick.name && it.takes("Ljava/lang/String;", "Ljava/lang/String;", "Ljava/lang/Runnable;")
+        }.apply {
+            val code = implementation!!.instructions.toList()
+            val name = code.indexOfFirst { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string == SPOTIFY }
+            val equals = (code.getOrNull(name + 1) as? ReferenceInstruction)?.reference as? MethodReference
+            val result = code.getOrNull(name + 2)
+            if (name < 0 || equals?.name != "equals" || equals.definingClass != "Ljava/lang/String;" ||
+                result?.opcode != Opcode.MOVE_RESULT
+            ) {
+                throw PatchException("audio app pick: its Spotify check not found")
+            }
+            val isSpotify = (result as OneRegisterInstruction).registerA
+            addInstructions(
+                name + 3,
+                """
+                    invoke-static/range { v$isSpotify .. v$isSpotify }, $MUSIC_APPS->spotifyRoute(Z)Z
+                    move-result v$isSpotify
+                """,
+            )
+        }
+        // Waze's player for an app (a media browser to the app's service, made by the players by package): the
+        // extension may point Spotify's at Waze's own, which follows Spotify's media session.
+        val playerArgs = arrayOf("Landroid/content/Context;", "Ljava/lang/String;", "Landroid/content/ComponentName;")
+        val playerInit = classDefBy(players).methods.firstNotNullOfOrNull { m ->
+            m.implementation?.instructions?.firstNotNullOfOrNull { i ->
+                ((i as? ReferenceInstruction)?.reference as? MethodReference)?.takeIf {
+                    i.opcode == Opcode.INVOKE_DIRECT && it.name == "<init>" && it.takes(*playerArgs)
+                }
+            }
+        } ?: throw PatchException("audio app player constructor (Context, package, service) not found")
+        mutableClassDefBy(playerInit.definingClass).methods.single { it.name == "<init>" && it.takes(*playerArgs) }.addInstructions(
+            0,
+            """
+                invoke-static/range { p2 .. p3 }, $MUSIC_APPS->browser(Ljava/lang/String;Landroid/content/ComponentName;)Landroid/content/ComponentName;
+                move-result-object p3
+            """,
+        )
 
         answer("sessionsClass", sessions.javaName())
         answer("sessionsInstance", instance.name)
