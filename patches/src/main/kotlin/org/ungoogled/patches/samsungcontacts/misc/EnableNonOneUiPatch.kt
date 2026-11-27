@@ -77,6 +77,18 @@ private val providersPatch = bytecodePatch(
         java.util.logging.Logger.getLogger(LOG).info("Provider calls: $calls, observers: $observers")
         // Measured against 16.3.00.87: 538 calls and 29 observers.
         if (calls < 200 || observers < 10) throw PatchException("only $calls provider calls found")
+
+        // Where a refused query left the app its stand-in cursor, it added its keys to Android's shared empty extras
+        // (opening the emergency contacts group crashed): the extras it reads can be added to (see ProviderCalls.extras).
+        val extras = redirectCalls(
+            mapOf(
+                "Landroid/database/Cursor;->getExtras()Landroid/os/Bundle;" to
+                    "$EXT/ProviderCalls;->extras(Landroid/database/Cursor;)Landroid/os/Bundle;",
+            ),
+        )
+        java.util.logging.Logger.getLogger(LOG).info("Cursor extras calls: $extras")
+        // Measured against 16.3.00.87: 38 calls.
+        if (extras < 10) throw PatchException("only $extras cursor extras calls found")
     }
 }
 

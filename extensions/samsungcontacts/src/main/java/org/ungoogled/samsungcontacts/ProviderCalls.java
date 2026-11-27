@@ -5,6 +5,7 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.util.Log;
 
@@ -145,6 +146,24 @@ public final class ProviderCalls {
 
     private static void learnt(Uri uri, String column) {
         if (Log.isLoggable(TAG, Log.DEBUG)) Log.d(TAG, "provider lacks " + column + " (" + uri + ")");
+    }
+
+    /**
+     * The cursor's extras, which the app adds its own keys to (list type, index titles). Off One UI a query Android's
+     * provider refuses leaves the app a stand-in MatrixCursor, whose extras are Android's shared empty bundle, and
+     * adding to that throws ("ArrayMap is immutable": the emergency contacts group's screen crashed). Such a cursor
+     * gets its own bundle instead.
+     */
+    public static Bundle extras(Cursor c) {
+        Bundle extras = c.getExtras();
+        if (extras != Bundle.EMPTY) return extras;
+        extras = new Bundle();
+        try {
+            c.setExtras(extras);
+        } catch (RuntimeException e) {
+            // A cursor that keeps no extras: the app's keys stay in this copy, as they would in a fresh bundle.
+        }
+        return extras;
     }
 
     // ContentResolver
