@@ -32,7 +32,8 @@ import java.util.Set;
  * (data/group_membership, data/group_membership_only_raw_contact_id), a "Groups" row at the top of the contact list
  * (dummyGroup) and one phone number or email per contact (data_groupby, a group's message and email): off One UI the
  * app listed no groups, saved no members and showed none. Only Android's standard columns are written; the emergency
- * contacts group (Samsung's own table) is left to the app.
+ * contacts group (Samsung's own table) is left to the app. Groups of the phone's local storage are the app's "Phone"
+ * groups (see LocalAccount).
  */
 final class Groups {
     private static final String TAG = "UA";
@@ -311,6 +312,9 @@ final class Groups {
                 g.accountName = c.getString(3);
                 g.accountType = c.getString(4);
                 g.dataSet = c.getString(5);
+                if (LocalAccount.active() && g.dataSet == null && LocalAccount.isLocal(g.accountName, g.accountType)) {
+                    g.accountName = g.accountType = LocalAccount.PHONE;
+                }
                 g.autoAdd = c.getLong(6);
                 g.favorites = c.getLong(7);
                 g.shouldSync = c.getLong(8);
@@ -554,6 +558,9 @@ final class Groups {
                 while (c != null && c.moveToNext()) {
                     long raw = c.getLong(0);
                     String rawName = c.getString(1), rawType = c.getString(2), rawDataSet = c.getString(3);
+                    if (LocalAccount.active() && rawDataSet == null && LocalAccount.isLocal(rawName, rawType)) {
+                        rawName = rawType = LocalAccount.PHONE;
+                    }
                     if (rawType != null && SIM.contains(rawType)) continue;
                     long group;
                     if (byRawContact) {
@@ -578,6 +585,8 @@ final class Groups {
     /** The group with this title in this account, made if the account takes groups; 0 when there is none. */
     private static long group(ContentResolver r, String title, String accountName, String accountType, String dataSet) {
         if ("preload".equals(dataSet)) dataSet = null;
+        // The app's "Phone" groups are the local storage's.
+        if (LocalAccount.active() && LocalAccount.PHONE.equals(accountType) && dataSet == null) accountName = accountType = null;
         List<String> args = new ArrayList<>();
         args.add(title);
         String where = "deleted=0 AND title=? AND " + is("account_name", accountName, args) + " AND "

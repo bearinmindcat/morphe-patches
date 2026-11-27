@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
  * query or write ("Invalid column ...") and an unknown path throws. The patch sends the app's ContentResolver calls
  * here: other providers are passed straight through; for these an unknown path answers nothing, and a column they
  * lack is learnt from the error, left out of the call (writes), read as null (queries) or as 0 (selections, sort orders), and
- * Samsung's UNICODE_NATURAL collation becomes Android's LOCALIZED. Samsung's group paths are answered by Groups.
+ * Samsung's UNICODE_NATURAL collation becomes Android's LOCALIZED. Samsung's group paths are answered by Groups; its
+ * "Phone" storage is the phone's local storage (see LocalAccount).
  */
 public final class ProviderCalls {
     private static final String TAG = "UA";
@@ -79,7 +80,7 @@ public final class ProviderCalls {
             if (contacts && "title".equals(c)) continue;
             out = replaceColumn(out, c, "0");
         }
-        return out;
+        return contacts ? LocalAccount.selection(out, missing) : out;
     }
 
     private static String replaceColumn(String sql, String column, String with) {
@@ -197,7 +198,12 @@ public final class ProviderCalls {
     public static Cursor query(ContentResolver r, Uri uri, String[] projection, String selection, String[] args, String sort,
                                CancellationSignal signal) {
         if (!telephony(uri)) return r.query(uri, projection, selection, args, sort, signal);
+        if (contacts(uri)) LocalAccount.prepare(r);
         if (Groups.handles(uri)) return Groups.query(r, uri, projection, selection, args, sort, signal);
+        if (contacts(uri)) {
+            selection = and(LocalAccount.clause(uri), selection);
+            uri = LocalAccount.uri(uri);
+        }
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
@@ -207,7 +213,7 @@ public final class ProviderCalls {
                     Log.v(TAG, "query " + uri + " where " + rewrite(selection, missing, contacts(uri)) + " " + java.util.Arrays.toString(args)
                             + " -> " + (c == null ? "null" : c.getCount()));
                 }
-                return shape(c, projection);
+                return shape(contacts(uri) ? LocalAccount.cursor(c) : c, projection);
             } catch (SQLiteException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
                 String column = unknownColumn(e);
                 if (column != null && missing.add(column)) {
@@ -223,7 +229,12 @@ public final class ProviderCalls {
 
     public static Uri insert(ContentResolver r, Uri uri, ContentValues values) {
         if (!telephony(uri)) return r.insert(uri, values);
+        if (contacts(uri)) LocalAccount.prepare(r);
         if (Groups.isMembership(uri)) return Groups.insertMembership(r, uri, values);
+        if (contacts(uri)) {
+            values = LocalAccount.values(values);
+            uri = LocalAccount.uri(uri);
+        }
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
@@ -243,6 +254,12 @@ public final class ProviderCalls {
 
     public static int update(ContentResolver r, Uri uri, ContentValues values, String selection, String[] args) {
         if (!telephony(uri)) return r.update(uri, values, selection, args);
+        if (contacts(uri)) {
+            LocalAccount.prepare(r);
+            values = LocalAccount.values(values);
+            selection = and(LocalAccount.clause(uri), selection);
+            uri = LocalAccount.uri(uri);
+        }
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
@@ -264,6 +281,11 @@ public final class ProviderCalls {
 
     public static int delete(ContentResolver r, Uri uri, String selection, String[] args) {
         if (!telephony(uri)) return r.delete(uri, selection, args);
+        if (contacts(uri)) {
+            LocalAccount.prepare(r);
+            selection = and(LocalAccount.clause(uri), selection);
+            uri = LocalAccount.uri(uri);
+        }
         Set<String> missing = missing(uri);
         for (int attempt = 0; attempt < 16; attempt++) {
             try {
@@ -285,11 +307,49 @@ public final class ProviderCalls {
             ArrayList<android.content.ContentProviderOperation> operations)
             throws android.os.RemoteException, android.content.OperationApplicationException {
         if (!"com.android.contacts".equals(authority)) return r.applyBatch(authority, operations);
+        LocalAccount.prepare(r);
         // One at a time through the same fitting as single calls; back references resolve from the results so far.
         Through through = new Through(r);
         android.content.ContentProviderResult[] results = new android.content.ContentProviderResult[operations.size()];
         for (int i = 0; i < results.length; i++) results[i] = operations.get(i).apply(through, results, i);
         return results;
+    }
+
+    /**
+     * The same for a batch sent through a ContentProviderClient (the profile's medical info): contacts provider
+     * operations go through the app's resolver like the others, so "Phone" storage is the local storage here too
+     * (Samsung's own provider gets the batch as before).
+     */
+    public static android.content.ContentProviderResult[] applyBatch(android.content.ContentProviderClient client,
+            ArrayList<android.content.ContentProviderOperation> operations)
+            throws android.os.RemoteException, android.content.OperationApplicationException {
+        ContentResolver r = LocalAccount.resolver();
+        if (r == null || !LocalAccount.active() || !contactsOnly(operations)) return client.applyBatch(operations);
+        return applyBatch(r, "com.android.contacts", operations);
+    }
+
+    public static android.content.ContentProviderResult[] applyBatch(android.content.ContentProviderClient client, String authority,
+            ArrayList<android.content.ContentProviderOperation> operations)
+            throws android.os.RemoteException, android.content.OperationApplicationException {
+        ContentResolver r = LocalAccount.resolver();
+        if (r == null || !LocalAccount.active() || !"com.android.contacts".equals(authority) || !contactsOnly(operations)) {
+            return client.applyBatch(authority, operations);
+        }
+        return applyBatch(r, authority, operations);
+    }
+
+    private static boolean contactsOnly(ArrayList<android.content.ContentProviderOperation> operations) {
+        if (operations.isEmpty()) return false;
+        for (android.content.ContentProviderOperation op : operations) {
+            if (!"com.android.contacts".equals(op.getUri().getAuthority())) return false;
+        }
+        return true;
+    }
+
+    private static String and(String clause, String selection) {
+        if (clause == null) return selection;
+        if (selection == null || selection.trim().isEmpty()) return clause;
+        return "(" + clause + ") AND (" + selection + ")";
     }
 
     /** A provider object (never registered) for ContentProviderOperation.apply to call. */

@@ -64,7 +64,8 @@ private val telephonyPatch = bytecodePatch(
 /**
  * Contacts reads and writes Android's contacts provider as if it were Samsung's (sec_* columns, UNICODE_NATURAL
  * collation, applyBatch saves with Samsung columns, its group paths): off One UI the list stayed empty, saving failed and
- * groups showed no members. Its calls are fitted to Android's provider (see ProviderCalls, Groups); missing providers are
+ * groups showed no members, and contacts saved to "Phone" (Samsung's account) vanished when any account was added or
+ * removed. Its calls are fitted to Android's provider (see ProviderCalls, Groups, LocalAccount); missing providers are
  * not watched (see Providers).
  */
 private val providersPatch = bytecodePatch(
@@ -90,6 +91,30 @@ private val providersPatch = bytecodePatch(
         java.util.logging.Logger.getLogger(LOG).info("Cursor extras calls: $extras")
         // Measured against 16.3.00.87: 38 calls.
         if (extras < 10) throw PatchException("only $extras cursor extras calls found")
+
+        // "Phone" storage was Samsung's account vnd.sec.contact.phone, which Android's provider deletes with everything
+        // in it whenever an account is added or removed: it is the phone's local storage now (see LocalAccount), also
+        // for the batch the profile's medical info is saved with and for the app's question what the local account is.
+        val batch = "Ljava/util/ArrayList;)[Landroid/content/ContentProviderResult;"
+        val client = "Landroid/content/ContentProviderClient;"
+        val batches = redirectCalls(
+            mapOf(
+                "$client->applyBatch($batch" to "$EXT/ProviderCalls;->applyBatch(${client}$batch",
+                "$client->applyBatch(Ljava/lang/String;$batch" to "$EXT/ProviderCalls;->applyBatch(${client}Ljava/lang/String;$batch",
+            ),
+        )
+        val raw = "Landroid/provider/ContactsContract\$RawContacts;"
+        val local = redirectCalls(
+            mapOf(
+                "$raw->getLocalAccountName(Landroid/content/Context;)Ljava/lang/String;" to
+                    "$EXT/LocalAccount;->getLocalAccountName(Landroid/content/Context;)Ljava/lang/String;",
+                "$raw->getLocalAccountType(Landroid/content/Context;)Ljava/lang/String;" to
+                    "$EXT/LocalAccount;->getLocalAccountType(Landroid/content/Context;)Ljava/lang/String;",
+            ),
+        )
+        java.util.logging.Logger.getLogger(LOG).info("Provider client batches: $batches, local account calls: $local")
+        // Measured against 16.3.00.87: 1 batch and 2 local account calls.
+        if (batches < 1 || local < 2) throw PatchException("only $batches provider client batches and $local local account calls found")
     }
 }
 
