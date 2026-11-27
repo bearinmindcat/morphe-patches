@@ -143,7 +143,8 @@ public final class CustomizationActivity extends Activity {
                 Shapes.hideExplorePatched(), "Explore sheet",
                 Shapes.hideTabsPatched(), "Bottom tabs",
                 Shapes.hideDirectoryPatched(), "Suggestions",
-                Shapes.hideAiPatched(), "AI"));
+                Shapes.hideAiPatched(), "AI",
+                Shapes.screenshotSharePatched(), "Screenshot sharing"));
         section(body, PAGE_MISC, names(
                 Shapes.navZoomPatched(), "Zoom controls in navigation",
                 Shapes.betterOfflinePatched(), "Better offline maps",
@@ -262,6 +263,14 @@ public final class CustomizationActivity extends Activity {
             body.addView(toggleRow("Hide AI", null, ai));
             // read each time a place sheet opens, so no restart
             ai.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideAiEnabled(this, on));
+        }
+
+        if (Shapes.screenshotSharePatched()) {
+            Switch shots = new Switch(this);
+            shots.setChecked(Shapes.hideScreenshotShareEnabled(this));
+            body.addView(toggleRow("Hide screenshot sharing", "Maps no longer reacts to screenshots", shots));
+            // read when a Maps screen starts, so no restart
+            shots.setOnCheckedChangeListener((CompoundButton b, boolean on) -> Shapes.setHideScreenshotShareEnabled(this, on));
         }
     }
 

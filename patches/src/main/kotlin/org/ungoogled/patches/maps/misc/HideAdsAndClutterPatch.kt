@@ -10,8 +10,8 @@ import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
 
 /**
  * Used to be five patches (Hide ads, Hide AI, Hide suggestions, Hide explore feed, Hide
- * navigation tabs). Each part still has its own switch on the Customization screen, so
- * one patch loses nothing.
+ * navigation tabs), plus screenshot sharing (issue #229). Each part has its own switch on
+ * the Customization screen, so one patch loses nothing.
  */
 @Suppress("unused")
 val hideAdsAndClutterPatch = bytecodePatch(
@@ -19,10 +19,10 @@ val hideAdsAndClutterPatch = bytecodePatch(
     description = "Hides promoted map pins (on the map, in search results and along a route) and \"Sponsored\" search results, " +
         "Gemini's AI summaries (\"Know " +
         "before you go\" and the review summary), the row of businesses under an address on its place " +
-        "sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched " +
-        "back on on the Customization screen.",
+        "sheet, the home tab's Explore feed, the Explore / Contribute / You tabs and the share sheet Maps opens " +
+        "on a screenshot. Each can be switched back on on the Customization screen.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
-    dependsOn(hideAdsPatch, hideAiPatch, hideDirectoryCarouselPatch, hideExploreFeedPatch, hideNavigationTabsPatch)
+    dependsOn(hideAdsPatch, hideAiPatch, hideDirectoryCarouselPatch, hideExploreFeedPatch, hideNavigationTabsPatch, hideScreenshotSharePatch)
 }

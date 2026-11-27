@@ -83,6 +83,7 @@ public final class Shapes {
     public static boolean powerSavingPatched() { return false; }
     public static boolean hideDirectoryPatched() { return false; }
     public static boolean hideAiPatched() { return false; }
+    public static boolean screenshotSharePatched() { return false; }
     public static boolean highRefreshPatched() { return false; }
     public static boolean timelinePatched() { return false; }
     public static boolean speedingChimePatched() { return false; }
@@ -131,6 +132,7 @@ public final class Shapes {
     public static volatile boolean HIDE_TABS = hideTabsPatched();
     public static volatile boolean HIDE_DIRECTORY = hideDirectoryPatched();
     public static volatile boolean HIDE_AI = hideAiPatched();
+    public static volatile boolean HIDE_SCREENSHOT_SHARE = screenshotSharePatched();
     /** Off by default, unlike the others: it costs battery. */
     public static volatile boolean HIGH_REFRESH = false;
     public static volatile boolean BETTER_OFFLINE = betterOfflinePatched();
@@ -276,6 +278,21 @@ public final class Shapes {
     public static void setHideAiEnabled(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_HIDE_AI, on).commit();
         HIDE_AI = on && hideAiPatched();
+    }
+
+    // ---- Hide screenshot sharing -------------------------------------------------
+    // Maps' share sheet that pops up as soon as a screenshot is taken (issue #229). Read
+    // when a screen starts (ScreenCapture), so a change needs no restart.
+
+    public static final String KEY_HIDE_SCREENSHOT_SHARE = "hide_screenshot_share";
+
+    public static boolean hideScreenshotShareEnabled(Context c) {
+        return screenshotSharePatched() && prefs(c).getBoolean(KEY_HIDE_SCREENSHOT_SHARE, true);
+    }
+
+    public static void setHideScreenshotShareEnabled(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_HIDE_SCREENSHOT_SHARE, on).commit();
+        HIDE_SCREENSHOT_SHARE = on && screenshotSharePatched();
     }
 
     // ---- Speeding chime ----------------------------------------------------------
@@ -927,6 +944,7 @@ public final class Shapes {
             HIDE_TABS = hideTabsEnabled(base);
             HIDE_DIRECTORY = hideDirectoryEnabled(base);
             HIDE_AI = hideAiEnabled(base);
+            HIDE_SCREENSHOT_SHARE = hideScreenshotShareEnabled(base);
             SPEEDING_CHIME = speedingChime(base);
             if (speedCamerasPatched()) SpeedCameras.refresh(base);
             if (wazeAlertsPatched()) WazeAlerts.refresh(base);
