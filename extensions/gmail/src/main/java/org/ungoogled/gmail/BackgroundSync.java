@@ -32,8 +32,12 @@ public final class BackgroundSync {
         new Thread(() -> schedule(app, minutes), "UA-gmail-sync").start();
     }
 
-    private static void schedule(Context context, int minutes) {
+    private static void schedule(Application app, int minutes) {
         try {
+            // Started as the Application is made, before Android attaches its context: wait for that, or nothing is set up.
+            for (int i = 0; app.getBaseContext() == null && i < 600; i++) Thread.sleep(50);
+            Context context = app.getBaseContext();
+            if (context == null) return;
             String authority = context.getPackageName() + AUTHORITY_SUFFIX;
             for (Account account : googleAccounts(context)) {
                 // Play services turns Gmail's sync on when it adds a Google account; microG-RE does not, so it stayed

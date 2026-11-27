@@ -14,6 +14,7 @@ import app.morphe.patcher.patch.intOption
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
@@ -283,6 +284,12 @@ private val gmailMicrogResourcesPatch: ResourcePatch = resourcePatch(
     }
 }
 
+/** Gmail's Application base class logs its start under this name (attachBaseContext, onCreate). */
+private const val APPLICATION_TRACE = "HubTikTokApplication"
+/** Gmail's notification client (GNP / Chime): its registration token getter throws this. */
+private const val GNP_TOKEN_GETTER = "Project ID must not be null when trying to get registration token"
+private const val GET_PACKAGE_NAME = "Landroid/content/Context;->getPackageName()Ljava/lang/String;"
+
 /** Gmail's helper that connects its Play services clients and shows Play services' error dialog when one fails. */
 private const val PLAY_SERVICES_HELPER = "com/google/android/apps/gmail/libraries/gmscore/AbstractPlayServicesHelper"
 private const val CONNECTION_RESULT = "Lcom/google/android/gms/common/ConnectionResult;"
@@ -308,8 +315,8 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
     val syncMinutes = intOption(
         key = "syncMinutes",
         default = 15,
-        title = "Check for new mail (minutes)",
-        description = "How often Google accounts sync in the background, push or not. 0 = off.",
+        title = "Background sync (minutes)",
+        description = "Extra mail check besides push (push needs MicroG-RE 7.4.0+). 0 = off.",
         required = true,
     ) { it != null && it >= 0 }
     category("microG-RE")
@@ -412,6 +419,63 @@ val gmailMicrogSupportPatch: BytecodePatch = bytecodePatch(
                 move-result-object p2
             """,
         ) ?: throw PatchException("app component factory ($COMPONENT_FACTORY) no longer makes the screens")
+
+        // Push (issue #216): MicroG-RE 7.4.0 registers microG Gmail for push as Gmail and routes Gmail's pushes back
+        // through an alias recorded at that registration. Gmail registers again once whenever MicroG-RE changed (a
+        // token from an older one has no alias), before Firebase reads its token store...
+        val application = methodsUsing(setOf(APPLICATION_TRACE))[APPLICATION_TRACE].orEmpty().singleOrNull {
+            it.method.name == "attachBaseContext" && it.method.parameterTypes.map(CharSequence::toString) == listOf("Landroid/content/Context;")
+        } ?: throw PatchException("Gmail's Application no longer logs its attachBaseContext")
+        mutable(application).addInstructions(0, "invoke-static { p1 }, Lorg/ungoogled/gmail/Push;->prepare(Landroid/content/Context;)V")
+
+        // ...and the push target Gmail registers with Google names Gmail, the app the token now belongs to, not
+        // microG Gmail's package. The target's package comes from Context.getPackageName() straight into its setter,
+        // in the two methods that build a target (they also read the registration token).
+        val tokenGetter = methodsUsing(setOf(GNP_TOKEN_GETTER)).single(GNP_TOKEN_GETTER, "GNP registration token")
+        val tokenStore = tokenGetter.classDef.interfaces.singleOrNull()
+            ?: throw PatchException("GNP token store no longer implements one interface")
+        fun Instruction.isTokenCall() = ((this as? ReferenceInstruction)?.reference as? MethodReference)?.let {
+            it.definingClass == tokenStore && it.name == tokenGetter.method.name && it.parameterTypes.isEmpty() &&
+                it.returnType == "Ljava/lang/String;"
+        } == true
+        val builders = mutableListOf<String>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            if (c.methods.any { m -> m.implementation?.instructions?.any { it.isTokenCall() } == true }) builders += c.type
+        }
+        var targets = 0
+        for (type in builders) {
+            for (m in mutableClassDefBy(type).methods) {
+                val code = m.implementation?.instructions?.toList() ?: continue
+                if (code.none { it.isTokenCall() }) continue
+                val sites = code.indices.filter { i ->
+                    val ref = (code[i] as? ReferenceInstruction)?.reference as? MethodReference ?: return@filter false
+                    if (code[i].opcode != Opcode.INVOKE_VIRTUAL || "${ref.definingClass}->${ref.name}(${ref.parameterTypes.joinToString("")})${ref.returnType}" != GET_PACKAGE_NAME) return@filter false
+                    val result = code.getOrNull(i + 1)?.takeIf { it.opcode == Opcode.MOVE_RESULT_OBJECT } as? OneRegisterInstruction ?: return@filter false
+                    // Into a static (String, builder) setter within a few instructions (after a null check).
+                    code.subList(i + 2, minOf(code.size, i + 5)).any { next ->
+                        val setter = (next as? ReferenceInstruction)?.reference as? MethodReference
+                        next.opcode == Opcode.INVOKE_STATIC && setter != null && setter.returnType == "V" &&
+                            setter.parameterTypes.size == 2 && setter.parameterTypes[0] == "Ljava/lang/String;" &&
+                            (next as Instruction35c).registerC == result.registerA
+                    }
+                }
+                for (i in sites.sortedDescending()) {
+                    val register = (code[i + 1] as OneRegisterInstruction).registerA
+                    if (register > 15) throw PatchException("GNP target builder uses a high register")
+                    m.addInstructions(
+                        i + 2,
+                        """
+                            invoke-static { v$register }, Lorg/ungoogled/gmail/Push;->targetPackage(Ljava/lang/String;)Ljava/lang/String;
+                            move-result-object v$register
+                        """,
+                    )
+                    targets++
+                }
+            }
+        }
+        // Measured on this Gmail version: the registration target and the per-device target.
+        if (targets != 2) throw PatchException("expected 2 GNP push targets naming Gmail's package, found $targets")
     }
 
     // Every Play services name and every name of Gmail's own in Gmail's code: in finalize, after every other
