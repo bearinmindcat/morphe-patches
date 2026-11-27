@@ -11,12 +11,13 @@ public final class SignIn {
     private SignIn() {}
 
     /**
-     * Shows "Can't sign in". [from] is whatever the tapped row has at hand: a Context, a View, or the
-     * row's holder, which keeps the Activity in one of its fields.
+     * Says this build cannot sign in, and which patch builds one that can (issue #79: people with microG-RE
+     * installed tapped "Sign in" in a build made without it). [from] is whatever the tapped row has at hand:
+     * a Context, a View, or the row's holder, which keeps the Activity in one of its fields.
      */
     public static void cantSignIn(Object from) {
         Context c = context(from);
-        if (c != null) Toast.makeText(c, "Can't sign in", Toast.LENGTH_SHORT).show();
+        if (c != null) Toast.makeText(c, "Can't sign in. Patch with Add microG-RE support to sign in.", Toast.LENGTH_LONG).show();
     }
 
     private static Context context(Object o) {
