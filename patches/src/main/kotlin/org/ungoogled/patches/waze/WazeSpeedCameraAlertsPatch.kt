@@ -2,6 +2,7 @@ package org.ungoogled.patches.waze
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.patch.stringOption
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 
 /** org.ungoogled.waze.SpeedCameras, the runtime half (extensions/waze); shares OsmCameras with Flock cameras. */
@@ -20,8 +21,19 @@ val wazeSpeedCameraAlertsPatch = bytecodePatch(
     compatibleWith(COMPATIBILITY_WAZE)
     dependsOn(wazeCustomizationPatch)
 
+    // How loud the chime is (issue #87); Flock cameras chime the same way. Changeable in Customization.
+    val chime by stringOption(
+        key = "chime",
+        default = "normal",
+        values = mapOf("Normal" to "normal", "Loud" to "loud", "Loud, at alarm volume" to "alarm"),
+        title = "Chime",
+        description = "How loud the camera chime is.",
+        required = true,
+    )
+
     execute {
         WazeApplicationCreateFingerprint.method.addInstruction(0, "invoke-static { p0 }, $SPEED_CAMERAS->init(Landroid/app/Application;)V")
         declareWazeToggle("speedCameras")
+        declareWazeValue("speedCameras", "CAMERA_CHIME", chime!!)
     }
 }

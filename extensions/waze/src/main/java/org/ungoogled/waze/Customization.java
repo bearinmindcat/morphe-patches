@@ -177,6 +177,8 @@ public final class Customization {
     static final String ZONE_TOLERANCE_PERCENT = "ZONE_TOLERANCE_PERCENT", ZONE_TOLERANCE_MIN = "ZONE_TOLERANCE_MIN";
     /** Where the zone bar goes on the phone's screen (issue #91). */
     static final String ZONE_POSITION = "ZONE_POSITION";
+    /** How loud the camera chime is (issue #87), for Speed camera alerts and Flock cameras alike. */
+    static final String CAMERA_CHIME = "CAMERA_CHIME";
 
     /** ConfigValues name -> how it is shown. Only these are offered for changing. */
     private static final Map<String, Label> VALUE_LABELS = new LinkedHashMap<>();
@@ -216,6 +218,9 @@ public final class Customization {
         VALUE_LABELS.put(ZONE_POSITION, new Label("Position",
                 new String[]{ZoneBar.LEFT, ZoneBar.ABOVE_SPEED_LIMIT, ZoneBar.RIGHT},
                 new String[]{"Left edge", "Above the speed limit", "Right edge"}));
+        VALUE_LABELS.put(CAMERA_CHIME, new Label("Chime",
+                new String[]{Chime.NORMAL, Chime.LOUD, Chime.ALARM},
+                new String[]{"Normal", "Loud", "Loud, at alarm volume"}));
         VALUE_LABELS.put("CONFIG_VALUE_MAP_SPEEDOMETER_STYLE", new Label("Sign style",
                 new String[]{"us", "world"}, new String[]{"US (white rectangle)", "World (red circle)"}));
     }
@@ -448,6 +453,7 @@ public final class Customization {
         if (name.startsWith("SKIN_") || name.startsWith("MAP_THEME_")) applySkin();
         if (name.equals(PIN_SIZE)) applyPins();
         if (name.equals(ZONE_POSITION)) ZoneBar.moved();
+        if (name.equals(CAMERA_CHIME)) Chime.camera();   // what it sounds like now
         reapply(name + " = " + (value == null ? "the patch's" : value));
         Value kept = values.get(name);
         if (kept != null) restartNote(kept.feature);
