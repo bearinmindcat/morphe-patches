@@ -2,11 +2,15 @@ package org.ungoogled.patches.samsungcontacts.misc
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import org.ungoogled.patches.samsung.addOneUiFrameworkResources
 import org.ungoogled.patches.samsung.android13Patch
@@ -258,6 +262,48 @@ private val updateCheckPatch = bytecodePatch(
     }
 }
 
+private const val WIDGET_UPDATE_LOG = "onChange! start DirectWidgetUpdateJobService"
+
+/** DirectWidgetUpdateRequest's answer to a contacts change: starts the widget update service. */
+private object WidgetUpdateRequestFingerprint : Fingerprint(
+    strings = listOf(WIDGET_UPDATE_LOG),
+)
+
+/**
+ * When contacts changed while Contacts was in the background, its widget refresh started a service from the background,
+ * which Android refuses for a downloaded app: the background process crashed. That start goes through WidgetUpdates,
+ * which runs the refresh as a job when Android refuses.
+ */
+private val widgetUpdatePatch = bytecodePatch(
+    description = "Refreshes the widgets with a job when the app is in the background.",
+) {
+    extendWith(SAMSUNG_CONTACTS_EXTENSION)
+
+    execute {
+        val method = WidgetUpdateRequestFingerprint.methodOrNull
+            ?: throw PatchException("Contacts' widget update request was not found")
+        val insns = method.implementation!!.instructions.toList()
+        val log = insns.indexOfFirst {
+            it.opcode == Opcode.CONST_STRING && ((it as ReferenceInstruction).reference as StringReference).string == WIDGET_UPDATE_LOG
+        }
+        val index = (log + 1 until insns.size).firstOrNull { i ->
+            val r = (insns[i] as? ReferenceInstruction)?.reference as? MethodReference
+            (insns[i].opcode == Opcode.INVOKE_VIRTUAL || insns[i].opcode == Opcode.INVOKE_VIRTUAL_RANGE) && r != null &&
+                r.name == "startService" && r.parameterTypes == listOf("Landroid/content/Intent;") &&
+                r.returnType == "Landroid/content/ComponentName;"
+        }
+        if (log < 0 || index == null) throw PatchException("the widget update service start was not found")
+        val target = "$EXT/WidgetUpdates;->startService(Landroid/content/Context;Landroid/content/Intent;)Landroid/content/ComponentName;"
+        val call = when (val insn = insns[index]) {
+            is FiveRegisterInstruction -> "invoke-static { v${insn.registerC}, v${insn.registerD} }, $target"
+            is RegisterRangeInstruction ->
+                "invoke-static/range { v${insn.startRegister} .. v${insn.startRegister + insn.registerCount - 1} }, $target"
+            else -> throw PatchException("unexpected ${insn.opcode} for the widget update service start")
+        }
+        method.replaceInstruction(index, call)
+    }
+}
+
 /** 16.3.00.87 runs on Android 13: its Android 14 and newer calls made without a version check go through Android13. */
 private val android13Patch =
     android13Patch(SAMSUNG_CONTACTS_EXTENSION, "Lorg/ungoogled/samsungcontacts/Android13;", "SamsungContacts")
@@ -276,7 +322,7 @@ val enableNonOneUiPatch = bytecodePatch(
     dependsOn(
         manifestPatch, telephonyPatch, providersPatch, displayPatch, settingsPatch, oneUiMembersPatch, systemServicesPatch,
         sprDrawablesPatch,
-        galaxyStoreChecksPatch("Samsung Contacts"), updateCheckPatch,
+        galaxyStoreChecksPatch("Samsung Contacts"), updateCheckPatch, widgetUpdatePatch,
         android13Patch,
     )
     extendWith(SAMSUNG_CONTACTS_EXTENSION)
