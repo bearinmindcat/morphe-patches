@@ -2,6 +2,8 @@ package org.ungoogled.coloroslauncher;
 
 import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetHostView;
+import android.content.ComponentName;
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -42,6 +44,17 @@ public final class Widgets {
         } finally {
             PENDING.remove();
         }
+    }
+
+    /**
+     * Widget list: whether an app's shortcut (an activity for CREATE_SHORTCUT, e.g. "Settings shortcut" or "Direct dial")
+     * is listed. OPPO's widget filter answered no for every entry without a widget. The launcher's own (System UI's bubble
+     * shortcut, which needs System UI) stays out.
+     */
+    public static boolean pickerShortcut(ComponentName component) {
+        if (component == null) return false;
+        Context c = App.context();
+        return c == null || !c.getPackageName().equals(component.getPackageName());
     }
 
     /** The host view listen() is registering for this widget, else null (the launcher makes a new one). */
