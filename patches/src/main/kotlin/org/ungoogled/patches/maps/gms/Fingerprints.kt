@@ -110,3 +110,25 @@ internal object DeviceComplianceVerdictFingerprint : Fingerprint(
     parameters = listOf("Ljava/lang/Object;"),
     filters = listOf(string("DO_NOT_ENFORCE"), string("https://www.google.com/maps")),
 )
+
+/**
+ * Maps' CarConnectionHandler.onCarConnected: once Android Auto's car service connects, it reads the car's
+ * info, sensors and messaging. Several of those calls -- the first one made here directly is the sensor
+ * service's location characterization -- are private: Android Auto answers them only for a Google-signed
+ * caller and throws `SecurityException: Wrong signature - go/gearhead-retail-device` at a re-signed Maps,
+ * uncaught on the main thread. Both strings occur once in the APK; the direct binder transaction
+ * (code, Parcel) -> Parcel is that private call.
+ */
+internal object CarConnectedFingerprint : Fingerprint(
+    returnType = "V",
+    parameters = listOf(),
+    filters = listOf(
+        string("onCarConnected called, but service is not created!: %s"),
+        string("CarConnectionHandler.onCarConnected"),
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            parameters = listOf("I", "Landroid/os/Parcel;"),
+            returnType = "Landroid/os/Parcel;",
+        ),
+    ),
+)

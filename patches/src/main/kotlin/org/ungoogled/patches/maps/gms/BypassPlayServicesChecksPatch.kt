@@ -16,9 +16,9 @@ val bypassPlayServicesChecksPatch = bytecodePatch(
     description = "Makes Maps' bundled Play services signature and availability checks always pass, so it " +
         "runs re-signed and with Play services disabled or absent, and lets it load tiles, search and " +
         "routing by sending Google's own package and certificate in the identity headers the Maps backend " +
-        "checks. Where Play services rejects the re-signed app, Maps degrades instead of crashing. Also skips " +
-        "Google's \"isn't Play Protect certified\" page, and with no Play services at all uses Android's own " +
-        "Cronet so the map still loads.",
+        "checks. Where Play services or Android Auto rejects the re-signed app, Maps degrades instead of " +
+        "crashing. Also skips Google's \"isn't Play Protect certified\" page, and with no Play services at " +
+        "all uses Android's own Cronet so the map still loads.",
     default = true,
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
