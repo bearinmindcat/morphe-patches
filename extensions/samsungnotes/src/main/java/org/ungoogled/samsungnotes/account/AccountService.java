@@ -5,7 +5,6 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.IInterface;
-import android.util.Log;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * they are.
  */
 final class AccountService implements InvocationHandler {
-    private static final String TAG = SamsungAuth.TAG;
     private static final String SERVICE = "com.msc.sa.aidl.ISAService";
     private static final String CALLBACK = "com.msc.sa.aidl.ISACallback";
     private static Binder binder;
@@ -46,7 +44,7 @@ final class AccountService implements InvocationHandler {
             binder = b;
             return b;
         } catch (ReflectiveOperationException | RuntimeException e) {
-            Log.w(TAG, "account service unavailable: " + e);
+            SamsungAuth.warn("account service unavailable: " + e);
             return null;
         }
     }
@@ -92,7 +90,7 @@ final class AccountService implements InvocationHandler {
                 return proxy == args[0];
             default:
                 // requestAuthCode, requestSCloudAccessToken, ...: the web sign-in has nothing for them.
-                Log.i(TAG, "not available without the Samsung Account app: " + method.getName());
+                SamsungAuth.log("not available without the Samsung Account app: " + method.getName());
                 return method.getReturnType() == boolean.class ? Boolean.FALSE : null;
         }
     }
@@ -100,24 +98,27 @@ final class AccountService implements InvocationHandler {
     private void answerToken(Object callback, int id, Bundle request) {
         AccountStore store = AccountStore.get(context);
         if (!store.signedIn()) {
+            SamsungAuth.log("Notes asked for a token while signed out");
             deliver(callback, "onReceiveAccessToken", id, false, error("SAC_0102", "Not signed in to a Samsung account"));
             return;
         }
         String expired = request != null ? request.getString("expired_access_token") : null;
-        boolean renew = store.accessExpired() || (!AccountStore.empty(expired) && expired.equals(store.accessToken()));
-        if (renew) {
-            SamsungAuth.Result r = SamsungAuth.refresh(store, SamsungAccount.clientId());
-            if (r == SamsungAuth.Result.REFUSED) {
-                store.needsSignIn(true);
-                SamsungAccount.askToSignInAgain(context);
-                deliver(callback, "onReceiveAccessToken", id, false, error("SAC_0402", "Sign in to your Samsung account again"));
-                return;
-            }
-            if (r == SamsungAuth.Result.NETWORK) {
-                deliver(callback, "onReceiveAccessToken", id, false, error("SAC_0301", "Network error"));
-                return;
-            }
+        boolean asked = store.needsSignIn();
+        SamsungAuth.Result r = SamsungAuth.current(context, store, SamsungAccount.clientId(), expired);
+        if (r == SamsungAuth.Result.REFUSED) {
+            // Samsung no longer takes the refresh token (or never gave one): the account stays, a new sign-in renews it.
+            SamsungAuth.warn("Samsung refused to renew the sign-in; " + (asked ? "already asked" : "asking") + " the user to sign in again");
+            store.needsSignIn(true);
+            if (!asked) SamsungAccount.askToSignInAgain(context);
+            deliver(callback, "onReceiveAccessToken", id, false, error("SAC_0402", "Sign in to your Samsung account again"));
+            return;
         }
+        if (r == SamsungAuth.Result.NETWORK) {
+            // Kept signed in; Notes asks again on its next sync.
+            deliver(callback, "onReceiveAccessToken", id, false, error("SAC_0301", "Network error"));
+            return;
+        }
+        if (asked && !store.needsSignIn()) SamsungAccount.cancelReminder(context);
         deliver(callback, "onReceiveAccessToken", id, true, store.toResult());
     }
 
@@ -134,7 +135,7 @@ final class AccountService implements InvocationHandler {
             Class<?> type = Class.forName(CALLBACK, false, AccountService.class.getClassLoader());
             type.getMethod(name, int.class, boolean.class, Bundle.class).invoke(callback, id, ok, data);
         } catch (ReflectiveOperationException | RuntimeException e) {
-            Log.w(TAG, "account answer not delivered: " + e);
+            SamsungAuth.warn("account answer not delivered: " + e);
         }
     }
 }

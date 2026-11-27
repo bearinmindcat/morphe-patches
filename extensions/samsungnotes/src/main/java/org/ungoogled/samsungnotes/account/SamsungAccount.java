@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.IBinder;
-import android.util.Log;
 
 /**
  * Samsung account sign-in without the Samsung Account app (experimental).
@@ -24,7 +23,6 @@ import android.util.Log;
  * <p>The patch calls the static methods here from Notes' account code (see the patch for where).
  */
 public final class SamsungAccount {
-    static final String TAG = SamsungAuth.TAG;
     public static final String ACCOUNT_APP = "com.osp.app.signin";
     static final String SIGNED_IN = "com.samsung.account.SAMSUNGACCOUNT_SIGNIN_COMPLETED";
     static final String SIGNED_OUT = "com.samsung.account.SAMSUNGACCOUNT_SIGNOUT_COMPLETED";
@@ -157,18 +155,24 @@ public final class SamsungAccount {
     }
 
     /** Sign-out: forgets the tokens and the sign-in page's cookies, then tells Notes. Notes' notes stay. */
-    static void signOut(Context context) {
+    static void signOut(Context context, String why) {
+        SamsungAuth.log("signed out (" + why + ")");
         AccountStore.get(context).clear();
         try {
             android.webkit.CookieManager.getInstance().removeAllCookies(null);
             android.webkit.CookieManager.getInstance().flush();
             android.webkit.WebStorage.getInstance().deleteAllData();
         } catch (RuntimeException e) {
-            Log.w(TAG, "web session not cleared: " + e);
+            SamsungAuth.warn("web session not cleared: " + e);
         }
+        cancelReminder(context);
+        announce(context, false);
+    }
+
+    /** Signed in again (or renewed after all): the "sign in again" notification is out of date. */
+    static void cancelReminder(Context context) {
         NotificationManager nm = context.getSystemService(NotificationManager.class);
         if (nm != null) nm.cancel(CHANNEL, 1);
-        announce(context, false);
     }
 
     /** The refresh token was refused: a notification that opens the sign-in page again. */
@@ -188,7 +192,7 @@ public final class SamsungAccount {
                 .build();
             nm.notify(CHANNEL, 1, n);
         } catch (RuntimeException e) {
-            Log.w(TAG, "sign-in reminder not shown: " + e);
+            SamsungAuth.warn("sign-in reminder not shown: " + e);
         }
     }
 }

@@ -4,12 +4,15 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 /**
  * The Samsung account signed in on Samsung's web page: the tokens Samsung's sign-in page returned for Notes' own client
  * ID, kept in Notes' private storage (Notes is excluded from Android backups). Nothing here is sent anywhere but to
- * Samsung, by Notes' own sync engine.
+ * Samsung, by Notes' own sync engine. Only Sign out (or signing in with another account) clears it; a refused renewal
+ * only marks it as needing a new sign-in.
  */
 final class AccountStore {
     private static final String PREFS = "ungoogled_samsung_account";
@@ -57,6 +60,13 @@ final class AccountStore {
         return until != 0 && System.currentTimeMillis() > until - 5 * 60_000L;
     }
 
+    /** How long ago the current access token was issued (ms). */
+    long accessAge() {
+        long issued = prefs.getLong("access_issued", 0);
+        return issued == 0 ? Long.MAX_VALUE / 2 : Math.max(0, System.currentTimeMillis() - issued);
+    }
+
+    /** Past the lifetime the sign-in stated; only informative, Samsung decides. */
     boolean refreshExpired() {
         long until = prefs.getLong("refresh_until", 0);
         return until != 0 && System.currentTimeMillis() > until;
@@ -67,12 +77,72 @@ final class AccountStore {
     }
 
     void needsSignIn(boolean on) {
-        prefs.edit().putBoolean("needs_sign_in", on).apply();
+        prefs.edit().putBoolean("needs_sign_in", on).commit();
     }
 
-    /** Stores a sign-in or refresh result; fields the answer leaves out keep their old value. */
+    long quietFailedAt() {
+        return prefs.getLong("quiet_failed_at", 0);
+    }
+
+    void quietFailed(long when) {
+        prefs.edit().putLong("quiet_failed_at", when).commit();
+    }
+
+    /** The last renewal problem, shown on the account screen. */
+    void status(String what) {
+        prefs.edit().putString("status", what).putLong("status_at", System.currentTimeMillis()).commit();
+    }
+
+    /** One line for the account screen: when the token was last renewed, and the last problem since. */
+    String statusLine() {
+        DateFormat f = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault());
+        StringBuilder s = new StringBuilder();
+        long renewed = prefs.getLong("renewed_at", 0);
+        long signedIn = prefs.getLong("signed_in_at", 0);
+        if (signedIn != 0) s.append("Signed in ").append(f.format(new Date(signedIn))).append(". ");
+        s.append(renewed != 0 ? "Token renewed " + f.format(new Date(renewed)) + "." : "Token not renewed yet.");
+        if (empty(refreshToken())) s.append(" No refresh token.");
+        long at = prefs.getLong("status_at", 0);
+        String status = prefs.getString("status", null);
+        if (!empty(status) && at > renewed) s.append("\n").append(status).append(" (").append(f.format(new Date(at))).append(")");
+        return s.toString();
+    }
+
+    /** A sign-in on Samsung's page (a new session). */
     void save(Token t) {
         SharedPreferences.Editor e = prefs.edit();
+        put(e, t);
+        if (!empty(t.userId)) e.putString("user_id", t.userId);
+        if (!empty(t.loginId)) e.putString("login_id", t.loginId);
+        e.putLong("signed_in_at", System.currentTimeMillis());
+        e.remove("renewed_at").remove("status").remove("status_at").remove("quiet_failed_at");
+        e.putBoolean("needs_sign_in", false);
+        e.commit();
+    }
+
+    /** A token endpoint answer: same account, new tokens (a refresh token is replaced when Samsung sends a new one). */
+    void renewed(Token t) {
+        SharedPreferences.Editor e = prefs.edit();
+        put(e, t);
+        e.putLong("renewed_at", System.currentTimeMillis());
+        e.remove("quiet_failed_at");
+        e.putBoolean("needs_sign_in", false);
+        e.commit();
+    }
+
+    /** The same account signed in again through Samsung's page without the user (its web session). */
+    void signedInAgain(Token t) {
+        SharedPreferences.Editor e = prefs.edit();
+        put(e, t);
+        if (!empty(t.loginId)) e.putString("login_id", t.loginId);
+        e.putLong("renewed_at", System.currentTimeMillis());
+        e.remove("quiet_failed_at");
+        e.putBoolean("needs_sign_in", false);
+        e.commit();
+    }
+
+    /** Token fields; fields the answer leaves out keep their old value. */
+    private static void put(SharedPreferences.Editor e, Token t) {
         long now = System.currentTimeMillis();
         if (!empty(t.accessToken)) {
             e.putString("access_token", t.accessToken);
@@ -83,12 +153,18 @@ final class AccountStore {
             e.putString("refresh_token", t.refreshToken);
             e.putLong("refresh_until", t.refreshSeconds > 0 ? now + t.refreshSeconds * 1000L : 0);
         }
-        if (!empty(t.userId)) e.putString("user_id", t.userId);
-        if (!empty(t.loginId)) e.putString("login_id", t.loginId);
         if (!empty(t.apiServer)) e.putString("api_server_url", t.apiServer);
         if (!empty(t.authServer)) e.putString("auth_server_url", t.authServer);
-        e.putBoolean("needs_sign_in", false);
-        e.commit();
+    }
+
+    /** Test hook (see SignInActivity.debugResult): where the quiet sign-in goes instead of Samsung's page. */
+    String debugQuietUrl() {
+        return prefs.getString("debug_quiet_url", null);
+    }
+
+    void debugQuietUrl(String url) {
+        if (empty(url)) prefs.edit().remove("debug_quiet_url").commit();
+        else prefs.edit().putString("debug_quiet_url", url).commit();
     }
 
     void clear() {

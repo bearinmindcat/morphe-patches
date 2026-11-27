@@ -109,9 +109,7 @@ public final class SignInActivity extends Activity {
     // ---- answers
 
     private void answerSignedIn() {
-        SamsungAuth.Result r = SamsungAuth.Result.OK;
-        if (store.accessExpired()) r = SamsungAuth.refresh(store, SamsungAccount.clientId());
-        SamsungAuth.Result result = r;
+        SamsungAuth.Result result = SamsungAuth.current(this, store, SamsungAccount.clientId(), null);
         main.post(() -> {
             if (done) return;
             if (result == SamsungAuth.Result.OK) finishSignedIn();
@@ -134,45 +132,55 @@ public final class SignInActivity extends Activity {
     private boolean accept(String url) {
         if (url == null || done) return false;
         Uri uri = Uri.parse(url);
-        String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase(Locale.ROOT) : "";
-        if (scheme.equals("https") && !samsungHost(uri.getHost())) return false;
-        if (scheme.equals("http")) return false;
+        if (!SamsungAuth.trusted(uri)) return false;
         AccountStore.Token t = SamsungAuth.parse(uri);
         if (t == null) {
             if ("true".equals(SamsungAuth.param(uri, "close"))) {
                 String error = SamsungAuth.param(uri, "error_description");
-                Log.w(TAG, "sign-in closed: " + SamsungAuth.param(uri, "error_code") + " " + error);
+                SamsungAuth.warn("sign-in page closed: " + SamsungAuth.param(uri, "error_code") + " " + error);
                 main.post(() -> showMessage(error != null ? "Samsung: " + error : "Not signed in."));
                 return true;
             }
             return false;
         }
         if (AccountStore.empty(t.userId)) {
-            Log.w(TAG, "sign-in answer without an account ID");
+            SamsungAuth.warn("sign-in answer without an account ID: " + SamsungAuth.describe(t));
             main.post(() -> showMessage("Samsung's page did not return your account. Try again."));
             return true;
         }
         if (store.signedIn() && store.userId() != null && !store.userId().equals(t.userId)) {
             // Another account: Notes' own sign-out first, so its sync state starts fresh.
-            SamsungAccount.signOut(this);
+            SamsungAccount.signOut(this, "another account signed in");
         }
         store.save(t);
-        Log.i(TAG, "signed in to a Samsung account");
+        SamsungAccount.cancelReminder(this);
+        SamsungAuth.log("signed in on Samsung's page: " + SamsungAuth.describe(t));
+        try {
+            // Samsung's web session, kept for a quiet sign-in when a renewal is refused.
+            android.webkit.CookieManager.getInstance().flush();
+        } catch (RuntimeException e) {
+            SamsungAuth.warn("web session not saved: " + e);
+        }
         SamsungAccount.announce(this, true);
         main.post(this::finishSignedIn);
         return true;
     }
 
-    private static boolean samsungHost(String host) {
-        if (host == null) return false;
-        String h = host.toLowerCase(Locale.ROOT);
-        return h.equals("samsung.com") || h.endsWith(".samsung.com") || h.endsWith(".samsungosp.com") || h.endsWith(".samsungaccount.com");
-    }
-
-    /** Tests (adb only, with `setprop log.tag.USamsungAccount DEBUG`): --es debug_result <address the page ends on>. */
+    /**
+     * Tests (adb only, with `setprop log.tag.USamsungAccount DEBUG`): --es debug_result <address the page ends on>;
+     * --es debug_quiet <address> makes the quiet sign-in load that address instead of Samsung's page ("" = Samsung's).
+     */
     private boolean debugResult() {
-        String url = getIntent() != null ? getIntent().getStringExtra("debug_result") : null;
-        if (url == null || !Log.isLoggable(TAG, Log.DEBUG)) return false;
+        if (getIntent() == null || !Log.isLoggable(TAG, Log.DEBUG)) return false;
+        String quiet = getIntent().getStringExtra("debug_quiet");
+        if (quiet != null) {
+            store.debugQuietUrl(quiet);
+            Log.d(TAG, "debug quiet sign-in address set");
+            finish();
+            return true;
+        }
+        String url = getIntent().getStringExtra("debug_result");
+        if (url == null) return false;
         Log.d(TAG, "debug sign-in result");
         if (!accept(url)) showMessage("Debug: no token in that address.");
         return true;
@@ -252,9 +260,10 @@ public final class SignInActivity extends Activity {
         LinearLayout column = page();
         text(column, store.loginName(), 20, false);
         text(column, store.needsSignIn() ? "Sign-in expired." : "Signed in on Samsung's web page (experimental).", 14, true);
-        if (store.needsSignIn()) button(column, "Sign in again", true, v -> showIntro());
+        text(column, store.statusLine(), 13, true);
+        if (store.needsSignIn()) button(column, "Sign in again", true, v -> startWeb());
         button(column, "Sign out", false, v -> {
-            SamsungAccount.signOut(this);
+            SamsungAccount.signOut(this, "Sign out");
             showMessage("Signed out. Your notes stay on this phone.");
         });
     }
