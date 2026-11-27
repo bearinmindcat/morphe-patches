@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.10.0](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
+> **[v2.10.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -95,7 +95,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. | • Keep Gmail's icon and name |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. | • Keep Gmail's icon and name<br>• Package name<br>• Check for new mail (minutes) |
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
@@ -119,7 +119,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Photos, a separate app that signs in to your Google account through microG-RE. Not for root installs. | • Keep Photos's icon and name |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Photos, a separate app next to the built-in Photos that signs in through microG-RE. Not for root installs. | • Keep Photos's icon and name<br>• Package name |
 | [Hide AI](#hide-ai) | Hides Ask Photos, Gemini, Help me edit, Magic Editor, Remix and the other generative tools. |  |
 | [Hide promos](#hide-promos) | Hides Google One storage offers, backup nags, print offers and "try this" promos. |  |
 | [Remove telemetry](#remove-telemetry) | Stops Firebase Analytics, logging, surveys and promo fetches. |  |
@@ -134,7 +134,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Speed cameras<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Enforcement zones on streets<br>• Enforcement zones on highways<br>• Enforcement zones on freeways<br>• Blocked lanes<br>• Least distance between two alerts |
+| [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Speed cameras<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Enforcement zones on streets<br>• Enforcement zones on highways<br>• Enforcement zones on freeways<br>• Blocked lanes<br>• Least distance between two alerts<br>• Reduced speed ahead<br>• Average speed zones |
 | [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
 | [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on. | • Position |
 | [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
@@ -244,7 +244,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 <summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
-**Supported version(s):** 18.0.07.59 — needs Android 15 or newer, 16.0.09.35 — needs Android 13 or newer
+**Supported version(s):** 18.0.07.59 — needs Android 15 or newer, 16.0.09.35 — needs Android 13 or newer, 15.1.03.75 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|

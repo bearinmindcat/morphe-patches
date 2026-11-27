@@ -1,3 +1,16 @@
+## [2.10.1](https://github.com/bearinmindcat/morphe-patches/compare/v2.10.0...v2.10.1) (2026-11-27)
+
+### 🐛 Bug Fixes
+
+* microg gmail and photos can install under a package name of your choice; issue [#244](https://github.com/bearinmindcat/morphe-patches/issues/244) ([d925b9d](https://github.com/bearinmindcat/morphe-patches/commit/d925b9dcec248cf76cdf792e3dc50f139e942ad5))
+* microg gmail syncs google accounts in the background; issue [#216](https://github.com/bearinmindcat/morphe-patches/issues/216) ([7921914](https://github.com/bearinmindcat/morphe-patches/commit/7921914740f99d976678ea4a13d2c751cb21c7d3))
+* one ui home supports 15.1.03.75; issue [#211](https://github.com/bearinmindcat/morphe-patches/issues/211) ([9e8894c](https://github.com/bearinmindcat/morphe-patches/commit/9e8894cf69a55c177f07d1220a345ffd2aabbe57))
+* oneplus system launcher can show a real blur, the wallpaper or a colour behind the drawer and menus; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([028cb60](https://github.com/bearinmindcat/morphe-patches/commit/028cb604cfb31eec598b0b85453697925fe25190))
+* oneplus system launcher shows where a dragged app will land and keeps it visible after the drop; issue [#135](https://github.com/bearinmindcat/morphe-patches/issues/135) ([c9ae860](https://github.com/bearinmindcat/morphe-patches/commit/c9ae8608e7993543a3598003f8d675b1aa34fd20))
+* photos docs say how to install next to the built-in photos; issue [#234](https://github.com/bearinmindcat/morphe-patches/issues/234) ([ed2bb20](https://github.com/bearinmindcat/morphe-patches/commit/ed2bb20cf7cea2327f6d131204200ca4f79cd75e))
+* samsung notes keeps your samsung account signed in; issue [#184](https://github.com/bearinmindcat/morphe-patches/issues/184) ([78ab8ce](https://github.com/bearinmindcat/morphe-patches/commit/78ab8ce6ce1d82c4a677d2c3f314ce9eb4128125))
+* waze alert distances for reduced speed ahead and average speed zones; issue [#157](https://github.com/bearinmindcat/morphe-patches/issues/157) ([200a92c](https://github.com/bearinmindcat/morphe-patches/commit/200a92cfd7a4989c19def9be17389d2a8b3b9836))
+
 ## [2.10.0](https://github.com/bearinmindcat/morphe-patches/compare/v2.9.11...v2.10.0) (2026-11-16)
 
 ### 🐛 Bug Fixes
