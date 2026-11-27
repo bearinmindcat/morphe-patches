@@ -119,6 +119,8 @@ public final class Customization {
                 "No reminder to register your account"});
         LABELS.put("patchedYouTubeMusic", new String[]{"Patched YouTube Music",
                 "YouTube Music from Morphe or ReVanced"});
+        LABELS.put("anyMediaApp", new String[]{"Any media app",
+                "Music apps that work with Android Auto"});
     }
 
     /** How an adjustable value is shown: its title, its unit, the Waze units per shown unit, its choices. */
@@ -351,6 +353,11 @@ public final class Customization {
         return p == null ? start : p.getBoolean(feature, start);
     }
 
+    /** Whether [feature]'s patch was applied (it declared its switch). */
+    static boolean patched(String feature) {
+        return features().contains(feature);
+    }
+
     /** For the self-tests: switches [feature]. */
     static void setForTest(String feature, boolean on) {
         set(feature, on);
@@ -391,7 +398,7 @@ public final class Customization {
         if (feature.equals("zoneBar")) ZoneBar.switched(on);
         if (feature.equals("flockCameras")) Flock.switched(on);
         if (feature.equals("speedCameras")) SpeedCameras.switched(on);
-        if (feature.equals(MusicApps.FEATURE)) MusicApps.refresh();
+        if (feature.equals(MusicApps.FEATURE) || feature.equals(MusicApps.MEDIA_FEATURE)) MusicApps.refresh();
         reapply(feature + (on ? " on" : " off"));
         restartNote(feature);
     }

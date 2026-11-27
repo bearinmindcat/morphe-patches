@@ -2,9 +2,10 @@ package org.ungoogled.patches.waze
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
@@ -13,7 +14,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import org.ungoogled.patches.waze.WazeConstants.COMPATIBILITY_WAZE
 
 /** org.ungoogled.waze.MusicApps, the runtime half (extensions/waze). */
-private const val MUSIC_APPS = "Lorg/ungoogled/waze/MusicApps;"
+internal const val MUSIC_APPS = "Lorg/ungoogled/waze/MusicApps;"
 
 /** The audio SDK's partner list, as Waze's native side hands it over (a JNI class; its fields keep their names). */
 private const val SDK_CONFIGURATION = "Lcom/waze/sdk/SdkConfiguration;"
@@ -43,17 +44,19 @@ private object PartnerIconUrlFingerprint : Fingerprint(
     strings = listOf("%s_%s.png?date=%s"),
 )
 
-@Suppress("unused")
-val wazePatchedYouTubeMusicPatch = bytecodePatch(
-    name = "Patched YouTube Music",
-    description = "Lets Waze's audio player use YouTube Music patched with Morphe or ReVanced.",
+/**
+ * The partner list hooks the audio apps share (Patched YouTube Music, Any media app): MusicApps.partners(list) right
+ * after the native side hands the list over, partner icons by package, and the refresh on installs.
+ */
+internal val wazeMusicAppsPatch = bytecodePatch(
+    description = "Adds apps to Waze's audio player list.",
 ) {
     compatibleWith(COMPATIBILITY_WAZE)
-    // The extension, the Application hook and a switch on Waze's Customization screen.
+    // The extension and the Application hook.
     dependsOn(wazeCustomizationPatch)
 
     execute {
-        // Right after the native side hands the list over: MusicApps.partners(list) adds the renamed partners.
+        // Right after the native side hands the list over: MusicApps.partners(list) adds the extra apps.
         UpdateAppListFingerprint.method.apply {
             val code = implementation!!.instructions.toList()
             val call = code.indexOfFirst {
@@ -67,19 +70,39 @@ val wazePatchedYouTubeMusicPatch = bytecodePatch(
             addInstruction(call + 2, "invoke-static/range { v$list .. v$list }, $MUSIC_APPS->partners(Ljava/lang/Object;)V")
         }
 
-        // Icons come from Waze's server under the partner's own package name.
-        PartnerIconUrlFingerprint.method.addInstructions(
-            0,
-            """
-                invoke-static/range { p1 .. p1 }, $MUSIC_APPS->iconPackage(Ljava/lang/String;)Ljava/lang/String;
-                move-result-object p1
-            """,
-        )
+        // Icons come from Waze's server under the partner's own package name; an app Waze's server does not know
+        // gets none from there (an empty address), so Waze shows the app's own icon.
+        PartnerIconUrlFingerprint.method.apply {
+            addInstructionsWithLabels(
+                0,
+                """
+                    invoke-static/range { p1 .. p1 }, $MUSIC_APPS->iconPackage(Ljava/lang/String;)Ljava/lang/String;
+                    move-result-object p1
+                    if-nez p1, :waze_icon
+                    const-string p1, ""
+                    return-object p1
+                """,
+                ExternalLabel("waze_icon", implementation!!.instructions.first()),
+            )
+        }
 
         WazeApplicationCreateFingerprint.method.addInstruction(
             0,
             "invoke-static { p0 }, $MUSIC_APPS->init(Landroid/app/Application;)V",
         )
+    }
+}
+
+@Suppress("unused")
+val wazePatchedYouTubeMusicPatch = bytecodePatch(
+    name = "Patched YouTube Music",
+    description = "Lets Waze's audio player use YouTube Music patched with Morphe or ReVanced.",
+) {
+    compatibleWith(COMPATIBILITY_WAZE)
+    // The extension, the partner list hook and a switch on Waze's Customization screen.
+    dependsOn(wazeCustomizationPatch, wazeMusicAppsPatch)
+
+    execute {
         declareWazeToggle(MUSIC_FEATURE)
     }
 }
