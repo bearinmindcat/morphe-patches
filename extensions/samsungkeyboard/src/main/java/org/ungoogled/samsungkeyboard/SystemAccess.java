@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -19,7 +20,9 @@ import android.view.inputmethod.InputMethodManager;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -28,8 +31,8 @@ import java.util.WeakHashMap;
  * What the installed-beside copy of Samsung Keyboard may not do as an ordinary app, done the ordinary way. As a
  * system app the keyboard may read and write any setting, broadcast to every user and open system windows;
  * refused, it got an exception it never expected and died. Here a refused setting read answers as a missing
- * setting does, a refused write reports failure, a broadcast to every user goes to this one, and a refused window
- * stays unshown.
+ * setting does, a refused write reports failure (the keyboard's own switches kept in system settings are kept by
+ * the app instead), a broadcast to every user goes to this one, and a refused window stays unshown.
  */
 public final class SystemAccess {
     private static final String TAG = "UA";
@@ -61,6 +64,93 @@ public final class SystemAccess {
 
     private static String fallback(String name) {
         return Settings.Secure.ENABLED_INPUT_METHODS.equals(name) ? enabledInputMethods() : null;
+    }
+
+    // The keyboard's own switches that it keeps in system settings
+
+    /**
+     * Key-press sound and vibration: the keyboard's switches write them to system settings and the keyboard plays
+     * sound and vibrates from what it reads back there. Android refuses an ordinary app that write, so the switch
+     * changed nothing (sound stayed on). Refused, the value is kept in the app's own storage (device-protected, so the
+     * keyboard has it before the first unlock) and answers every later read; the keyboard's own observers of the
+     * setting are told it changed. A write the system takes clears the kept value.
+     */
+    private static final Set<String> OWN = new HashSet<>(Arrays.asList(
+            "system/sip_key_feedback_sound",
+            "system/sip_key_feedback_vibration"));
+    private static final String STORE = "org.ungoogled.samsungkeyboard.settings";
+    private static SharedPreferences store;
+
+    private static SharedPreferences store() {
+        if (store == null) {
+            try {
+                Application app = (Application) Class.forName("android.app.ActivityThread")
+                        .getMethod("currentApplication").invoke(null);
+                if (app == null) return null;
+                store = app.createDeviceProtectedStorageContext().getSharedPreferences(STORE, Context.MODE_PRIVATE);
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                return null;
+            }
+        }
+        return store;
+    }
+
+    /** The value kept for one of the keyboard's own settings, or null (not one of them, or never refused). */
+    private static String kept(String table, String name) {
+        if (name == null || !OWN.contains(table + "/" + name)) return null;
+        SharedPreferences prefs = store();
+        return prefs != null ? prefs.getString(table + "/" + name, null) : null;
+    }
+
+    /** After a write: true when the system took it (any kept value goes), else whether the app kept it. */
+    private static boolean keep(ContentResolver r, String table, String name, String value, boolean written) {
+        if (name == null || !OWN.contains(table + "/" + name)) return written;
+        SharedPreferences prefs = store();
+        if (prefs == null) return written;
+        if (written) {
+            prefs.edit().remove(table + "/" + name).apply();
+            return true;
+        }
+        prefs.edit().putString(table + "/" + name, value).apply();
+        try {
+            r.notifyChange(Settings.System.getUriFor(name), null);
+        } catch (RuntimeException e) {
+            refused("notify " + name, e);
+        }
+        return true;
+    }
+
+    private static int keptInt(String kept, int def) {
+        try {
+            return Integer.parseInt(kept);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static long keptLong(String kept, long def) {
+        try {
+            return Long.parseLong(kept);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static float keptFloat(String kept, float def) {
+        try {
+            return Float.parseFloat(kept);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static boolean systemPut(ContentResolver r, String name, String value) {
+        try {
+            return Settings.System.putString(r, name, value);
+        } catch (SecurityException | IllegalArgumentException e) {
+            refused(name, e);
+            return false;
+        }
     }
 
     // Settings.Secure
@@ -149,6 +239,8 @@ public final class SystemAccess {
     // Settings.System
 
     public static String systemGetString(ContentResolver r, String name) {
+        String kept = kept("system", name);
+        if (kept != null) return kept;
         try {
             return Settings.System.getString(r, name);
         } catch (SecurityException | IllegalArgumentException e) {
@@ -158,6 +250,8 @@ public final class SystemAccess {
     }
 
     public static int systemGetInt(ContentResolver r, String name, int def) {
+        String kept = kept("system", name);
+        if (kept != null) return keptInt(kept, def);
         try {
             return Settings.System.getInt(r, name, def);
         } catch (SecurityException | IllegalArgumentException e) {
@@ -167,6 +261,14 @@ public final class SystemAccess {
     }
 
     public static int systemGetInt(ContentResolver r, String name) throws Settings.SettingNotFoundException {
+        String kept = kept("system", name);
+        if (kept != null) {
+            try {
+                return Integer.parseInt(kept);
+            } catch (NumberFormatException e) {
+                throw new Settings.SettingNotFoundException(name);
+            }
+        }
         try {
             return Settings.System.getInt(r, name);
         } catch (SecurityException | IllegalArgumentException e) {
@@ -176,6 +278,8 @@ public final class SystemAccess {
     }
 
     public static long systemGetLong(ContentResolver r, String name, long def) {
+        String kept = kept("system", name);
+        if (kept != null) return keptLong(kept, def);
         try {
             return Settings.System.getLong(r, name, def);
         } catch (SecurityException | IllegalArgumentException e) {
@@ -185,6 +289,8 @@ public final class SystemAccess {
     }
 
     public static float systemGetFloat(ContentResolver r, String name, float def) {
+        String kept = kept("system", name);
+        if (kept != null) return keptFloat(kept, def);
         try {
             return Settings.System.getFloat(r, name, def);
         } catch (SecurityException | IllegalArgumentException e) {
@@ -194,45 +300,27 @@ public final class SystemAccess {
     }
 
     public static boolean systemPutString(ContentResolver r, String name, String value) {
-        try {
-            return Settings.System.putString(r, name, value);
-        } catch (SecurityException | IllegalArgumentException e) {
-            refused(name, e);
-            return false;
-        }
+        return keep(r, "system", name, value, systemPut(r, name, value));
     }
 
     public static boolean systemPutInt(ContentResolver r, String name, int value) {
-        try {
-            return Settings.System.putInt(r, name, value);
-        } catch (SecurityException | IllegalArgumentException e) {
-            refused(name, e);
-            return false;
-        }
+        return keep(r, "system", name, Integer.toString(value), systemPut(r, name, Integer.toString(value)));
     }
 
     public static boolean systemPutLong(ContentResolver r, String name, long value) {
-        try {
-            return Settings.System.putLong(r, name, value);
-        } catch (SecurityException | IllegalArgumentException e) {
-            refused(name, e);
-            return false;
-        }
+        return keep(r, "system", name, Long.toString(value), systemPut(r, name, Long.toString(value)));
     }
 
     public static boolean systemPutFloat(ContentResolver r, String name, float value) {
-        try {
-            return Settings.System.putFloat(r, name, value);
-        } catch (SecurityException | IllegalArgumentException e) {
-            refused(name, e);
-            return false;
-        }
+        return keep(r, "system", name, Float.toString(value), systemPut(r, name, Float.toString(value)));
     }
 
     private static Method semGetIntForUser;
 
     /** Samsung's per-user read; the keyboard only ever asks for the current user. */
     public static int systemSemGetIntForUser(ContentResolver r, String name, int def, int user) {
+        String kept = kept("system", name);
+        if (kept != null) return keptInt(kept, def);
         try {
             if (semGetIntForUser == null) {
                 semGetIntForUser = Settings.System.class.getMethod("semGetIntForUser",
