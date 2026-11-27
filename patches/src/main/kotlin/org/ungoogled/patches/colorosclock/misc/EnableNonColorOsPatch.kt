@@ -9,8 +9,10 @@ import app.morphe.patcher.patch.resourcePatch
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import org.w3c.dom.Element
@@ -26,6 +28,7 @@ private const val CONSENT = "Lorg/ungoogled/colorosclock/Consent;"
 private const val ALERTS = "Lorg/ungoogled/colorosclock/Alerts;"
 private const val RINGTONES = "Lorg/ungoogled/colorosclock/Ringtones;"
 private const val WIDGETS = "Lorg/ungoogled/colorosclock/Widgets;"
+private const val SCREENS = "Lorg/ungoogled/colorosclock/Screens;"
 
 private val log = java.util.logging.Logger.getLogger("OnePlusClock")
 
@@ -173,6 +176,9 @@ private val privateClassesPatch = privateFrameworkClassesPatch(
  *
  * Network: its export build fetches cloud settings from OPPO's servers (HeyTap cloud config) at first launch without
  * asking; that now waits for an explicit Allow (Consent, asked once on the home screen).
+ *
+ * Screens: Clock keeps its tabs and screens clear of the navigation bar only on ColorOS 15 (by the ColorOS version);
+ * Android 15+ draws it edge to edge on any phone, so there it does that too (Screens).
  */
 @Suppress("unused")
 val enableNonColorOsPatch = bytecodePatch(
@@ -381,6 +387,63 @@ val enableNonColorOsPatch = bytecodePatch(
             .firstOrNull { it.name == "onDestroy" && it.parameterTypes.isEmpty() }
             ?: throw PatchException("TimerKlaxon.onDestroy not found")
         klaxon.addInstructions(0, "invoke-static {p0}, $ALERTS->timerStopped(Landroid/content/Context;)V")
+
+        // The system-bar insets: Clock listens for them (bottom tabs, every screen's bottom padding) only when ColorOS's
+        // version says 15; the check is the static ()Z comparing OplusBuild.VERSION.SDK_VERSION with 34. Where an
+        // activity registers its inset listener, that answer goes through Screens.edgeToEdge (true on Android 15+).
+        val versionChecks = mutableListOf<String>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            c.methods.forEach { m ->
+                val insns = m.implementation?.instructions?.toList() ?: return@forEach
+                if (m.returnType != "Z" || m.parameterTypes.isNotEmpty() || insns.size > 30) return@forEach
+                val readsVersion = insns.any {
+                    it.opcode == Opcode.SGET && ((it as ReferenceInstruction).reference as FieldReference).let { f ->
+                        f.definingClass == "Lcom/oplus/os/OplusBuild\$VERSION;" && f.name == "SDK_VERSION"
+                    }
+                }
+                val comparesWith34 = insns.any { (it as? NarrowLiteralInstruction)?.narrowLiteral == 34 }
+                if (readsVersion && comparesWith34) versionChecks += "${c.type}->${m.name}()Z"
+            }
+        }
+        // Measured against 16.19.8: two (VersionUtils.isOsVersion15 in two modules); the activities call one of them.
+        if (versionChecks.isEmpty()) throw PatchException("ColorOS 15 version check not found")
+        val insetSites = mutableListOf<Pair<String, Method>>()
+        classDefForEach { c ->
+            if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+            c.methods.forEach { m ->
+                val insns = m.implementation?.instructions ?: return@forEach
+                val listens = insns.any {
+                    it.opcode == Opcode.INVOKE_VIRTUAL &&
+                        ((it as ReferenceInstruction).reference as MethodReference).name == "setOnApplyWindowInsetsListener"
+                }
+                val checks = insns.any {
+                    it.opcode == Opcode.INVOKE_STATIC && ((it as ReferenceInstruction).reference as MethodReference).toString() in versionChecks
+                }
+                if (listens && checks) insetSites += c.type to m
+            }
+        }
+        var insetChecks = 0
+        insetSites.forEach { (type, method) ->
+            val mutable = mutableClassDefBy(type).methods.first {
+                it.name == method.name && it.parameterTypes == method.parameterTypes && it.returnType == method.returnType
+            }
+            val instructions = mutable.implementation!!.instructions.toList()
+            instructions.withIndex().reversed().forEach { (index, insn) ->
+                if (insn.opcode != Opcode.INVOKE_STATIC || ((insn as ReferenceInstruction).reference as MethodReference).toString() !in versionChecks) return@forEach
+                val result = instructions.getOrNull(index + 1)
+                if (result?.opcode != Opcode.MOVE_RESULT) throw PatchException("ColorOS 15 check in ${type}->${method.name} without a result")
+                val register = (result as OneRegisterInstruction).registerA
+                mutable.addInstructions(
+                    index + 2,
+                    "invoke-static {v$register}, $SCREENS->edgeToEdge(Z)Z\nmove-result v$register",
+                )
+                insetChecks++
+            }
+        }
+        // Measured against 16.19.8: 3 (AlarmClock, BaseActivity and BaseAVMActivity onCreate).
+        log.info("inset listeners on Android 15+: $insetChecks")
+        if (insetChecks < 2) throw PatchException("only $insetChecks inset listener checks found")
 
         // On OPPO, OnePlus and realme phones ColorOS's own apps are there but refuse it: a refusal reads as their absence.
         val (services, providers) = treatRefusedComponentsAsMissing(RUNTIME)
