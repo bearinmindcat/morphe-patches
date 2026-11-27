@@ -14,7 +14,8 @@ public final class MyFiles {
      * phones get OnePlus's (application id com.oneplus.filemanager), every other phone OPPO's (com.coloros.filemanager),
      * so off OPPO's phones the OnePlus build looked for its own data folder, recycle-bin provider and file provider
      * under OPPO's package name and found nothing. This build is OnePlus's: answer "OnePlus" everywhere except on OPPO and
-     * realme phones, where the app's own choice stays.
+     * realme phones, where the app's own choice stays (its application id is this build's own there too: see
+     * EnableNonColorOsPatch).
      */
     public static boolean isOnePlusBrand() {
         String brand = Build.BRAND;
