@@ -14,6 +14,11 @@ import java.util.Locale;
 public final class HideAi {
     private HideAi() {}
 
+    /** Ask Maps' own switch, on its way out of Maps' getter: false stays false, true becomes !HIDE_AI. */
+    public static boolean askMaps(boolean on) {
+        return on && !Shapes.HIDE_AI;
+    }
+
     /** Rewritten by the patch: "placeData;slots;slotConfig;kbygSlot", the names leading from a place to its KBYG slot id. */
     static String kbygPath() { return ""; }
 

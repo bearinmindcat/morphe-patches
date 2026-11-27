@@ -4,6 +4,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.resource.ResourceType
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.morphe.patcher.util.smali.ExternalLabel
 import com.android.tools.smali.dexlib2.AccessFlags
@@ -11,7 +12,9 @@ import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.BuilderOffsetInstruction
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
@@ -21,6 +24,7 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 import org.ungoogled.patches.maps.ui.SHAPES
 import org.ungoogled.patches.maps.ui.activityContextHookPatch
+import org.ungoogled.patches.maps.ui.mapsId
 import org.ungoogled.patches.maps.ui.markPatched
 import org.ungoogled.patches.maps.ui.sharedExtensionPatch
 import org.ungoogled.patches.shared.Constants.COMPATIBILITY_MAPS
@@ -31,7 +35,7 @@ private const val AD_CASE = 5
 
 internal val hideAdsPatch = bytecodePatch(
     description = "Hides promoted map pins -- on the map, in search results and along a route, in directions and navigation -- " +
-        "and \"Sponsored\" search result rows.",
+        "and \"Sponsored\" rows in search results and search suggestions.",
 ) {
     compatibleWith(COMPATIBILITY_MAPS)
     // Every edit below reads Shapes.HIDE_ADS, so the Customization screen's
@@ -370,6 +374,70 @@ internal val hideAdsPatch = bytecodePatch(
                     """,
                 )
             }
+        }
+
+        // "Sponsored" rows in the search suggestions, the list under the search box while typing (issue #230). The
+        // list is built in one method (the one that also words Ask Maps' "Try Ask Maps" row), which leaves a
+        // suggestion of the ad kind out unless a server flag allows ads there: `if (kind == AD && !flags.ads) skip`.
+        // That flag goes through HIDE_ADS (false stays false, true becomes !HIDE_ADS), so the ad is left out the
+        // way it is where Google shows none.
+        run {
+            val prefix = mapsId(ResourceType.STRING, "ASK_MAPS_SUGGESTION_PREFIX").toLong()
+            val builders = mutableListOf<Pair<String, Method>>()
+            classDefForEach { c ->
+                if (c.type.startsWith("Lorg/ungoogled/")) return@classDefForEach
+                for (m in c.methods) {
+                    val code = m.implementation?.instructions ?: continue
+                    if (code.any { (it as? NarrowLiteralInstruction)?.narrowLiteral?.toLong() == prefix } &&
+                        code.any { it.opcode == Opcode.IPUT_OBJECT && ((it as ReferenceInstruction).reference as FieldReference).type == "Lcom/google/common/collect/ImmutableList;" }
+                    ) builders += c.type to m
+                }
+            }
+            val (owner, found) = builders.singleOrNull() ?: throw PatchException("search suggestion list: found ${builders.size} builders")
+            val builder = mutableClassDefBy(owner).methods.single {
+                it.name == found.name && it.returnType == found.returnType &&
+                    it.parameterTypes.map(CharSequence::toString) == found.parameterTypes.map(CharSequence::toString)
+            }
+            val code = builder.implementation!!.instructions
+            // `const/16 vK, KIND; if-ne vT, vK, :keep; ...; iget-boolean vF, vFlags, flags.ads; if-eqz vF, :skip`
+            val sites = code.indices.filter { i ->
+                code[i].opcode == Opcode.IGET_BOOLEAN && code.getOrNull(i + 1)?.opcode == Opcode.IF_EQZ &&
+                    (code[i + 1] as OneRegisterInstruction).registerA == (code[i] as TwoRegisterInstruction).registerA &&
+                    (maxOf(1, i - 8) until i).any { j -> code[j].opcode == Opcode.IF_NE && code[j - 1].opcode == Opcode.CONST_16 }
+            }
+            val at = sites.singleOrNull() ?: throw PatchException("search suggestion ad gate: found ${sites.size}")
+            val compare = (maxOf(1, at - 8) until at).last { j -> code[j].opcode == Opcode.IF_NE && code[j - 1].opcode == Opcode.CONST_16 }
+            val kind = (code[compare - 1] as NarrowLiteralInstruction).narrowLiteral
+            // The kind is the ad kind: the suggestion row's own "is it an ad" test -- the one its "About this ad" getter
+            // asks -- compares with the same number.
+            val about = mapsId(ResourceType.STRING, "ABOUT_THIS_AD_CONTENT_DESCRIPTION").toLong()
+            val aboutTypes = mutableSetOf<String>()
+            classDefForEach { c ->
+                if (c.methods.any { m -> m.implementation?.instructions?.any { (it as? NarrowLiteralInstruction)?.narrowLiteral?.toLong() == about } == true }) aboutTypes += c.type
+            }
+            val rows = code.filter { it.opcode == Opcode.INSTANCE_OF }.map { ((it as ReferenceInstruction).reference as TypeReference).type }.distinct()
+            val confirmed = rows.any { row ->
+                val rowClass = classDefByOrNull(row) ?: return@any false
+                rowClass.methods.filter { it.returnType in aboutTypes && it.parameterTypes.isEmpty() }.any { getter ->
+                    getter.implementation?.instructions?.mapNotNull { (it as? ReferenceInstruction)?.reference as? MethodReference }
+                        ?.filter { it.definingClass == row && it.returnType == "Z" }?.any { test ->
+                            rowClass.methods.firstOrNull { it.name == test.name && it.parameterTypes.map(CharSequence::toString) == test.parameterTypes.map(CharSequence::toString) }
+                                ?.implementation?.instructions?.any { (it as? NarrowLiteralInstruction)?.narrowLiteral == kind } == true
+                        } == true
+                }
+            }
+            if (!confirmed) throw PatchException("search suggestion gate compares with kind $kind, not the suggestion rows' ad kind")
+            if (code[at + 1].location.labels.isNotEmpty()) throw PatchException("search suggestion ad flag test is a branch target")
+            val flag = (code[at] as TwoRegisterInstruction).registerA
+            builder.addInstructionsWithLabels(
+                at + 1,
+                """
+                    if-eqz v$flag, :suggestion_ads_off
+                    sget-boolean v$flag, $SHAPES->HIDE_ADS:Z
+                    xor-int/lit8 v$flag, v$flag, 0x1
+                """,
+                ExternalLabel("suggestion_ads_off", code[at + 1]),
+            )
         }
     }
 }

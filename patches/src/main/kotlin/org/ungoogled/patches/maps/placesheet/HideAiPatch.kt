@@ -489,21 +489,20 @@ internal val hideAiPatch = bytecodePatch(
                 it.name == master.name && it.parameterTypes.isEmpty() && it.returnType == "Z"
             }
             // Its only register may be `this`, so the answer is changed on its way out: false stays false,
-            // true becomes !HIDE_AI. Every return, from the last up, so no index moves under the next.
+            // true becomes !HIDE_AI. Every return, from the last up, so no index moves under the next. The call
+            // goes AT the return's label: 26.44 computes `true` and jumps to a shared return, and a hook placed
+            // in front of that return was skipped by the jump, so Ask Maps stayed on (issue #230).
             val returns = enabled.implementation!!.instructions.withIndex()
                 .filter { it.value.opcode == Opcode.RETURN }.map { it.index }.reversed()
             if (returns.isEmpty()) throw PatchException("Ask Maps switch has no return")
             for (r in returns) {
-                val ret = enabled.implementation!!.instructions[r]
-                val reg = (ret as OneRegisterInstruction).registerA
-                enabled.addInstructionsWithLabels(
+                val reg = (enabled.implementation!!.instructions[r] as OneRegisterInstruction).registerA
+                enabled.addInstructionsAtLabel(
                     r,
                     """
-                        if-eqz v$reg, :ask_maps_off
-                        sget-boolean v$reg, $SHAPES->HIDE_AI:Z
-                        xor-int/lit8 v$reg, v$reg, 0x1
+                        invoke-static/range { v$reg .. v$reg }, $HIDE_AI->askMaps(Z)Z
+                        move-result v$reg
                     """,
-                    ExternalLabel("ask_maps_off", ret),
                 )
             }
         }
