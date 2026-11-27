@@ -440,6 +440,11 @@ APP_RENAMES = {
         '<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher',
         '<img src="docs/icons/moto-launcher.png" width="20" height="20" align="top"> Moto App Launcher',
     ),
+    # Pixel Launcher (the Pixel home screen; root mount install only).
+    "com.google.android.apps.nexuslauncher": (
+        '<img src="docs/icons/pixel-launcher.png" width="20" height="20" align="top"> Pixel Launcher',
+        '<img src="docs/icons/pixel-launcher.png" width="20" height="20" align="top"> Pixel Launcher',
+    ),
     # HyperOS launcher (Xiaomi's System launcher, com.miui.home): listed under Launchers, not Xiaomi Apps.
     "com.miui.home": (
         '<img src="docs/icons/hyperos-launcher.png" width="20" height="20" align="top"> HyperOS Launcher',
