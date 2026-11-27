@@ -118,7 +118,7 @@ public final class ColorOS {
         String target = intent == null ? null : intent.getPackage();
         if (target == null && intent != null && intent.getComponent() != null) target = intent.getComponent().getPackageName();
         if (target == null || target.equals(context.getPackageName())) return false;
-        android.util.Log.w("ColorOS", "refused, treated as missing: " + intent + ": " + e.getMessage());
+        if (e.getMessage() != STATISTICS_OFF) android.util.Log.w("ColorOS", "refused, treated as missing: " + intent + ": " + e.getMessage());
         return true;
     }
 
@@ -127,7 +127,7 @@ public final class ColorOS {
         if (authority == null) return false;
         for (String name : OPPO_NAMES) {
             if (authority.startsWith(name)) {
-                android.util.Log.w("ColorOS", "refused, treated as missing: " + authority + ": " + e.getMessage());
+                if (e.getMessage() != STATISTICS_OFF) android.util.Log.w("ColorOS", "refused, treated as missing: " + authority + ": " + e.getMessage());
                 return true;
             }
         }
@@ -138,9 +138,56 @@ public final class ColorOS {
         return uri != null && oppo(uri.getAuthority(), e);
     }
 
+    /*
+     * OPPO's usage statistics. The statistics SDKs bundled in the app (OplusTrack / DCS, DCC track, DRS track) hand
+     * their events to ColorOS's statistics service -- the com.oplus.statistics.provider provider, the older
+     * com.nearme.statistics.rom service, the DRS app -- which uploads them to OPPO. Only an OPPO / OnePlus / realme phone
+     * has that service. With "Remove telemetry" (statisticsOff() answers true) every call to it answers as if it were
+     * missing, as on every other phone: the call goes the refused-component way below, without the log line.
+     */
+
+    private static final String[] STATISTICS_PROVIDERS = { "com.oplus.statistics.provider",
+            "com.oplus.dcc.provider.TrackContentProvider", "com.oplus.framework.network.drs.sdk.track" };
+    private static final String[] STATISTICS_SERVICES = { "com.nearme.statistics.rom", "com.oplus.statistics.rom",
+            "com.oplus.framework.network.drs" };
+    private static final String STATISTICS_OFF = "usage statistics off";
+    private static final java.util.Set<String> STATISTICS_LOGGED =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
+    /** "Remove telemetry" makes this answer true. */
+    public static boolean statisticsOff() {
+        return false;
+    }
+
+    private static void statistics(String target, String[] names) {
+        if (target == null || !statisticsOff()) return;
+        for (String name : names) {
+            if (target.equals(name) || target.startsWith(name + "/")) {
+                if (STATISTICS_LOGGED.add(name)) android.util.Log.i("ColorOS", "usage statistics to " + name + " dropped");
+                throw new SecurityException(STATISTICS_OFF);
+            }
+        }
+    }
+
+    private static void statistics(android.net.Uri uri) {
+        if (uri != null) statistics(uri.getAuthority(), STATISTICS_PROVIDERS);
+    }
+
+    private static void statistics(String authority) {
+        statistics(authority, STATISTICS_PROVIDERS);
+    }
+
+    private static void statistics(android.content.Intent service) {
+        if (service == null) return;
+        String target = service.getPackage();
+        if (target == null && service.getComponent() != null) target = service.getComponent().getPackageName();
+        statistics(target, STATISTICS_SERVICES);
+    }
+
     public static boolean bindService(android.content.Context context, android.content.Intent service,
             android.content.ServiceConnection connection, int flags) {
         try {
+            statistics(service);
             return context.bindService(service, connection, flags);
         } catch (SecurityException e) {
             if (foreign(context, service, e)) return false;
@@ -151,6 +198,7 @@ public final class ColorOS {
     public static boolean bindService(android.content.Context context, android.content.Intent service, int flags,
             java.util.concurrent.Executor executor, android.content.ServiceConnection connection) {
         try {
+            statistics(service);
             return context.bindService(service, flags, executor, connection);
         } catch (SecurityException e) {
             if (foreign(context, service, e)) return false;
@@ -161,6 +209,7 @@ public final class ColorOS {
     public static android.content.ComponentName startService(android.content.Context context,
             android.content.Intent service) {
         try {
+            statistics(service);
             return context.startService(service);
         } catch (SecurityException e) {
             if (foreign(context, service, e)) return null;
@@ -171,6 +220,7 @@ public final class ColorOS {
     public static android.content.ComponentName startForegroundService(android.content.Context context,
             android.content.Intent service) {
         try {
+            statistics(service);
             return context.startForegroundService(service);
         } catch (SecurityException e) {
             if (foreign(context, service, e)) return null;
@@ -180,6 +230,7 @@ public final class ColorOS {
 
     public static boolean stopService(android.content.Context context, android.content.Intent service) {
         try {
+            statistics(service);
             return context.stopService(service);
         } catch (SecurityException e) {
             if (foreign(context, service, e)) return false;
@@ -190,6 +241,7 @@ public final class ColorOS {
     public static android.database.Cursor query(android.content.ContentResolver resolver, android.net.Uri uri,
             String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         try {
+            statistics(uri);
             return resolver.query(uri, projection, selection, selectionArgs, sortOrder);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -201,6 +253,7 @@ public final class ColorOS {
             String[] projection, String selection, String[] selectionArgs, String sortOrder,
             android.os.CancellationSignal cancellationSignal) {
         try {
+            statistics(uri);
             return resolver.query(uri, projection, selection, selectionArgs, sortOrder, cancellationSignal);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -211,6 +264,7 @@ public final class ColorOS {
     public static android.database.Cursor query(android.content.ContentResolver resolver, android.net.Uri uri,
             String[] projection, android.os.Bundle queryArgs, android.os.CancellationSignal cancellationSignal) {
         try {
+            statistics(uri);
             return resolver.query(uri, projection, queryArgs, cancellationSignal);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -220,6 +274,7 @@ public final class ColorOS {
 
     public static String getType(android.content.ContentResolver resolver, android.net.Uri uri) {
         try {
+            statistics(uri);
             return resolver.getType(uri);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -230,6 +285,7 @@ public final class ColorOS {
     public static android.net.Uri insert(android.content.ContentResolver resolver, android.net.Uri uri,
             android.content.ContentValues values) {
         try {
+            statistics(uri);
             return resolver.insert(uri, values);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
@@ -240,6 +296,7 @@ public final class ColorOS {
     public static android.net.Uri insert(android.content.ContentResolver resolver, android.net.Uri uri,
             android.content.ContentValues values, android.os.Bundle extras) {
         try {
+            statistics(uri);
             return resolver.insert(uri, values, extras);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
@@ -250,6 +307,7 @@ public final class ColorOS {
     public static int bulkInsert(android.content.ContentResolver resolver, android.net.Uri uri,
             android.content.ContentValues[] values) {
         try {
+            statistics(uri);
             return resolver.bulkInsert(uri, values);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
@@ -260,6 +318,7 @@ public final class ColorOS {
     public static int update(android.content.ContentResolver resolver, android.net.Uri uri,
             android.content.ContentValues values, String where, String[] selectionArgs) {
         try {
+            statistics(uri);
             return resolver.update(uri, values, where, selectionArgs);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
@@ -270,6 +329,7 @@ public final class ColorOS {
     public static int update(android.content.ContentResolver resolver, android.net.Uri uri,
             android.content.ContentValues values, android.os.Bundle extras) {
         try {
+            statistics(uri);
             return resolver.update(uri, values, extras);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
@@ -280,6 +340,7 @@ public final class ColorOS {
     public static int delete(android.content.ContentResolver resolver, android.net.Uri uri, String where,
             String[] selectionArgs) {
         try {
+            statistics(uri);
             return resolver.delete(uri, where, selectionArgs);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
@@ -289,6 +350,7 @@ public final class ColorOS {
 
     public static int delete(android.content.ContentResolver resolver, android.net.Uri uri, android.os.Bundle extras) {
         try {
+            statistics(uri);
             return resolver.delete(uri, extras);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URL " + uri);
@@ -299,6 +361,7 @@ public final class ColorOS {
     public static android.os.Bundle call(android.content.ContentResolver resolver, android.net.Uri uri, String method,
             String arg, android.os.Bundle extras) {
         try {
+            statistics(uri);
             return resolver.call(uri, method, arg, extras);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new IllegalArgumentException("Unknown URI " + uri);
@@ -309,6 +372,7 @@ public final class ColorOS {
     public static android.os.Bundle call(android.content.ContentResolver resolver, String authority, String method,
             String arg, android.os.Bundle extras) {
         try {
+            statistics(authority);
             return resolver.call(authority, method, arg, extras);
         } catch (SecurityException e) {
             if (oppo(authority, e)) throw new IllegalArgumentException("Unknown authority " + authority);
@@ -320,6 +384,7 @@ public final class ColorOS {
             String authority, java.util.ArrayList<android.content.ContentProviderOperation> operations)
             throws android.os.RemoteException, android.content.OperationApplicationException {
         try {
+            statistics(authority);
             return resolver.applyBatch(authority, operations);
         } catch (SecurityException e) {
             if (oppo(authority, e)) throw new IllegalArgumentException("Unknown authority " + authority);
@@ -330,6 +395,7 @@ public final class ColorOS {
     public static android.content.ContentProviderClient acquireContentProviderClient(
             android.content.ContentResolver resolver, android.net.Uri uri) {
         try {
+            statistics(uri);
             return resolver.acquireContentProviderClient(uri);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -340,6 +406,7 @@ public final class ColorOS {
     public static android.content.ContentProviderClient acquireContentProviderClient(
             android.content.ContentResolver resolver, String name) {
         try {
+            statistics(name);
             return resolver.acquireContentProviderClient(name);
         } catch (SecurityException e) {
             if (oppo(name, e)) return null;
@@ -350,6 +417,7 @@ public final class ColorOS {
     public static android.content.ContentProviderClient acquireUnstableContentProviderClient(
             android.content.ContentResolver resolver, android.net.Uri uri) {
         try {
+            statistics(uri);
             return resolver.acquireUnstableContentProviderClient(uri);
         } catch (SecurityException e) {
             if (oppo(uri, e)) return null;
@@ -360,6 +428,7 @@ public final class ColorOS {
     public static android.content.ContentProviderClient acquireUnstableContentProviderClient(
             android.content.ContentResolver resolver, String name) {
         try {
+            statistics(name);
             return resolver.acquireUnstableContentProviderClient(name);
         } catch (SecurityException e) {
             if (oppo(name, e)) return null;
@@ -370,6 +439,7 @@ public final class ColorOS {
     public static java.io.InputStream openInputStream(android.content.ContentResolver resolver, android.net.Uri uri)
             throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openInputStream(uri);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -380,6 +450,7 @@ public final class ColorOS {
     public static java.io.OutputStream openOutputStream(android.content.ContentResolver resolver, android.net.Uri uri)
             throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openOutputStream(uri);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -390,6 +461,7 @@ public final class ColorOS {
     public static java.io.OutputStream openOutputStream(android.content.ContentResolver resolver, android.net.Uri uri,
             String mode) throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openOutputStream(uri, mode);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -400,6 +472,7 @@ public final class ColorOS {
     public static android.os.ParcelFileDescriptor openFileDescriptor(android.content.ContentResolver resolver,
             android.net.Uri uri, String mode) throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openFileDescriptor(uri, mode);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -410,6 +483,7 @@ public final class ColorOS {
     public static android.os.ParcelFileDescriptor openFileDescriptor(android.content.ContentResolver resolver,
             android.net.Uri uri, String mode, android.os.CancellationSignal signal) throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openFileDescriptor(uri, mode, signal);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -421,6 +495,7 @@ public final class ColorOS {
             android.content.ContentResolver resolver, android.net.Uri uri, String mode)
             throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openAssetFileDescriptor(uri, mode);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -432,6 +507,7 @@ public final class ColorOS {
             android.content.ContentResolver resolver, android.net.Uri uri, String mode,
             android.os.CancellationSignal signal) throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openAssetFileDescriptor(uri, mode, signal);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
@@ -443,6 +519,7 @@ public final class ColorOS {
             android.content.ContentResolver resolver, android.net.Uri uri, String mimeType, android.os.Bundle opts)
             throws java.io.FileNotFoundException {
         try {
+            statistics(uri);
             return resolver.openTypedAssetFileDescriptor(uri, mimeType, opts);
         } catch (SecurityException e) {
             if (oppo(uri, e)) throw new java.io.FileNotFoundException("No content provider: " + uri);
