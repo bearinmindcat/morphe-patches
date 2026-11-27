@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.10.1](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;217 patches total
+> **[v2.10.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;265 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -35,23 +35,23 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Account sheet cleanup](#account-sheet-cleanup) | Removes the "More from this app" label from the account sheet, and keeps the sheet open when you come back from Settings or Customization or tap "Your profile", instead of dropping back to the map. |  |
 | [Add microG-RE support](#add-microg-re-support) | Builds microG Maps, a separate app that signs in to your Google account through microG-RE (MicroG-RE or ReVanced GmsCore). Not for root installs; for original microG, use Add original microG support. |  |
 | [Add original microG support](#add-original-microg-support) | Signs in through original microG on ROMs with signature spoofing. Keeps Maps' own package name; allow signature spoofing for it. |  |
-| [Any media app](#any-media-app) | Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, also where Google switches media controls off. YouTube Music and Spotify only connect to Google's own Maps. |  |
+| [Any media app](#any-media-app) | Navigation's Default media app (Settings > Navigation) offers every music and podcast app that works with Android Auto, such as Poweramp, also where Google switches media controls off. Spotify connects like the other apps; YouTube Music only connects to Google's own Maps. |  |
 | [Avoid Flock cameras](#avoid-flock-cameras) | Steers driving directions around Flock cameras: when Google's route passes one, a camera-free way is worked out with BRouter, an OpenStreetMap router, and Maps asks Google again for a route through it, so Google still times and navigates the trip, and keeps it through reroutes. A detour longer than half again the distance is dropped. Off until turned on in Waze & external data source, with Flock cameras; your route's start and end go to brouter.de. Trips with stops are left as they are. |  |
 | [Better offline maps](#better-offline-maps) | Reworks the offline area picker: zooming out really selects more instead of being shrunk to Google's size cap, the box can be resized by dragging its edges and corners, a large area is split into several downloads whose true total size is shown, and areas already downloaded are drawn on the map. Can be turned off on the Customization screen. |  |
 | [Black theme](#black-theme) | AMOLED-black theme. Pins Maps' own dark mode and its separate navigation colour scheme, and remaps colour resources, drawable fills and draw-time paints so no surface is left grey. |  |
 | [Blue pin](#blue-pin) | Chromium-coloured flat map pin on every in-app product logo and the search bar's leading icon. |  |
-| [Bypass Play Services checks](#bypass-play-services-checks) | Makes Maps' bundled Play services signature and availability checks always pass, so it runs re-signed and with Play services disabled or absent, and lets it load tiles, search and routing by sending Google's own package and certificate in the identity headers the Maps backend checks. Where Play services rejects the re-signed app, Maps degrades instead of crashing. Also skips Google's "isn't Play Protect certified" page, and with no Play services at all uses Android's own Cronet so the map still loads. |  |
+| [Bypass Play Services checks](#bypass-play-services-checks) | Makes Maps' bundled Play services signature and availability checks always pass, so it runs re-signed and with Play services disabled or absent, and lets it load tiles, search and routing by sending Google's own package and certificate in the identity headers the Maps backend checks. Where Play services or Android Auto rejects the re-signed app, Maps degrades instead of crashing. Also skips Google's "isn't Play Protect certified" page, and with no Play services at all uses Android's own Cronet so the map still loads. |  |
 | [Change app name](#change-app-name) | Sets the launcher and in-app app name. | • App name |
 | [Change package name](#change-package-name) | Installs alongside stock Google Maps under its own package name. On by default, because stock Maps comes built into most phones and cannot be replaced by a patched copy. | • Package name |
 | [Customization screen](#customization-screen) | Adds a Customization row under Settings on the account sheet and at the top of Settings, with switches for the patches here that can be turned back off inside the app. |  |
 | [Flock cameras](#flock-cameras) | Puts Flock and other license plate reader cameras on the map, from OpenStreetMap -- the cameras DeFlock's volunteers map -- and chimes and shows a note when one is coming up ahead. Off until turned on in Waze & external data source, a row on the account sheet, because it downloads the ones near you from an OpenStreetMap server, over the same area as the speed cameras. |  |
 | [Follow playing media](#follow-playing-media) | Navigation's media controls show what any app is playing (needs notification access). |  |
-| [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed and the Explore / Contribute / You tabs. Each can be switched back on on the Customization screen. |  |
+| [Hide ads and clutter](#hide-ads-and-clutter) | Hides promoted map pins (on the map, in search results and along a route) and "Sponsored" search results, Gemini's AI summaries ("Know before you go" and the review summary), the row of businesses under an address on its place sheet, the home tab's Explore feed, the Explore / Contribute / You tabs and the share sheet Maps opens on a screenshot. Each can be switched back on on the Customization screen. |  |
 | [Legacy icon](#legacy-icon) | Uses the flat multicolour pin Maps had before the 2025 gradient icon as the launcher icon and on the screen Maps opens with. With Add microG-RE support, microG's C sits in the pin's circle. |  |
 | [Light map](#light-map) | Adds a Customization switch that keeps the map light while Maps' menus are dark. |  |
 | [Location provider toggle](#location-provider-toggle) | Adds a Location source choice to the Customization screen: Android's own location providers, microG-RE's or Google Play services' fused provider. With Android, neither is ever asked for a location. A source that is missing or disabled is never used, so location keeps working without it. Also keeps the network (Wi-Fi/cell) provider registered when no fused provider answers, instead of GPS only, so a fix does not go stale indoors. | • Default to Play services location |
 | [Map region](#map-region) | Adds a Customization option to pick the country the map's names and borders are shown for. |  |
-| [Media panel can be closed](#media-panel-can-be-closed) | Navigation's media button stays above the media controls, so they can be closed again. |  |
+| [Media panel can be closed](#media-panel-can-be-closed) | Navigation's media button stays above the media controls, so they can be closed again; the lowered sheet ends right below them and the row of media apps scrolls. |  |
 | [Offline saved places](#offline-saved-places) | Save places without a Google account, kept only on the phone: Save opens Maps' own "Place saved" sheet (Want to go, Travel plans, Starred places, Favorites, your own lists, a note), and a "Local saved" row on the account sheet rebuilds Maps' You tab -- your recent places, your lists and labels (Home, Work, your own) -- with export and import (backup file, KML, Google Takeout's saved lists and Saved Places.json, several files or the whole Takeout .zip at once). It also has a Timeline: where the phone has been, grouped into days and visits, kept only on the phone, with GPX export. Recording is off until switched on there; it shows a notification while it runs. With Add microG-RE support, Maps' own Save keeps syncing to your account and Local saved instead copies the account's saved lists to the phone (Pull from Google account). |  |
 | [Power saving mode](#power-saving-mode) | Brings the Pixel-only power saving mode to every phone: while driving with navigation, press the power button and Maps shows only key information such as the next turn on a black screen. Turn it on or off in Settings > Navigation > Power saving mode. Pixels that have it built in keep Google's own version unless Power saving mode is turned on in Power Saving Options, a row on the account sheet under Customization, which also has: a navigation button that opens the power saving screen without locking the phone, switching to it by itself when idle, the normal screen near turns, a speedometer on it, a lower frame rate, and its black map in navigation or all over Maps. |  |
 | [Proxy](#proxy) | Adds a Proxy screen to Customization that sends Maps' own traffic, map data included, through an HTTP proxy -- for example Orbot's (127.0.0.1:8118) to use Tor. Map data never falls back to a direct connection: if the proxy stops, Maps stops loading. Needs a recent Play services network engine (Cronet); Maps warns when it cannot take the proxy. |  |
@@ -69,7 +69,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/alltrails.png" width="20" height="20" align="top"> AllTrails&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/alltrails-black.png" width="20" height="20" align="top"> AllTrails&nbsp;&nbsp;•&nbsp;&nbsp;8 patches</summary>
+<summary><img src="docs/icons/alltrails.png" width="20" height="20" align="top"> AllTrails&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/alltrails-black.png" width="20" height="20" align="top"> AllTrails&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
 <br>
 
 **Supported version(s):** 26.3.20
@@ -83,6 +83,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change package name](#change-package-name) | Installs alongside stock AllTrails under its own package name. | • Package name |
 | [Experimental screen](#experimental-screen) | Adds an Experimental row to your profile's menu, under Edit profile and Share profile, that opens an Experimental screen. |  |
 | [Remember filters](#remember-filters) | Adds a Remember filter states switch to the Experimental screen. With it on, the trail filters you set (length, elevation, rating, difficulty, activities, features and the rest, but not Distance away) stay set when you go back to the home screen and after the app restarts, instead of resetting. |  |
+| [Remove telemetry](#remove-telemetry) | No analytics, attribution, crash reports, surveys or session replay. | • Keep push notifications |
 | [Theme](#theme) | Adds a Theme choice to the Experimental screen: Follow phone, Light, Dark or AMOLED black (dark with pure black backgrounds). AllTrails itself only follows the phone. |  |
 
 </details>
@@ -95,7 +96,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
-| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. | • Keep Gmail's icon and name<br>• Package name<br>• Check for new mail (minutes) |
+| [Add microG-RE support](#add-microg-re-support) | Builds microG Gmail, a separate app next to the built-in Gmail that signs in through microG-RE. Not for root installs. | • Keep Gmail's icon and name<br>• Package name<br>• Background sync (minutes) |
 | [Black theme](#black-theme) | Pure black dark mode. |  |
 | [Block remote images](#block-remote-images) | Loads images in mail only when you tap Show pictures, so tracking pixels don't fire when you open it. |  |
 | [Change app name](#change-app-name) | Renames Gmail on the home screen. | • App name |
@@ -127,7 +128,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;27 patches</summary>
+<summary><img src="docs/icons/waze.png" width="20" height="20" align="top"> Waze&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/waze.png" width="20" height="20" align="top"> De-Waze&nbsp;&nbsp;•&nbsp;&nbsp;28 patches</summary>
 <br>
 
 **Supported version(s):** 5.27.5.0, 5.27.0.1, 5.26.90.901, 5.26.5.0, 5.24.5.0
@@ -136,6 +137,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Speed cameras<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Enforcement zones on streets<br>• Enforcement zones on highways<br>• Enforcement zones on freeways<br>• Blocked lanes<br>• Least distance between two alerts<br>• Reduced speed ahead<br>• Average speed zones |
 | [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
+| [Any media app](#any-media-app) | Lets Waze's audio player use any music app that works with Android Auto. |  |
 | [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on. | • Position |
 | [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
 | [Bigger speedometer](#bigger-speedometer) | Bigger speedometer and speed limit digits. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |
@@ -156,7 +158,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Remove telemetry](#remove-telemetry) | No crash reports, usage stats or performance data. Traffic reporting stays. |  |
 | [Report speed limit](#report-speed-limit) | Lets you correct speed limits from the speedometer (unverified). |  |
 | [Share alerts with Maps](#share-alerts-with-maps) | Shows Waze alerts in Ungoogled Maps on this phone, which can start Waze for them. Waze must be signed in. |  |
-| [Speed camera alerts](#speed-camera-alerts) | Chime when a speed camera is ahead, from OpenStreetMap, in any country. No map pins or routing. Off until switched on. |  |
+| [Speed camera alerts](#speed-camera-alerts) | Chime when a speed camera is ahead, from OpenStreetMap, in any country. No map pins or routing. Off until switched on. | • Chime |
 | [Speed camera sound at any speed](#speed-camera-sound-at-any-speed) | Plays the camera sound even when you are not speeding. |  |
 | [Speed cameras everywhere](#speed-cameras-everywhere) | Camera and police alerts in every country. Camera warnings are illegal in some. |  |
 | [Speed limit sign](#speed-limit-sign) | One speed limit sign style in every country. | • Sign style |
@@ -176,7 +178,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;9 apps&nbsp;&nbsp;•&nbsp;&nbsp;9 patches</summary>
+<summary>📱 Launchers&nbsp;&nbsp;•&nbsp;&nbsp;10 apps&nbsp;&nbsp;•&nbsp;&nbsp;13 patches</summary>
 <br>
 <blockquote>
 
@@ -241,19 +243,20 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-ui-home.png" width="20" height="20" align="top"> One UI Home&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 18.0.07.59 — needs Android 15 or newer, 16.0.09.35 — needs Android 13 or newer, 15.1.03.75 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own One UI Home on Galaxy phones. | • Package name<br>• Home Up package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes One UI Home usable as a home screen on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/oneplus-launcher.png" width="20" height="20" align="top"> OnePlus Launcher (OxygenOS 11)&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 5.2.66 — needs Android 10 or newer
@@ -261,11 +264,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-OxygenOS ROM support](#enable-non-oxygenos-rom-support) | Makes the old OxygenOS 11 OnePlus Launcher usable as a home screen on non-OxygenOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OnePlus phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-launcher.png" width="20" height="20" align="top"> OnePlus System Launcher&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.4.30 — needs Android 13 or newer, 15.6.24 — needs Android 11 or newer
@@ -273,6 +277,17 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus System Launcher usable as a home screen on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics and log uploads to OPPO on OPPO, OnePlus and realme phones. |  |
+
+</details>
+
+<details>
+<summary><img src="docs/icons/pixel-launcher.png" width="20" height="20" align="top"> Pixel Launcher&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pixel-launcher.png" width="20" height="20" align="top"> Pixel Launcher&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+| Patch | Description | Options |
+|----------|----------------|-----------|
+| [Icon pack](#icon-pack) | Adds an icon pack choice to Home settings. Root (mount) install only. |  |
 
 </details>
 
@@ -292,30 +307,32 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;32 apps&nbsp;&nbsp;•&nbsp;&nbsp;74 patches</summary>
+<summary>📱 Samsung Apps&nbsp;&nbsp;•&nbsp;&nbsp;32 apps&nbsp;&nbsp;•&nbsp;&nbsp;105 patches</summary>
 <br>
 <blockquote>
 
 <details>
-<summary><img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calculator.png" width="20" height="20" align="top"> Samsung Calculator&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 12.4.00.13 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Calculator on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Calculator usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-calendar.png" width="20" height="20" align="top"> Samsung Calendar&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 12.8.01.0 — needs Android 15 or newer, 12.5.06.5 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Calendar on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Calendar installable and usable on non-One UI ROMs. |  |
 
 </details>
@@ -334,76 +351,83 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-clock.png" width="20" height="20" align="top"> Samsung Clock&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 12.4.02.38 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Clock on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Clock installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-contacts.png" width="20" height="20" align="top"> Samsung Contacts&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.3.00.87 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Contacts on Galaxy phones. | • Package name<br>• Samsung Phone package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Contacts installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-editor-lite.png" width="20" height="20" align="top"> Samsung Editor Lite&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 4.0.85.20 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Editor Lite on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Editor Lite usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-email.png" width="20" height="20" align="top"> Samsung Email&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 6.2.13.1
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Email on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Email usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-finder.png" width="20" height="20" align="top"> Samsung Finder&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 10.2.13.0 — needs Android 10 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Finder on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Finder installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
+<summary><img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-gallery.png" width="20" height="20" align="top"> Samsung Gallery&nbsp;&nbsp;•&nbsp;&nbsp;8 patches</summary>
 <br>
 
 **Supported version(s):** 15.9.01.7
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Gallery on Galaxy phones. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Gallery installable and usable on non-One UI ROMs. |  |
 | [Extract text](#extract-text) | Brings back Extract text with an on-device text recognizer. |  |
+| [Navigation bar tabs](#navigation-bar-tabs) | Adds Videos, Favorites and Recent to the navigation bar. | • Videos<br>• Favorites<br>• Recent |
 | [Remove Google services](#remove-google-services) | Turns off Google Maps and Play services location; maps and places are hidden. |  |
 | [Search by content](#search-by-content) | Finds photos by what's in them, such as dogs, food or credit cards, with an on-device model. |  |
 | [Stop remote updates](#stop-remote-updates) | Ignores policies pushed from Samsung's servers. |  |
@@ -411,13 +435,14 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-good-lock.png" width="20" height="20" align="top"> Good Lock&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 3.0.16.6
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Good Lock on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Good Lock on non-One UI ROMs, listing the modules that work there. |  |
 
 </details>
@@ -435,25 +460,27 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-health-monitor.png" width="20" height="20" align="top"> Samsung Health Monitor&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 1.5.3.011
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Health Monitor on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Health Monitor usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-home-up.png" width="20" height="20" align="top"> Home Up&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 18.0.00.24 — needs Android 16 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Home Up, for the renamed One UI Home. | • Package name<br>• One UI Home package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Home Up on non-One UI ROMs together with the patched One UI Home. |  |
 
 </details>
@@ -476,7 +503,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;10 patches</summary>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;•&nbsp;&nbsp;11 patches</summary>
 <br>
 
 **Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
@@ -489,6 +516,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Change package name](#change-package-name) | Installs next to the system Samsung Keyboard under its own package name. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports and typed-text collection. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Keyboard usable on non-One UI ROMs. |  |
+| [Hide predictive text download prompt](#hide-predictive-text-download-prompt) | Stops asking to download predictive text on phones other than Galaxy. |  |
 | [No GIF tracking](#no-gif-tracking) | Stops GIPHY and Tenor view and share pings. |  |
 | [Remove internet permission](#remove-internet-permission) | Keeps the keyboard offline. GIFs, stickers, translation, AI tools and language downloads stop working. |  |
 | [Show GIFs in every region](#show-gifs-in-every-region) | Shows the GIF board where the phone's region turns it off. |  |
@@ -497,7 +525,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/sboard.png" width="20" height="20" align="top"> SBoard&nbsp;&nbsp;•&nbsp;&nbsp;16 patches</summary>
+<summary><img src="docs/icons/samsung-keyboard.png" width="20" height="20" align="top"> Samsung Keyboard&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/sboard.png" width="20" height="20" align="top"> SBoard&nbsp;&nbsp;•&nbsp;&nbsp;18 patches</summary>
 <br>
 
 **Supported version(s):** 5.9.40.75, 5.9.40.48, 5.9.40.12, 5.9.40.11, 5.9.40.6, 5.9.30.97, 5.9.30.95, 5.9.30.90
@@ -508,6 +536,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [Build SBoard](#build-sboard) | Builds SBoard, its own keyboard app with its own name and icon. | • Package name<br>• App name |
 | [Faster backspace](#faster-backspace) | Backspace deletes twice as fast at every speed. |  |
 | [Faster suggestion animations](#faster-suggestion-animations) | Halves the suggestion bar's animation time. |  |
+| [Frosted glass](#frosted-glass) | Makes the keyboard background see-through and blurred. |  |
 | [Hide Bitmoji and mojitok](#hide-bitmoji-and-mojitok) | Removes the Bitmoji and mojitok sticker services. |  |
 | [Hide Galaxy AI](#hide-galaxy-ai) | Removes Galaxy AI from the toolbar, stickers and settings. |  |
 | [Hide Samsung Pass](#hide-samsung-pass) | Removes the Samsung Pass button from the toolbar. |  |
@@ -520,6 +549,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | [No contacts access](#no-contacts-access) | Removes the contacts permission (names in suggestions). |  |
 | [One-handed keyboard on every phone](#one-handed-keyboard-on-every-phone) | Offers the one-handed keyboard mode on every phone. |  |
 | [Pure black theme](#pure-black-theme) | Makes the Dark and Solid dark themes pure black. |  |
+| [Voice input without navigation bar button](#voice-input-without-navigation-bar-button) | Starts voice input without asking for the keyboard button on the navigation bar. |  |
 
 </details>
 
@@ -536,49 +566,54 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-modes-and-routines.png" width="20" height="20" align="top"> Samsung Modes and Routines&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 5.1.03.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Modes and Routines on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Modes and Routines installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-music.png" width="20" height="20" align="top"> Samsung Music&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **Supported version(s):** 16.2.45.1
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Music on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Music installable and usable on non-One UI ROMs. |  |
+| [Follow system font size](#follow-system-font-size) | Scales Samsung Music's text with the phone's font size. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-my-files.png" width="20" height="20" align="top"> Samsung My Files&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 15.2.03.2 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own My Files on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung My Files installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;5 patches</summary>
+<summary><img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-notes.png" width="20" height="20" align="top"> Samsung Notes&nbsp;&nbsp;•&nbsp;&nbsp;6 patches</summary>
 <br>
 
 **Supported version(s):** 4.4.48.15
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Notes on Galaxy phones. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics, crash reports, usage surveys and marketing data. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Notes installable and usable on non-One UI ROMs. |  |
 | [Import and export notes](#import-and-export-notes) | Adds Import notes and Export notes (.sdocx files) to Settings. |  |
@@ -588,86 +623,93 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-one-hand-operation.png" width="20" height="20" align="top"> One Hand Operation +&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 9.3.13.0 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own One Hand Operation + on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs One Hand Operation + on non-One UI ROMs through an accessibility service. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-phone.png" width="20" height="20" align="top"> Samsung Phone&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.3.52.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Phone on Galaxy phones. | • Package name<br>• Samsung Contacts package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Samsung Phone on non-One UI ROMs; your default phone app still handles calls. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-photo-editor.png" width="20" height="20" align="top"> Samsung Photo Editor&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 3.9.04.6 — needs Android 15 or newer, 3.4.14.63 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Photo Editor on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Photo Editor installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-reminder.png" width="20" height="20" align="top"> Samsung Reminder&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 12.8.00.62 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Reminder on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Reminder installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-screen-recorder.png" width="20" height="20" align="top"> Samsung Screen Recorder&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 4.0.23
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Screen Recorder on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Screen Recorder installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-sound-assistant.png" width="20" height="20" align="top"> Sound Assistant&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **Supported version(s):** 8.1.00.6 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Sound Assistant on Galaxy phones. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Sound Assistant on non-One UI ROMs, where only Individual app volumes work. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<summary><img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-library.png" width="20" height="20" align="top"> Samsung Video Library&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
 
 **Supported version(s):** 1.4.22.81 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Video Library on Galaxy phones. | • Package name |
 | [Disable telemetry](#disable-telemetry) | Turns off Samsung Analytics and crash reports. |  |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Video Library installable on Android 15+ and usable on non-One UI ROMs. |  |
 | [Hide end of support notice](#hide-end-of-support-notice) | Removes the notice that Samsung discontinued the app. |  |
@@ -675,49 +717,53 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-video-player.png" width="20" height="20" align="top"> Samsung Video Player&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 7.3.47.1 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Video Player on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Video Player installable and usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-voice-recorder.png" width="20" height="20" align="top"> Samsung Voice Recorder&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 21.5.91.33 — needs Android 13 or newer
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Voice Recorder on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Voice Recorder usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-weather.png" width="20" height="20" align="top"> Samsung Weather&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 1.7.30.50
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Weather on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Makes Samsung Weather usable on non-One UI ROMs. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/samsung-wonderland.png" width="20" height="20" align="top"> Wonderland&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 1.6.22
 
 | Patch | Description | Options |
 |----------|----------------|-----------|
+| [Change package name](#change-package-name) | Installs next to Samsung's own Wonderland on Galaxy phones. | • Package name |
 | [Enable non-One UI ROM support](#enable-non-one-ui-rom-support) | Runs Wonderland on non-One UI ROMs. |  |
 
 </details>
@@ -1080,12 +1126,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;12 apps&nbsp;&nbsp;•&nbsp;&nbsp;15 patches</summary>
+<summary>📱 ColorOS Apps&nbsp;&nbsp;•&nbsp;&nbsp;12 apps&nbsp;&nbsp;•&nbsp;&nbsp;26 patches</summary>
 <br>
 <blockquote>
 
 <details>
-<summary><img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-calculator.png" width="20" height="20" align="top"> OnePlus Calculator&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 17.0.0
@@ -1093,6 +1139,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Calculator installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
@@ -1109,7 +1156,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-clock.png" width="20" height="20" align="top"> OnePlus Clock&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.19.8
@@ -1117,11 +1164,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Clock installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-compass.png" width="20" height="20" align="top"> OnePlus Compass&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 17.0.0
@@ -1129,11 +1177,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Compass installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-contacts.png" width="20" height="20" align="top"> OnePlus Contacts&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **Supported version(s):** 16.80.15 — needs Android 15 or newer
@@ -1142,11 +1191,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Change package name](#change-package-name) | Installs next to the phone's own Contacts app under its own package name. | • Package name |
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Runs OnePlus Contacts on non-ColorOS ROMs; your default phone app still handles calls. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-documents.png" width="20" height="20" align="top"> OnePlus Documents&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 17.1.26 — needs Android 15 or newer
@@ -1154,11 +1204,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Documents installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-myfiles.png" width="20" height="20" align="top"> OnePlus My Files&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.12.4
@@ -1166,11 +1217,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus My Files installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-notes.png" width="20" height="20" align="top"> OnePlus Notes&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.6.14
@@ -1178,11 +1230,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Notes installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-gallery.png" width="20" height="20" align="top"> OnePlus Photos&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.45.2 — needs Android 13 or newer, 15.33.40 — needs Android 11 or newer
@@ -1190,11 +1243,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Photos installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-recorder.png" width="20" height="20" align="top"> OnePlus Recorder&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.17.6
@@ -1202,11 +1256,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Recorder installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-screenrecorder.png" width="20" height="20" align="top"> OnePlus Screen Recording&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 16.5.12
@@ -1214,11 +1269,12 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Screen Recording installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
 <details>
-<summary><img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/coloros-weather.png" width="20" height="20" align="top"> OnePlus Weather&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
 <br>
 
 **Supported version(s):** 17.6.30
@@ -1226,6 +1282,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 | Patch | Description | Options |
 |----------|----------------|-----------|
 | [Enable non-ColorOS ROM support](#enable-non-coloros-rom-support) | Makes OnePlus Weather installable and usable on non-ColorOS ROMs. |  |
+| [Remove telemetry](#remove-telemetry) | Stops usage statistics to OPPO's statistics service on OPPO, OnePlus and realme phones. |  |
 
 </details>
 
