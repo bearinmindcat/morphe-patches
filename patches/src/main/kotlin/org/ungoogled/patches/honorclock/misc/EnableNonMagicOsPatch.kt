@@ -1,11 +1,13 @@
 package org.ungoogled.patches.honorclock.misc
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.BytecodePatchContext
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import app.morphe.patcher.util.smali.ExternalLabel
 import org.ungoogled.patches.honor.followMagicDayNight
 import org.ungoogled.patches.honor.redirectMagicFrameworkLookups
 import org.ungoogled.patches.honor.replaceMagicIconDrawables
@@ -19,6 +21,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import com.android.tools.smali.dexlib2.iface.reference.TypeReference
@@ -199,6 +202,82 @@ private fun BytecodePatchContext.preferenceListsAsAndroid(): Int {
     return changed
 }
 
+/** DownloadChineseRecessHelper's two downloads: the switch's (b) and the weekly update's (c). */
+private val HOLIDAY_DOWNLOAD_STRINGS = listOf(
+    "download chinese recess start",
+    "[downloadHolidayInfo] download chinese recess failed, result is empty",
+)
+
+/**
+ * The alarm editor's "Working days (skip holidays)" switch downloaded China's statutory holidays from Honor's server
+ * (configserver-drcn.platform.hihonorcloud.com, phone model in a header) on every ROM, as soon as it was turned on and
+ * without a word about Honor; Clock only uses that data on a Chinese ROM (see Holidays). Both downloads now first ask
+ * Holidays.allowed (a Chinese ROM and the user's yes), and the switch's call goes through Holidays.download, which asks.
+ * Returns the downloads gated and the switch calls moved.
+ */
+private fun BytecodePatchContext.holidayDownloadsAskFirst(): Pair<Int, Int> {
+    fun strings(m: com.android.tools.smali.dexlib2.iface.Method) =
+        m.implementation?.instructions?.mapNotNull { ((it as? ReferenceInstruction)?.reference as? StringReference)?.string }.orEmpty()
+    val downloads = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+    val switches = mutableListOf<Pair<String, com.android.tools.smali.dexlib2.iface.Method>>()
+    classDefForEach { c ->
+        for (m in c.methods) {
+            if (strings(m).any { it in HOLIDAY_DOWNLOAD_STRINGS }) downloads += c.type to m
+            if (c.type.endsWith("/alarmclock/SetAlarm;") && m.implementation?.instructions?.any {
+                    ((it as? ReferenceInstruction)?.reference as? MethodReference)?.name == "downloadHolidayDataDirection"
+                } == true
+            ) switches += c.type to m
+        }
+    }
+    fun mutable(type: String, m: com.android.tools.smali.dexlib2.iface.Method) = mutableClassDefBy(type).methods.first {
+        it.name == m.name && it.parameterTypes == m.parameterTypes && it.returnType == m.returnType
+    }
+    for ((type, method) in downloads) {
+        if (method.returnType != "Z" || method.parameterTypes.isNotEmpty() || method.accessFlags and 0x8 != 0) {
+            throw PatchException("holiday download $type.${method.name} is not an instance method returning boolean")
+        }
+        val context = method.implementation!!.instructions.firstNotNullOfOrNull { insn ->
+            ((insn as? ReferenceInstruction)?.reference as? FieldReference)
+                ?.takeIf { insn.opcode == Opcode.IGET_OBJECT && it.definingClass == type && it.type == "Landroid/content/Context;" }
+        } ?: throw PatchException("holiday download $type.${method.name} reads no Context field")
+        mutable(type, method).apply {
+            if (implementation!!.registerCount < 2) throw PatchException("holiday download has no local register")
+            addInstructionsWithLabels(
+                0,
+                """
+                    iget-object v0, p0, $type->${context.name}:Landroid/content/Context;
+                    invoke-static { v0 }, $EXT/Holidays;->allowed(Landroid/content/Context;)Z
+                    move-result v0
+                    if-nez v0, :allowed
+                    const/4 v0, 0x0
+                    return v0
+                """,
+                ExternalLabel("allowed", implementation!!.instructions.first()),
+            )
+        }
+    }
+    var moved = 0
+    for ((type, method) in switches) {
+        val target = mutable(type, method)
+        val instructions = target.implementation!!.instructions
+        for (index in instructions.indices) {
+            val insn = instructions[index]
+            val ref = (insn as? ReferenceInstruction)?.reference as? MethodReference ?: continue
+            if (ref.name != "downloadHolidayDataDirection") continue
+            if (insn.opcode != Opcode.INVOKE_STATIC || ref.parameterTypes.joinToString("") != "Landroid/content/Context;Z" || ref.returnType != "V") {
+                throw PatchException("unexpected holiday download call in $type.${method.name}: $ref")
+            }
+            val call = insn as FiveRegisterInstruction
+            target.replaceInstruction(
+                index,
+                "invoke-static { v${call.registerC}, v${call.registerD} }, $EXT/Holidays;->download(Landroid/content/Context;Z)V",
+            )
+            moved++
+        }
+    }
+    return downloads.size to moved
+}
+
 /**
  * The timer's default sound is MagicOS's Timer_Beep.ogg, looked up in the phone's sounds; where there is none the
  * timer (and its page's sound setting) fell back to "silent" and finished without a sound. It falls back to the
@@ -292,7 +371,8 @@ private fun BytecodePatchContext.androidRingtonePicker(): Int {
  * classes it uses (generated by .github/scripts/honor-standins; TextArrowPreference hand-written), including the
  * framework widgets its layouts inflate; on an Honor phone the framework's own classes load first, so they never run
  * there. What only Honor's system copy may do (write secure settings, pick ringtones and cities in MagicOS's own
- * apps) gets a plain Android answer; alarms ring through the full-screen notification Clock already posts.
+ * apps) gets a plain Android answer; alarms ring through the full-screen notification Clock already posts. Holiday data
+ * comes from Honor's server only on a Chinese ROM, where it is used, and only after the user allowed it.
  */
 @Suppress("unused")
 val enableNonMagicOsPatch = bytecodePatch(
@@ -346,5 +426,10 @@ val enableNonMagicOsPatch = bytecodePatch(
         log.info("Preference lists: $lists instructions")
         // Measured: the alarm editor's fragment (check-cast + 3 calls) and the Muslim alarm's (instance-of, check-cast, 2 calls).
         if (lists < 8) throw PatchException("only $lists preference list instructions found")
+
+        val (downloads, switches) = holidayDownloadsAskFirst()
+        log.info("Holiday downloads gated: $downloads, switch calls: $switches")
+        // Measured against 12.0.1.196: DownloadChineseRecessHelper.b() and .c(); SetAlarm.d0().
+        if (downloads != 2 || switches != 1) throw PatchException("holiday downloads: $downloads gated, $switches switch calls")
     }
 }
