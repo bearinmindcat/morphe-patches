@@ -31,34 +31,38 @@ public final class CronetProxy {
 
     private static final Executor CALLBACKS = Executors.newSingleThreadExecutor();
 
-    static final String UNSUPPORTED = "Maps can't use a proxy on this phone — traffic goes direct";
+    static final String UNSUPPORTED = "Maps can't apply the required proxy — network engine blocked";
 
     /** False once an engine could not take the proxy (a Cronet without ProxyOptions). */
     static volatile boolean supported = true;
 
     public static void onBuild(Object builder) {
         String hp = Shapes.proxyEffective();
+        if (hp.isEmpty()) {
+            if (Shapes.proxyRequired()) throw new IllegalStateException("Proxy is enabled but its configuration is invalid");
+            return;
+        }
         int colon = hp.lastIndexOf(':');
-        if (colon <= 0) return;
+        if (colon <= 0) throw new IllegalStateException("Invalid proxy endpoint");
         String host = hp.substring(0, colon).trim();
         int port;
         try {
             port = Integer.parseInt(hp.substring(colon + 1).trim());
         } catch (NumberFormatException e) {
-            return;
+            throw new IllegalStateException("Invalid proxy port", e);
         }
-        CronetEngine.Builder b = (CronetEngine.Builder) builder;
+        if (host.isEmpty() || port < 1 || port > 65535) throw new IllegalStateException("Invalid proxy endpoint");
         try {
+            CronetEngine.Builder b = (CronetEngine.Builder) builder;
             b.enableQuic(false);
-        } catch (Throwable ignored) {}
-        try {
             Proxy proxy = Proxy.createHttpProxy(Proxy.SCHEME_HTTP, host, port, CALLBACKS, new Connect());
             b.setProxyOptions(ProxyOptions.fromProxyList(Collections.singletonList(proxy),
                     ProxyOptions.ALL_PROXIES_FAILED_BEHAVIOR_DISALLOW_DIRECT));
-        } catch (Throwable t) {
-            // An older Cronet: it has no way to take a proxy, so this engine's traffic goes direct.
+        } catch (RuntimeException | LinkageError t) {
+            // Do not let the injected buildExperimental hook continue with an unproxied engine.
             supported = false;
             Shapes.warnProxy(UNSUPPORTED);
+            throw new IllegalStateException(UNSUPPORTED, t);
         }
     }
 
