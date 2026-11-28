@@ -14,7 +14,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 ## Patches
 
 <!-- PATCHES_START -->
-> **[v2.10.2](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;265 patches total
+> **[v2.10.3](https://github.com/bearinmindcat/morphe-patches/releases/tag/v2.10.3)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;265 patches total
 <details>
 <summary><img src="docs/icons/pin-google.png" width="20" height="20" align="top"> Google Maps&nbsp;&nbsp;-&gt;&nbsp;&nbsp;<img src="docs/icons/pin-ungoogled.png" width="20" height="20" align="top"> Ungoogled Maps&nbsp;&nbsp;•&nbsp;&nbsp;34 patches</summary>
 <br>
@@ -137,7 +137,7 @@ Select the app you want to patch inside Morphe Manager, follow all instructions 
 |----------|----------------|-----------|
 | [Alert distances](#alert-distances) | How early each alert is announced. | • Police<br>• Speed cameras<br>• Hazards<br>• Crashes<br>• Traffic jams<br>• Enforcement zones on streets<br>• Enforcement zones on highways<br>• Enforcement zones on freeways<br>• Blocked lanes<br>• Least distance between two alerts<br>• Reduced speed ahead<br>• Average speed zones |
 | [All moods](#all-moods) | Unlocks every mood, beta ones too. |  |
-| [Any media app](#any-media-app) | Lets Waze's audio player use any music app that works with Android Auto. |  |
+| [Any media app](#any-media-app) | Lets Waze's audio player use any music app that works with Android Auto, and Spotify. |  |
 | [Average speed zone bar](#average-speed-zone-bar) | Bar with progress and your average speed in an average speed zone, Android Auto too. Off until switched on. | • Position |
 | [Bigger alert pins](#bigger-alert-pins) | Bigger alert pins on the map. | • Pin size (%) |
 | [Bigger speedometer](#bigger-speedometer) | Bigger speedometer and speed limit digits. | • Speed digits (dp)<br>• Unit label (dp)<br>• Speed limit sign digits (sp)<br>• Speed limit sign digits, 100 and over (sp) |

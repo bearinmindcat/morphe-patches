@@ -1,3 +1,12 @@
+## [2.10.3](https://github.com/bearinmindcat/morphe-patches/compare/v2.10.2...v2.10.3) (2026-11-28)
+
+### 🐛 Bug Fixes
+
+* samsung contacts groups work on non-galaxy phones ([f0f0f87](https://github.com/bearinmindcat/morphe-patches/commit/f0f0f877a21a50dccaa6374ecf205705eb9a0b56))
+* samsung contacts keeps phone-storage contacts when an account is added or removed ([89ff196](https://github.com/bearinmindcat/morphe-patches/commit/89ff19660765fe330dd1e973e1b94edf784dbfb9))
+* samsung contacts no longer crashes in the background when contacts change ([afd5245](https://github.com/bearinmindcat/morphe-patches/commit/afd5245d653909f59060421669f1da312abb8945))
+* waze's audio player controls spotify through its media session; issue [#213](https://github.com/bearinmindcat/morphe-patches/issues/213) ([82dcab0](https://github.com/bearinmindcat/morphe-patches/commit/82dcab018f6ebb3dd618bd68e2d8230e1adf8eab))
+
 ## [2.10.2](https://github.com/bearinmindcat/morphe-patches/compare/v2.10.1...v2.10.2) (2026-11-27)
 
 ### 🐛 Bug Fixes
